@@ -1,0 +1,15 @@
+﻿node_modules/
+dist/
+artifacts/
+.env
+.env.local
+*.log
+vite-err
+vite-job-id
+vite-out
+.agents/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.tsbuildinfo

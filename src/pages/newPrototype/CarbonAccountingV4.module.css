@@ -358,31 +358,65 @@
 
 .rankTable th { font-size: 12px; }
 
-.previewFooter {
+.snapshotCard { overflow: hidden; }
+
+.snapshotHeader {
   display: flex;
-  min-height: 62px;
+  min-height: 70px;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  gap: 20px;
+  padding: 13px 16px;
+  background: linear-gradient(90deg, #f4fbf8, #fff);
+  border-bottom: 1px solid var(--line);
 }
 
-.previewFooter > div {
+.snapshotHeader h3 { margin: 0; font-size: 15px; }
+.snapshotHeader p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.snapshotHeader > span { color: #3977e8; font-size: 12px; font-weight: 600; white-space: nowrap; }
+
+.snapshotTable {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.snapshotTable th,
+.snapshotTable td {
+  text-align: left !important;
+  vertical-align: middle;
+}
+
+.snapshotTable th {
+  height: 36px;
+  padding: 0 14px;
+  color: #46545a;
+  background: #fbfcfc;
+  border-bottom: 1px solid #e8efed;
+  font-size: 12px;
+}
+
+.snapshotTable td {
+  height: 40px;
+  padding: 0 14px;
+  color: #445158;
+  border-bottom: 1px solid #eef2f1;
+  font-size: 12px;
+}
+
+.snapshotTable tr:last-child td { border-bottom: 0; }
+.snapshotComplete,
+.snapshotPending { display: inline-flex; padding: 3px 9px; border-radius: 10px; font-size: 11px; }
+.snapshotComplete { color: #168456; background: #e8f8f0; }
+.snapshotPending { color: #d57b00; background: #fff3df; }
+
+.snapshotActions {
   display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
-.previewFooter > div > i {
-  width: 8px;
-  height: 8px;
-  background: var(--brand);
-  border-radius: 50%;
-}
-
-.previewFooter small {
-  display: block;
-  margin-top: 3px;
-  color: var(--muted);
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 11px 16px;
+  background: #fff;
+  border-top: 1px solid var(--line);
 }
 
 .taskLeft {
@@ -544,6 +578,26 @@
 
 .groupTable tr:last-child td { border-bottom: 0; }
 
+.invalidRow td { background: #fff8f0; }
+.invalidRow td:first-child { box-shadow: inset 3px 0 #e9a23a; }
+
+/* 清单表头与表体使用同一列起始线，避免表头左对齐而内容居中造成视觉错位。 */
+.sourceTypeCell,
+.sourceCell,
+.activityCell,
+.factorCell,
+.emissionCell {
+  text-align: left;
+}
+
+.sourceCell b,
+.activityCell b,
+.factorCell b,
+.emissionCell b {
+  display: block;
+  line-height: 1.35;
+}
+
 .groupTable td small,
 .factorTable td small,
 .parameterTable td small {
@@ -554,11 +608,12 @@
 }
 
 .rowActions {
+  text-align: left;
   white-space: nowrap;
 }
 
 .rowActions button {
-  margin-right: 12px;
+  margin: 0 12px 0 0;
   padding: 0;
   color: var(--brand);
   background: none;
@@ -568,6 +623,26 @@
 
 .rowActions button.deleteLink { color: #e94b54; }
 .emptyRow { padding: 24px !important; color: var(--muted); text-align: center; }
+
+.confirmTable,
+.changeTable {
+  width: 100%;
+  margin-bottom: 14px;
+  border-collapse: collapse;
+}
+
+.confirmTable th,
+.confirmTable td,
+.changeTable th,
+.changeTable td {
+  padding: 9px 10px;
+  text-align: left;
+  border: 1px solid #e7eeeb;
+  font-size: 12px;
+}
+
+.confirmTable th { width: 36%; color: #66747b; background: #f8fbfa; font-weight: 500; }
+.changeTable th { color: #5a6870; background: #f7faf9; }
 
 .supportMeta {
   margin-top: 11px;
@@ -639,10 +714,36 @@
   font-size: 12px;
 }
 
+.supportTable {
+  table-layout: fixed;
+}
+
+.supportTable th,
+.supportTable td {
+  text-align: left !important;
+  vertical-align: middle;
+}
+
 .supportGroup td {
-  padding: 8px 10px;
+  padding: 0 16px;
+  text-align: left;
   background: #f8faf9;
   font-weight: 700;
+}
+
+.supportGroupTitle {
+  display: flex;
+  height: 44px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  color: #3d4d54;
+}
+
+.supportGroupTitle > span {
+  width: 14px;
+  color: #4e6960;
+  font-size: 12px;
 }
 
 .blueText { color: #377ce0; }
