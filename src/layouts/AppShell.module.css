@@ -1,0 +1,4 @@
+.app { width: 1440px; min-height: 100vh; background: var(--color-bg); }
+.main { width: calc(1440px - var(--sidebar-width)); min-width: 0; margin-left: var(--sidebar-width); }
+.content { padding: 12px 24px 28px; }
+.pageSurface { min-height: 520px; }

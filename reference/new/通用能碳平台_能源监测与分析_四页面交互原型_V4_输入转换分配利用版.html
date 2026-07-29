@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>通用能碳平台｜能源监测与分析 V4</title>
+  <style>
+    :root{
+      --brand:#00A870;
+      --brand-dark:#00875A;
+      --brand-soft:#EAF8F3;
+      --blue:#1677FF;
+      --blue-soft:#EEF5FF;
+      --orange:#F79009;
+      --orange-soft:#FFF6E8;
+      --red:#F04438;
+      --red-soft:#FFF0EF;
+      --purple:#7A5AF8;
+      --purple-soft:#F2EEFF;
+      --nav:#0F2740;
+      --nav-2:#102F4E;
+      --bg:#F4F7F8;
+      --card:#FFFFFF;
+      --text:#172033;
+      --text-2:#5F6B7A;
+      --muted:#8A94A3;
+      --border:#E2E8EF;
+      --table-head:#F5F8FA;
+      --shadow:0 2px 10px rgba(20,45,70,.06);
+      --radius:10px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;font-family:"Microsoft YaHei","PingFang SC",Arial,sans-serif;color:var(--text);background:var(--bg)}
+    button,input,select{font:inherit}
+    button{cursor:pointer}
+    .app{display:flex;min-height:100vh}
+    .sidebar{width:228px;background:linear-gradient(180deg,var(--nav),#0B2238);color:#fff;position:fixed;inset:0 auto 0 0;z-index:20;display:flex;flex-direction:column}
+    .brand{height:66px;display:flex;align-items:center;gap:11px;padding:0 18px;border-bottom:1px solid rgba(255,255,255,.08);font-size:17px;font-weight:700;letter-spacing:.2px}
+    .brand-logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,#00C389,#2E7CF6);font-size:18px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
+    .side-scroll{padding:14px 10px 16px;overflow:auto}
+    .side-item,.side-group-title,.sub-item{width:100%;border:0;color:#C8D3DF;background:transparent;border-radius:7px;text-align:left;display:flex;align-items:center;gap:10px;transition:.16s}
+    .side-item,.side-group-title{height:42px;padding:0 12px;font-size:14px}
+    .side-item:hover,.side-group-title:hover,.sub-item:hover{background:rgba(255,255,255,.07);color:#fff}
+    .side-group{margin-top:6px}
+    .side-group-title{justify-content:space-between;color:#E2E8F0}
+    .side-group-title .left{display:flex;align-items:center;gap:10px}
+    .chevron{transition:.2s;font-size:12px}
+    .side-group.open .chevron{transform:rotate(180deg)}
+    .sub-menu{display:none;padding:2px 0 4px 17px}
+    .side-group.open .sub-menu{display:block}
+    .sub-item{height:38px;padding:0 12px 0 20px;font-size:14px;position:relative}
+    .sub-item::before{content:"";position:absolute;left:8px;width:4px;height:4px;border-radius:50%;background:#8EA0B5}
+    .sub-item.active{background:linear-gradient(90deg,rgba(0,168,112,.95),rgba(0,168,112,.72));color:#fff;font-weight:600}
+    .sub-item.active::before{background:#fff}
+    .sidebar-foot{margin-top:auto;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#AFC0D2;font-size:13px;display:flex;align-items:center;gap:9px}
+    .main{margin-left:228px;width:calc(100% - 228px);min-width:0}
+    .topbar{height:58px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 22px;position:sticky;top:0;z-index:10}
+    .top-left{display:flex;align-items:center;gap:14px;color:var(--text-2);font-size:14px}
+    .collapse-btn{border:0;background:transparent;font-size:22px;color:var(--text-2);padding:4px 6px;border-radius:6px}
+    .collapse-btn:hover{background:#F2F5F7}
+    .top-actions{display:flex;align-items:center;gap:16px;color:var(--text-2);font-size:14px}
+    .avatar{width:29px;height:29px;border-radius:50%;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-weight:700}
+    .content{padding:20px 22px 34px}
+    .page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:16px}
+    .page-title{margin:0;font-size:24px;font-weight:700;letter-spacing:.3px}
+    .page-desc{margin-top:6px;color:var(--text-2);font-size:14px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+    .filter-card{padding:16px 18px;margin-bottom:14px;display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+    .field{min-width:170px}
+    .field.wide{min-width:220px}
+    .field label{display:block;margin-bottom:6px;color:var(--text-2);font-size:13px}
+    select,input{width:100%;height:38px;border:1px solid #D7DEE7;border-radius:7px;background:#fff;color:var(--text);padding:0 11px;outline:none}
+    select:focus,input:focus{border-color:var(--brand);box-shadow:0 0 0 2px rgba(0,168,112,.10)}
+    .seg{display:flex;height:38px;border:1px solid #D7DEE7;border-radius:7px;overflow:hidden;background:#fff}
+    .seg button{border:0;background:#fff;color:var(--text-2);padding:0 16px;border-right:1px solid #D7DEE7}
+    .seg button:last-child{border-right:0}
+    .seg button.active{background:var(--brand);color:#fff}
+    .filter-spacer{flex:1}
+    .btn{height:38px;border:1px solid var(--border);border-radius:7px;background:#fff;color:var(--text-2);padding:0 16px;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
+    .btn:hover{border-color:var(--brand);color:var(--brand)}
+    .btn-primary{background:var(--brand);border-color:var(--brand);color:#fff}
+    .btn-primary:hover{background:var(--brand-dark);border-color:var(--brand-dark);color:#fff}
+    .btn-outline-brand{border-color:#8AD8BB;color:var(--brand-dark);background:#fff}
+    .more-link{height:38px;border:0;background:transparent;color:var(--blue);padding:0 6px}
+    .more-filter{display:none;flex-basis:100%;padding-top:12px;border-top:1px dashed var(--border);gap:16px;flex-wrap:wrap}
+    .more-filter.open{display:flex}
+    .section-title{font-size:16px;font-weight:700;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+    .section-title::before{content:"";width:4px;height:18px;border-radius:2px;background:var(--brand)}
+    .summary-strip{display:grid;grid-template-columns:1.25fr .8fr .8fr 1.4fr .8fr;align-items:center;min-height:76px;padding:0 22px;margin-bottom:14px;background:linear-gradient(90deg,#F1FBF7,#FFFFFF)}
+    .summary-item{padding:0 20px;border-right:1px solid #DDE9E4}
+    .summary-item:first-child{padding-left:0}
+    .summary-item:last-child{border-right:0}
+    .summary-label{font-size:13px;color:var(--text-2)}
+    .summary-value{margin-top:5px;font-size:21px;font-weight:700;color:var(--brand-dark)}
+    .summary-value.big{font-size:27px}
+    .summary-value.red{color:var(--red)}
+    .summary-value.green{color:var(--brand-dark)}
+    .summary-value.orange{color:var(--orange)}
+    .unit{font-size:13px;color:var(--text-2);font-weight:500;margin-left:5px}
+    .up{color:var(--red)}
+    .down{color:var(--brand)}
+    .grid-2{display:grid;grid-template-columns:1.3fr .9fr;gap:14px;margin-bottom:14px}
+    .chart-card{padding:16px 18px;min-height:300px}
+    .chart-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .chart-title{font-size:16px;font-weight:700}
+    .chart-sub{font-size:12px;color:var(--muted);margin-top:3px}
+    .bar-chart{height:230px;display:flex;align-items:flex-end;gap:24px;padding:22px 24px 30px;border-left:1px solid #DDE3EA;border-bottom:1px solid #DDE3EA;position:relative}
+    .bar-chart::before,.bar-chart::after{content:"";position:absolute;left:0;right:0;border-top:1px dashed #E4E9EF}
+    .bar-chart::before{top:35%}.bar-chart::after{top:65%}
+    .bar-item{flex:1;min-width:28px;text-align:center;position:relative;z-index:1}
+    .bar{width:36px;max-width:90%;margin:0 auto;border-radius:5px 5px 0 0;background:linear-gradient(180deg,#3EC181,#1BA66C);transition:.25s;position:relative}
+    .bar:hover{filter:brightness(.95);transform:translateY(-2px)}
+    .bar-value{position:absolute;left:50%;transform:translateX(-50%);top:-23px;font-size:12px;color:var(--text);white-space:nowrap}
+    .bar-label{margin-top:8px;color:var(--text-2);font-size:12px}
+    .donut-wrap{display:flex;align-items:center;justify-content:center;gap:36px;height:240px}
+    .donut{width:180px;height:180px;border-radius:50%;background:conic-gradient(var(--brand) 0 46%,var(--blue) 46% 78%,var(--orange) 78% 93%,var(--purple) 93%);position:relative;display:grid;place-items:center}
+    .donut::after{content:"";position:absolute;width:94px;height:94px;border-radius:50%;background:#fff}
+    .donut-center{position:relative;z-index:1;text-align:center;font-weight:700;font-size:20px}
+    .donut-center small{display:block;color:var(--text-2);font-size:12px;font-weight:500;margin-top:3px}
+    .legend{min-width:210px}
+    .legend-row{display:grid;grid-template-columns:12px 1fr 64px 80px;align-items:center;gap:8px;padding:8px 0;font-size:13px}
+    .dot{width:10px;height:10px;border-radius:50%}
+    .table-card{padding:14px 16px;margin-bottom:14px}
+    .table-wrap{overflow:auto}
+    table{width:100%;border-collapse:collapse;min-width:860px}
+    th,td{height:46px;padding:0 12px;border-bottom:1px solid #E8EDF2;text-align:left;font-size:13px;white-space:nowrap}
+    th{background:var(--table-head);color:#4B5665;font-weight:600}
+    tbody tr:hover td{background:#FBFDFC}
+    tfoot td{background:#F1F8F5;font-weight:700}
+    .status{display:inline-flex;align-items:center;justify-content:center;height:25px;padding:0 10px;border-radius:13px;font-size:12px}
+    .status.ok{background:#E7F7EF;color:var(--brand-dark)}
+    .status.warn{background:#FFF1D8;color:#B54708}
+    .status.check{background:#EAF2FF;color:#1769C2}
+    .status.bad{background:#FFE6E4;color:#D92D20}
+    .link{border:0;background:transparent;color:var(--blue);padding:2px 4px}
+    .pagination{height:48px;display:flex;align-items:center;justify-content:flex-end;gap:9px;color:var(--muted);font-size:13px}
+    .page-btn{width:30px;height:30px;border:1px solid var(--border);background:#fff;border-radius:6px;color:var(--text-2)}
+    .page-btn.active{border-color:var(--brand);color:var(--brand);background:var(--brand-soft)}
+    .metric-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px}
+    .metric-card{padding:20px 22px;min-height:136px;display:flex;align-items:center;gap:18px}
+    .metric-icon{width:62px;height:62px;border-radius:50%;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-size:27px;flex:none}
+    .metric-name{font-size:15px;color:var(--text-2)}
+    .metric-num{font-size:30px;font-weight:700;color:var(--brand-dark);margin-top:7px}
+    .metric-sub{font-size:13px;margin-top:8px;color:var(--text-2)}
+    .data-note{display:grid;grid-template-columns:repeat(3,1fr);gap:0;padding:14px 18px;background:#F2F7FF;border:1px solid #D7E6FF;border-radius:9px;color:#365A7A;font-size:13px}
+    .data-note>div{padding:0 18px;border-right:1px solid #D7E6FF}
+    .data-note>div:last-child{border-right:0}
+    .benchmark-overview{display:grid;grid-template-columns:repeat(5,1fr);min-height:150px;margin-bottom:14px;border-left:4px solid var(--blue)}
+    .bench-item{padding:28px 28px;border-right:1px solid #E4E9EF}
+    .bench-item:last-child{border-right:0}
+    .bench-label{color:var(--text-2);font-size:14px}
+    .bench-value{font-size:29px;font-weight:700;margin-top:11px}
+    .benchmark-grid{display:grid;grid-template-columns:.9fr 1.45fr;gap:14px}
+    .line-chart{height:330px;padding:8px 8px 0}
+    .line-chart svg{width:100%;height:100%;display:block}
+    .flow-summary{display:grid;grid-template-columns:repeat(4,1fr);align-items:center;min-height:78px;margin-bottom:14px}
+    .flow-stat{padding:0 28px;border-right:1px solid var(--border);display:flex;align-items:center;gap:14px}
+    .flow-stat:last-child{border-right:0}
+    .flow-icon{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-size:20px;background:var(--blue-soft);color:var(--blue)}
+    .flow-stat:nth-child(2) .flow-icon{background:var(--brand-soft);color:var(--brand)}
+    .flow-stat:nth-child(3) .flow-icon{background:var(--orange-soft);color:var(--orange)}
+    .flow-stat:nth-child(4) .flow-icon{background:var(--purple-soft);color:var(--purple)}
+    .flow-main{padding:14px 16px;margin-bottom:14px}
+    .sankey{width:100%;height:auto;display:block;min-height:350px}
+    .sankey .flow{fill:none;stroke-linecap:round;opacity:.34;transition:.2s}
+    .sankey .flow.active{opacity:.82;filter:drop-shadow(0 0 2px rgba(0,0,0,.12))}
+    .sankey .node{cursor:pointer;transition:.2s}
+    .sankey .node:hover rect,.sankey .node.selected rect{stroke-width:2.5}
+    .flow-bottom{display:grid;grid-template-columns:.7fr 1.4fr;gap:14px}
+    .rank-card,.flow-table-card{padding:14px 16px}
+    .rank-row{display:grid;grid-template-columns:42px 1fr 110px 70px;align-items:center;height:44px;border-bottom:1px solid #E8EDF2;font-size:13px}
+    .rank-badge{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#F1F3F5;color:#667085;font-weight:700}
+    .rank-row:nth-child(2) .rank-badge{background:#FFF1D8;color:#B54708}
+    .rank-row:nth-child(3) .rank-badge{background:#EEF3FA;color:#5F6B7A}
+    .rank-row:nth-child(4) .rank-badge{background:#FFE8D7;color:#C45A11}
+    .toast{position:fixed;right:24px;top:72px;z-index:1000;background:#fff;border:1px solid #CBECDD;border-radius:8px;box-shadow:0 10px 30px rgba(20,45,70,.18);padding:12px 16px;color:var(--brand-dark);display:none;align-items:center;gap:8px}
+    .toast.show{display:flex}
+    .overlay{position:fixed;inset:0;background:rgba(16,24,40,.46);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+    .overlay.open{display:flex}
+    .modal{width:min(720px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:12px;box-shadow:0 22px 60px rgba(16,24,40,.24)}
+    .modal-head{height:58px;padding:0 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+    .modal-title{font-size:17px;font-weight:700}
+    .modal-close{border:0;background:transparent;font-size:24px;color:var(--muted)}
+    .modal-body{padding:20px}
+    .modal-foot{height:62px;padding:0 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;align-items:center;gap:10px}
+    .detail-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+    .detail-box{border:1px solid var(--border);border-radius:8px;padding:12px;background:#FBFCFD}
+    .detail-box span{display:block;color:var(--muted);font-size:12px;margin-bottom:5px}
+    .hidden{display:none!important}
+    .mobile-menu{display:none}
+    @media(max-width:1100px){
+      .sidebar{width:76px}.main{margin-left:76px;width:calc(100% - 76px)}
+      .brand span,.side-group-title span.label,.side-item span.label,.sub-item span.label,.sidebar-foot span{display:none}
+      .brand{justify-content:center;padding:0}.side-group-title,.side-item{justify-content:center;padding:0}.sub-menu{padding-left:0}.sub-item{justify-content:center;padding:0}.sub-item::before{display:none}
+      .summary-strip{grid-template-columns:repeat(3,1fr);padding:14px 18px;gap:10px}.summary-item{border-right:0;padding:7px 10px}.grid-2,.benchmark-grid,.flow-bottom{grid-template-columns:1fr}.metric-grid{grid-template-columns:1fr 1fr}.flow-summary{grid-template-columns:1fr 1fr}.flow-stat:nth-child(2){border-right:0}.benchmark-overview{grid-template-columns:repeat(3,1fr)}
+    }
+    @media(max-width:760px){
+      .content{padding:14px}.topbar{padding:0 12px}.page-title{font-size:21px}.filter-card{align-items:stretch}.field,.field.wide{width:100%;min-width:0}.filter-spacer{display:none}.btn{flex:1}.metric-grid{grid-template-columns:1fr}.summary-strip{grid-template-columns:1fr 1fr}.grid-2{grid-template-columns:1fr}.donut-wrap{flex-direction:column;height:auto;padding:14px}.benchmark-overview{grid-template-columns:1fr 1fr}.flow-summary{grid-template-columns:1fr}.flow-stat{border-right:0;border-bottom:1px solid var(--border);padding:14px 20px}.flow-stat:last-child{border-bottom:0}.data-note{grid-template-columns:1fr}.data-note>div{border-right:0;border-bottom:1px solid #D7E6FF;padding:10px}.data-note>div:last-child{border-bottom:0}.detail-grid{grid-template-columns:1fr}
+    }
+
+    /* ===== V2 定稿版补充样式 ===== */
+    .page-head .head-action{display:flex;align-items:center;gap:10px}
+    .filter-card.simple{align-items:flex-end}
+    .filter-card .seg-field{min-width:auto}
+    .filter-card .seg-field label{display:block}
+    .summary-compact{display:grid;grid-template-columns:1.15fr .7fr .7fr;min-height:88px;margin-bottom:14px;padding:0 22px;background:linear-gradient(90deg,#F1FBF7 0%,#FFF 72%)}
+    .summary-compact.annual{grid-template-columns:1.3fr .7fr}
+    .summary-compact .summary-item{display:flex;flex-direction:column;justify-content:center}
+    .summary-compact .summary-item:first-child{padding-left:4px}
+    .summary-compact .summary-value.big{font-size:30px}
+    .table-toolbar{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px}
+    .table-toolbar .meta{margin-top:5px;color:var(--text-2);font-size:13px}
+    .slim-note{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 16px;margin-top:14px;background:#F4F8FF;border:1px solid #D9E7FF;border-radius:8px;color:#41627F;font-size:13px}
+    .slim-note .note-main{display:flex;align-items:center;gap:10px;min-width:0}
+    .slim-note .note-icon{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#E4EEFF;color:var(--blue);font-weight:700;flex:none}
+    .slim-note.warning{background:#FFF9ED;border-color:#FCE7B7;color:#7A5818}
+    .slim-note.warning .note-icon{background:#FFF0C7;color:var(--orange)}
+    .empty-state{padding:56px 20px;text-align:center;color:var(--muted)}
+    .empty-state strong{display:block;color:var(--text-2);font-size:15px;margin-bottom:8px}
+    .chart-inline-result{display:flex;align-items:center;gap:18px;flex-wrap:wrap;color:var(--text-2);font-size:13px}
+    .chart-inline-result b{font-size:15px;color:var(--text)}
+    .chart-inline-result .bad-text{color:var(--red)}
+    .chart-inline-result .ok-text{color:var(--brand-dark)}
+    .clickable-row{cursor:pointer}
+    .clickable-row.selected td{background:#F1FAF6!important}
+    .object-seg{display:flex;border:1px solid #D7DEE7;border-radius:7px;overflow:hidden;height:38px;background:#fff}
+    .object-seg button{height:36px;padding:0 17px;border:0;border-right:1px solid #D7DEE7;background:#fff;color:var(--text-2)}
+    .object-seg button:last-child{border-right:0}
+    .object-seg button.active{background:var(--brand);color:#fff}
+    .flow-tabs{display:flex;align-items:center;gap:22px;border-bottom:1px solid var(--border);margin:-2px -2px 10px;padding:0 2px}
+    .flow-tab{height:43px;border:0;background:transparent;color:var(--text-2);position:relative;padding:0 2px;font-weight:600}
+    .flow-tab.active{color:var(--brand-dark)}
+    .flow-tab.active::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--brand)}
+    .flow-head-actions{display:flex;align-items:center;gap:10px;margin-left:auto}
+    .flow-legend{display:flex;align-items:center;gap:14px;flex-wrap:wrap;color:var(--text-2);font-size:12px}
+    .legend-square{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:5px}
+    .flow-main{position:relative}
+    .node-tooltip{position:absolute;z-index:5;min-width:180px;max-width:260px;background:#172033;color:#fff;border-radius:7px;padding:10px 12px;font-size:12px;line-height:1.7;box-shadow:0 10px 24px rgba(16,24,40,.24);display:none;pointer-events:none}
+    .node-tooltip.show{display:block}
+    .difference-strip{display:flex;align-items:center;gap:22px;flex-wrap:wrap;padding:12px 16px;margin-bottom:14px;background:#FFFDFC;border:1px solid #F2E3D0;border-radius:9px;color:var(--text-2);font-size:13px}
+    .difference-strip strong{color:var(--text)}
+    .difference-strip .warning-value{color:var(--orange);font-weight:700}
+    .difference-strip .loss-value{color:var(--red);font-weight:700}
+    .difference-strip .muted-value{color:var(--muted);font-weight:600}
+    .balance-card{padding:10px 14px 14px}
+    .balance-card table{min-width:980px}
+    .formula-box{padding:14px;border:1px solid #DCE5EC;border-radius:8px;background:#F8FAFC;color:#334155;line-height:1.8}
+    .formula-box strong{color:var(--text)}
+    .modal-note{margin-top:14px;padding:12px 14px;border-radius:8px;background:#F5F8FB;color:var(--text-2);font-size:13px;line-height:1.7}
+    .detail-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .detail-list .detail-box{min-height:70px}
+    .mini-table{width:100%;border-collapse:collapse;min-width:0}
+    .mini-table th,.mini-table td{height:40px;padding:0 10px}
+    .modal .field{min-width:0}
+    .modal-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+    .modal-form .full{grid-column:1/-1}
+    .required-label::before{content:"*";color:var(--red);margin-right:4px}
+    .target-direction{display:flex;height:38px;border:1px solid #D7DEE7;border-radius:7px;overflow:hidden}
+    .target-direction button{flex:1;border:0;background:#fff;color:var(--text-2)}
+    .target-direction button.active{background:var(--brand-soft);color:var(--brand-dark);font-weight:600}
+    .status.none{background:#F1F3F5;color:#667085}
+    .row-muted{color:var(--muted)}
+    .subtle-count{font-size:13px;color:var(--text-2);margin-top:5px}
+    .export-hint{font-size:12px;color:var(--muted);margin-top:5px}
+    @media(max-width:1100px){
+      .summary-compact{grid-template-columns:1fr 1fr 1fr}
+    }
+    @media(max-width:760px){
+      .summary-compact{grid-template-columns:1fr;padding:12px 16px}.summary-compact .summary-item{border-right:0;border-bottom:1px solid var(--border);padding:12px 0}.summary-compact .summary-item:last-child{border-bottom:0}
+      .object-seg{width:100%}.object-seg button{flex:1;padding:0 8px}
+      .detail-list,.modal-form{grid-template-columns:1fr}.modal-form .full{grid-column:1}
+      .table-toolbar{flex-direction:column}
+    }
+
+
+    /* ===== V3 能流模型协同重构 ===== */
+    .capability-strip{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px;margin-bottom:14px;border:1px solid #D7E6FF;border-radius:9px;background:#F4F8FF;color:#365A7A;font-size:13px}
+    .capability-main{display:flex;align-items:center;gap:10px;min-width:0}
+    .capability-icon{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#E4EEFF;color:var(--blue);font-weight:700;flex:none}
+    .capability-tags{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+    .capability-tag{height:25px;padding:0 9px;border-radius:13px;display:inline-flex;align-items:center;background:#fff;border:1px solid #CADDFC;color:#365A7A;font-size:12px}
+    .flow-method-note{padding:11px 14px;margin-top:10px;border-radius:8px;background:#F8FAFC;border:1px solid #E2E8EF;color:var(--text-2);font-size:12px;line-height:1.7}
+    @media(max-width:760px){.capability-strip{align-items:flex-start;flex-direction:column}.capability-tags{justify-content:flex-start}}
+
+    /* ===== V4 能流分析业务语言与三Tab重构 ===== */
+    .rank-card-wide{padding:16px 18px;margin-top:14px}
+    .rank-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+    .rank-list{display:grid;gap:10px}
+    .rank-bar-row{display:grid;grid-template-columns:34px minmax(120px,210px) 1fr 110px 72px;gap:12px;align-items:center;min-height:38px}
+    .rank-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+    .rank-track{height:10px;border-radius:999px;background:#EDF2F5;overflow:hidden}
+    .rank-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#52C58D,#00A870)}
+    .rank-value,.rank-share{text-align:right;white-space:nowrap;color:var(--text-2);font-size:13px}
+    .balance-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+    .balance-caption{font-size:12px;color:var(--muted);line-height:1.7;max-width:820px}
+    .flow-detail-tab{padding:8px 0 4px}
+    .flow-detail-summary{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px;color:var(--text-2);font-size:13px}
+    .flow-detail-summary strong{color:var(--text)}
+    .stage-note{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
+    .stage-note-item{padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:#FAFCFD}
+    .stage-note-item strong{display:block;font-size:13px;margin-bottom:4px}
+    .stage-note-item span{font-size:12px;color:var(--muted);line-height:1.5}
+    @media(max-width:900px){
+      .rank-bar-row{grid-template-columns:32px minmax(90px,150px) 1fr 92px 60px;gap:8px}
+      .stage-note{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media(max-width:680px){
+      .rank-bar-row{grid-template-columns:30px 1fr 82px 54px}
+      .rank-track{grid-column:2/-1}
+      .stage-note{grid-template-columns:1fr}
+    }
+
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><div class="brand-logo">◈</div><span>通用能碳平台</span></div>
+    <div class="side-scroll">
+      <button class="side-item"><span>⌂</span><span class="label">首页概览</span></button>
+      <div class="side-group">
+        <button class="side-group-title"><span class="left"><span>▦</span><span class="label">数据管理</span></span><span class="chevron">⌄</span></button>
+        <div class="sub-menu">
+          <button class="sub-item"><span class="label">用能单元</span></button>
+          <button class="sub-item"><span class="label">能源品种</span></button>
+          <button class="sub-item"><span class="label">能源数据</span></button>
+          <button class="sub-item"><span class="label">运营数据</span></button>
+          <button class="sub-item"><span class="label">重点设备</span></button>
+        </div>
+      </div>
+      <div class="side-group open" id="energyGroup">
+        <button class="side-group-title"><span class="left"><span>▥</span><span class="label">能源监测与分析</span></span><span class="chevron">⌄</span></button>
+        <div class="sub-menu">
+          <button class="sub-item active" data-page="query"><span class="label">能耗查询</span></button>
+          <button class="sub-item" data-page="intensity"><span class="label">能耗强度指标</span></button>
+          <button class="sub-item" data-page="benchmark"><span class="label">能效对标</span></button>
+          <button class="sub-item" data-page="flow"><span class="label">能流分析</span></button>
+        </div>
+      </div>
+      <div class="side-group">
+        <button class="side-group-title"><span class="left"><span>◉</span><span class="label">碳管理</span></span><span class="chevron">⌄</span></button>
+        <div class="sub-menu"><button class="sub-item"><span class="label">碳排放核算</span></button><button class="sub-item"><span class="label">碳足迹核算</span></button></div>
+      </div>
+      <div class="side-group">
+        <button class="side-group-title"><span class="left"><span>⚙</span><span class="label">系统管理</span></span><span class="chevron">⌄</span></button>
+        <div class="sub-menu"><button class="sub-item"><span class="label">组织管理</span></button><button class="sub-item"><span class="label">权限管理</span></button></div>
+      </div>
+    </div>
+    <div class="sidebar-foot"><span>☰</span><span>收起菜单</span></div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="top-left"><button class="collapse-btn" id="collapseBtn">☰</button><span>首页</span><span>/</span><span>能源监测与分析</span><span>/</span><strong id="crumb">能耗查询</strong></div>
+      <div class="top-actions"><span>?</span><span>🔔</span><div class="avatar">管</div><span>管理员⌄</span></div>
+    </header>
+    <section class="content" id="content"></section>
+  </main>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title" id="modalTitle">详情</div><button class="modal-close" id="modalClose">×</button></div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot"><button class="btn" id="modalCancel">关闭</button><button class="btn btn-primary" id="modalConfirm">确定</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"><span>✓</span><span id="toastText">操作成功</span></div>
+
+<script>
+(() => {
+  const content = document.getElementById('content');
+  const crumb = document.getElementById('crumb');
+  const overlay = document.getElementById('overlay');
+  const modalConfirm = document.getElementById('modalConfirm');
+  const modalCancel = document.getElementById('modalCancel');
+  let modalConfirmHandler = null;
+
+  const pageNames = {
+    query:'能耗查询',
+    intensity:'能耗强度指标',
+    benchmark:'能效对标',
+    flow:'能流分析'
+  };
+
+  const state = {
+    page:'query',
+    query:{period:'month',time:'2026-06',unit:'all'},
+    intensity:{year:'2026',org:'factory'},
+    benchmark:{year:'2026',type:'all',object:'',metric:'',grain:'month',selectedId:'b1'},
+    flow:{year:'2026',org:'factory',grain:'month',month:'6月',level:'level1',tab:'diagram'}
+  };
+
+  const unitLabels = {
+    all:'全部',factory:'全厂',prodA:'生产单元A',prodB:'生产单元B',utilities:'公辅系统',office:'办公区域',boiler:'锅炉系统',wasteHeat:'余热发电系统'
+  };
+
+  const queryData = {
+    all:{
+      month:{total:13320,yoy:2.1,mom:0.8,trend:[8420,9210,10340,11280,12260,13320],labels:['1月','2月','3月','4月','5月','6月'],structure:[['#00A870','电力',46,6127],['#1677FF','燃料',32,4256],['#F79009','热力',15,1999],['#7A5AF8','其他',7,938]],rows:[
+        {unit:'生产单元A',category:'电力',energy:'外购电力',physical:5380000,measure:'kWh',tce:5160,share:38.7,yoy:2.8,mom:1.2,source:'能源数据｜生产单元A｜电力｜2026年6月'},
+        {unit:'动力车间',category:'燃料',energy:'天然气',physical:610000,measure:'Nm³',tce:3190,share:23.9,yoy:1.6,mom:0.9,source:'能源数据｜动力车间｜天然气｜2026年6月'},
+        {unit:'锅炉房',category:'热力',energy:'蒸汽',physical:8250,measure:'GJ',tce:1999,share:15.0,yoy:-0.8,mom:0.3,source:'能源数据｜锅炉房｜蒸汽｜2026年6月'},
+        {unit:'空压站',category:'电力',energy:'外购电力',physical:1150000,measure:'kWh',tce:1103,share:8.3,yoy:3.4,mom:1.5,source:'能源数据｜空压站｜电力｜2026年6月'},
+        {unit:'余热回收系统',category:'其他',energy:'余热回收',physical:2600,measure:'GJ',tce:938,share:7.0,yoy:-1.2,mom:-0.4,source:'能源数据｜余热回收系统｜余热｜2026年6月'}
+      ]},
+      year:{total:138500,yoy:-1.8,trend:[112800,119400,126600,132200,138500],labels:['2022','2023','2024','2025','2026'],structure:[['#00A870','电力',45,62325],['#1677FF','燃料',34,47090],['#F79009','热力',14,19390],['#7A5AF8','其他',7,9695]],rows:[
+        {unit:'生产单元A',category:'电力',energy:'外购电力',physical:58900000,measure:'kWh',tce:58900,share:42.5,yoy:-1.1,source:'能源数据｜生产单元A｜电力｜2026年度'},
+        {unit:'动力车间',category:'燃料',energy:'天然气',physical:7200000,measure:'Nm³',tce:38500,share:27.8,yoy:-2.2,source:'能源数据｜动力车间｜天然气｜2026年度'},
+        {unit:'锅炉房',category:'热力',energy:'蒸汽',physical:98500,measure:'GJ',tce:19390,share:14.0,yoy:-0.7,source:'能源数据｜锅炉房｜蒸汽｜2026年度'},
+        {unit:'空压站',category:'电力',energy:'外购电力',physical:13100000,measure:'kWh',tce:13100,share:9.5,yoy:0.6,source:'能源数据｜空压站｜电力｜2026年度'},
+        {unit:'余热回收系统',category:'其他',energy:'余热回收',physical:31100,measure:'GJ',tce:8610,share:6.2,yoy:-3.1,source:'能源数据｜余热回收系统｜余热｜2026年度'}
+      ]}
+    },
+    prodA:{
+      month:{total:5160,yoy:2.8,mom:1.2,trend:[3800,4020,4330,4560,4860,5160],labels:['1月','2月','3月','4月','5月','6月'],structure:[['#00A870','电力',62,3199],['#1677FF','燃料',24,1240],['#F79009','热力',9,465],['#7A5AF8','其他',5,256]],rows:[
+        {unit:'生产单元A',category:'电力',energy:'外购电力',physical:5380000,measure:'kWh',tce:3199,share:62,yoy:2.8,mom:1.2,source:'能源数据｜生产单元A｜外购电力｜2026年6月'},
+        {unit:'生产单元A',category:'燃料',energy:'天然气',physical:610000,measure:'Nm³',tce:1240,share:24,yoy:1.6,mom:0.9,source:'能源数据｜生产单元A｜天然气｜2026年6月'},
+        {unit:'生产单元A',category:'热力',energy:'蒸汽',physical:8250,measure:'GJ',tce:465,share:9,yoy:-0.8,mom:0.3,source:'能源数据｜生产单元A｜蒸汽｜2026年6月'},
+        {unit:'生产单元A',category:'其他',energy:'压缩空气',physical:1250000,measure:'Nm³',tce:256,share:5,yoy:0.5,mom:0.2,source:'能源数据｜生产单元A｜压缩空气｜2026年6月'}
+      ]},
+      year:{total:58900,yoy:-1.1,trend:[51000,54200,56100,57400,58900],labels:['2022','2023','2024','2025','2026'],structure:[['#00A870','电力',61,35929],['#1677FF','燃料',25,14725],['#F79009','热力',9,5301],['#7A5AF8','其他',5,2945]],rows:[
+        {unit:'生产单元A',category:'电力',energy:'外购电力',physical:58900000,measure:'kWh',tce:35929,share:61,yoy:-0.9,source:'能源数据｜生产单元A｜外购电力｜2026年度'},
+        {unit:'生产单元A',category:'燃料',energy:'天然气',physical:7200000,measure:'Nm³',tce:14725,share:25,yoy:-1.5,source:'能源数据｜生产单元A｜天然气｜2026年度'},
+        {unit:'生产单元A',category:'热力',energy:'蒸汽',physical:98500,measure:'GJ',tce:5301,share:9,yoy:-0.6,source:'能源数据｜生产单元A｜蒸汽｜2026年度'},
+        {unit:'生产单元A',category:'其他',energy:'压缩空气',physical:14900000,measure:'Nm³',tce:2945,share:5,yoy:-2.2,source:'能源数据｜生产单元A｜压缩空气｜2026年度'}
+      ]}
+    },
+    prodB:{month:{total:3480,yoy:1.4,mom:0.6,trend:[2800,2920,3060,3190,3350,3480],labels:['1月','2月','3月','4月','5月','6月'],structure:[['#00A870','电力',54,1879],['#1677FF','燃料',30,1044],['#F79009','热力',12,418],['#7A5AF8','其他',4,139]],rows:[
+      {unit:'生产单元B',category:'电力',energy:'外购电力',physical:3200000,measure:'kWh',tce:1879,share:54,yoy:1.9,mom:0.8,source:'能源数据｜生产单元B｜外购电力｜2026年6月'},
+      {unit:'生产单元B',category:'燃料',energy:'天然气',physical:420000,measure:'Nm³',tce:1044,share:30,yoy:0.9,mom:0.3,source:'能源数据｜生产单元B｜天然气｜2026年6月'},
+      {unit:'生产单元B',category:'热力',energy:'蒸汽',physical:6100,measure:'GJ',tce:418,share:12,yoy:-0.4,mom:0.2,source:'能源数据｜生产单元B｜蒸汽｜2026年6月'},
+      {unit:'生产单元B',category:'其他',energy:'压缩空气',physical:680000,measure:'Nm³',tce:139,share:4,yoy:0.2,mom:0.1,source:'能源数据｜生产单元B｜压缩空气｜2026年6月'}
+    ]},year:{total:41300,yoy:-0.7,trend:[36500,38200,39500,40600,41300],labels:['2022','2023','2024','2025','2026'],structure:[['#00A870','电力',55,22715],['#1677FF','燃料',29,11977],['#F79009','热力',12,4956],['#7A5AF8','其他',4,1652]],rows:[]}},
+    utilities:{month:{total:2300,yoy:3.1,mom:1.7,trend:[1760,1840,1970,2050,2190,2300],labels:['1月','2月','3月','4月','5月','6月'],structure:[['#00A870','电力',70,1610],['#F79009','热力',18,414],['#7A5AF8','其他',12,276]],rows:[
+      {unit:'公辅系统',category:'电力',energy:'外购电力',physical:2100000,measure:'kWh',tce:1610,share:70,yoy:3.4,mom:1.9,source:'能源数据｜公辅系统｜外购电力｜2026年6月'},
+      {unit:'公辅系统',category:'热力',energy:'蒸汽',physical:5200,measure:'GJ',tce:414,share:18,yoy:1.1,mom:0.6,source:'能源数据｜公辅系统｜蒸汽｜2026年6月'},
+      {unit:'公辅系统',category:'其他',energy:'压缩空气',physical:900000,measure:'Nm³',tce:276,share:12,yoy:0.4,mom:0.2,source:'能源数据｜公辅系统｜压缩空气｜2026年6月'}
+    ]},year:{total:27600,yoy:1.2,trend:[24100,25200,26000,26900,27600],labels:['2022','2023','2024','2025','2026'],structure:[['#00A870','电力',70,19320],['#F79009','热力',18,4968],['#7A5AF8','其他',12,3312]],rows:[]}}
+  };
+
+  const intensityData = {
+    factory:[
+      {id:'i1',name:'单位产品综合能耗',value:91.8,unit:'kgce/t',yoy:-2.3,status:'可用',type:'ok',formula:'综合能耗 ÷ 产品产量',numerator:'综合能耗 138,500 tce',denominator:'产品产量 1,508,715 t',source:'能源数据 + 运营数据',period:'2026年度'},
+      {id:'i2',name:'单位产品电耗',value:76.5,unit:'kWh/t',yoy:-3.1,status:'可用',type:'ok',formula:'电力消费量 ÷ 产品产量',numerator:'电力消费量 115,427,000 kWh',denominator:'产品产量 1,508,715 t',source:'能源数据 + 运营数据',period:'2026年度'},
+      {id:'i3',name:'单位产值综合能耗',value:0.351,unit:'tce/万元',yoy:1.1,status:'可用',type:'ok',formula:'综合能耗 ÷ 工业总产值',numerator:'综合能耗 138,500 tce',denominator:'工业总产值 394,587 万元',source:'能源数据 + 运营数据',period:'2026年度'},
+      {id:'i4',name:'单位增加值综合能耗',value:null,unit:'tce/万元',yoy:null,status:'待补充',type:'warn',formula:'综合能耗 ÷ 工业增加值',numerator:'综合能耗 138,500 tce',denominator:'工业增加值未录入',source:'能源数据 + 运营数据',period:'2026年度',issue:'缺少2026年度工业增加值。'},
+      {id:'i5',name:'单位营业收入电耗',value:152.3,unit:'kWh/万元',yoy:-2.0,status:'需核验',type:'check',formula:'电力消费量 ÷ 营业收入',numerator:'电力消费量 115,427,000 kWh',denominator:'营业收入 757,900 万元',source:'能源数据 + 运营数据',period:'能源数据截至12月，营业收入截至11月',issue:'分子与分母的统计期间不一致。'}
+    ],
+    prodA:[
+      {id:'pa1',name:'单位产品综合能耗',value:91.8,unit:'kgce/t',yoy:-2.3,status:'可用',type:'ok',formula:'生产单元A综合能耗 ÷ 生产单元A产品产量',numerator:'综合能耗 58,900 tce',denominator:'产品产量 641,612 t',source:'能源数据 + 运营数据',period:'2026年度'},
+      {id:'pa2',name:'单位产品电耗',value:76.5,unit:'kWh/t',yoy:-3.1,status:'可用',type:'ok',formula:'生产单元A电力消费量 ÷ 产品产量',numerator:'电力消费量 49,084,318 kWh',denominator:'产品产量 641,612 t',source:'能源数据 + 运营数据',period:'2026年度'},
+      {id:'pa3',name:'单位业务量能耗',value:null,unit:'kgce/件',yoy:null,status:'待补充',type:'warn',formula:'综合能耗 ÷ 业务量',numerator:'综合能耗 58,900 tce',denominator:'业务量未录入',source:'能源数据 + 运营数据',period:'2026年度',issue:'缺少生产单元A业务量数据。'}
+    ],
+    utilities:[
+      {id:'u1',name:'单位供气电耗',value:0.102,unit:'kWh/Nm³',yoy:-1.4,status:'可用',type:'ok',formula:'空压系统电耗 ÷ 压缩空气供应量',numerator:'空压系统电耗 13,100,000 kWh',denominator:'压缩空气供应量 128,431,373 Nm³',source:'能源数据 + 运营数据',period:'2026年度'},
+      {id:'u2',name:'单位蒸汽综合能耗',value:null,unit:'kgce/t蒸汽',yoy:null,status:'待补充',type:'warn',formula:'锅炉燃料综合能耗 ÷ 蒸汽产出量',numerator:'燃料综合能耗已录入',denominator:'蒸汽产出量未录入',source:'能源数据 + 运营数据',period:'2026年度',issue:'缺少锅炉系统蒸汽产出量。'}
+    ]
+  };
+
+  const benchmarkRows = [
+    {id:'b1',object:'全厂',type:'企业',typeKey:'enterprise',name:'单位产值综合能耗',unit:'tce/万元',actual:0.351,target:0.340,direction:'low',trend:[0.390,0.370,0.360,0.350,0.340,0.330,0.340,0.350,0.360,0.310,0.320,0.351]},
+    {id:'b2',object:'生产单元A',type:'用能单元',typeKey:'unit',name:'单位产品综合能耗',unit:'kgce/t',actual:91.8,target:90.0,direction:'low',trend:[94.0,93.6,92.9,92.5,92.1,91.4,91.0,91.3,91.8,92.2,91.9,91.8]},
+    {id:'b3',object:'生产单元A',type:'用能单元',typeKey:'unit',name:'单位产品电耗',unit:'kWh/t',actual:76.5,target:78.0,direction:'low',trend:[82.0,81.0,80.5,79.4,78.8,78.0,77.4,76.9,76.6,76.3,76.1,76.5]},
+    {id:'b4',object:'余热发电系统',type:'用能单元',typeKey:'unit',name:'能源转换效率',unit:'%',actual:85.7,target:84.0,direction:'high',trend:[82.0,82.8,83.5,84.1,84.5,85.0,85.2,85.6,85.4,85.8,85.6,85.7]},
+    {id:'b5',object:'重点设备A',type:'设备',typeKey:'device',name:'年度电耗',unit:'kWh',actual:325000,target:320000,direction:'low',trend:[27800,26500,27100,26900,26600,27000,26800,27200,27100,26900,27300,28500]}
+  ];
+
+  const flowDatasets = {
+    factory:{input:13320,allocated:12980,unallocated:340,loss:220,rate:97.4,external:340,relations:2,capability:'已具备全厂控制量、一级用能单元归属、能源转换和外供数据。'},
+    prodA:{input:5160,allocated:5060,unallocated:100,loss:null,rate:98.1,external:0,relations:0,capability:'当前范围可生成用能分配；未配置能源转换或外部输出。'}
+  };
+
+  const flowRows = [
+    {type:'终端消费',input:'厂内电力',relation:'能源介质汇总',target:'生产单元A',tce:3780,share:28.4,action:'source',source:'能源数据｜生产单元A｜电力｜2026年6月'},
+    {type:'终端消费',input:'厂内电力',relation:'能源介质汇总',target:'公辅系统',tce:1103,share:8.3,action:'source',source:'能源数据｜公辅系统｜电力｜2026年6月'},
+    {type:'能源转换',input:'余热',relation:'余热发电系统 → 电力',target:'厂内电力',tce:960,share:7.2,action:'relation',inputTce:1120,outputTce:960,efficiency:85.7,loss:160,source:'能源转换关系｜余热发电系统｜余热→电力｜2026年6月'},
+    {type:'能源转换',input:'天然气',relation:'燃气锅炉 → 蒸汽',target:'厂内蒸汽',tce:1880,share:14.1,action:'relation',inputTce:1940,outputTce:1880,efficiency:96.9,loss:60,source:'能源转换关系｜燃气锅炉｜天然气→蒸汽｜2026年6月'},
+    {type:'外部输出',input:'厂内电力',relation:'由外供能源数据自动识别',target:'企业外部',tce:340,share:2.6,action:'external',source:'能源数据｜余热发电系统｜电力｜外供能源｜2026年6月'},
+    {type:'未归属',input:'—',relation:'本级控制量与下级归属量差额',target:'未归属差额',tce:340,share:2.6,action:'none',source:'系统计算'}
+  ];
+
+  const balanceRows = [
+    {energy:'电力',boundary:6127,internal:960,convertIn:0,terminal:6747,external:340,unallocated:0,status:'已校验'},
+    {energy:'天然气',boundary:3256,internal:0,convertIn:1940,terminal:1316,external:0,unallocated:0,status:'已校验'},
+    {energy:'原煤',boundary:2000,internal:0,convertIn:0,terminal:1960,external:0,unallocated:40,status:'存在未归属'},
+    {energy:'蒸汽',boundary:1937,internal:1880,convertIn:0,terminal:3517,external:0,unallocated:300,status:'存在未归属'},
+    {energy:'余热',boundary:0,internal:1120,convertIn:1120,terminal:0,external:0,unallocated:0,status:'已校验'}
+  ];
+
+  const flowRowsProdA = [
+    {type:'直接消费',input:'外购电力',relation:'—',target:'原料制备',tce:1480,share:28.7,action:'source',source:'能源数据｜生产单元A—原料制备｜外购电力｜2026年6月'},
+    {type:'直接消费',input:'外购电力',relation:'—',target:'核心工序',tce:1719,share:33.3,action:'source',source:'能源数据｜生产单元A—核心工序｜外购电力｜2026年6月'},
+    {type:'直接消费',input:'天然气',relation:'—',target:'核心工序',tce:1240,share:24.0,action:'source',source:'能源数据｜生产单元A—核心工序｜天然气｜2026年6月'},
+    {type:'直接消费',input:'蒸汽',relation:'—',target:'包装发运',tce:465,share:9.0,action:'source',source:'能源数据｜生产单元A—包装发运｜蒸汽｜2026年6月'},
+    {type:'直接消费',input:'压缩空气',relation:'—',target:'包装发运',tce:156,share:3.0,action:'source',source:'能源数据｜生产单元A—包装发运｜压缩空气｜2026年6月'},
+    {type:'未分配',input:'—',relation:'—',target:'未分配能源量',tce:100,share:1.9,action:'none',source:'生产单元A能源量与下级工序合计的差额'}
+  ];
+
+  const balanceRowsProdA = [
+    {energy:'电力',boundary:3199,internal:0,convertIn:0,terminal:3199,external:0,unallocated:0,status:'已校验'},
+    {energy:'天然气',boundary:1240,internal:0,convertIn:0,terminal:1240,external:0,unallocated:0,status:'已校验'},
+    {energy:'蒸汽',boundary:465,internal:0,convertIn:0,terminal:465,external:0,unallocated:0,status:'已校验'},
+    {energy:'其他',boundary:256,internal:0,convertIn:0,terminal:156,external:0,unallocated:100,status:'存在未归属'}
+  ];
+
+  function fmt(n,d=0){
+    if(n===null || n===undefined || n==='') return '—';
+    return Number(n).toLocaleString('zh-CN',{minimumFractionDigits:d,maximumFractionDigits:d});
+  }
+  function pct(n){return `${n>0?'+':''}${fmt(n,1)}%`;}
+  function changeClass(n){return Number(n)<0?'down':'up';}
+  function statusClass(type){return type==='ok'?'ok':type==='warn'?'warn':type==='check'?'check':'none';}
+  function toast(text){
+    document.getElementById('toastText').textContent=text;
+    document.getElementById('toast').classList.add('show');
+    setTimeout(()=>document.getElementById('toast').classList.remove('show'),1700);
+  }
+  function openModal(title,body,{confirmText='确定',showConfirm=true,onConfirm=null}={}){
+    document.getElementById('modalTitle').textContent=title;
+    document.getElementById('modalBody').innerHTML=body;
+    modalConfirm.textContent=confirmText;
+    modalConfirm.style.display=showConfirm?'inline-flex':'none';
+    modalConfirmHandler=onConfirm;
+    overlay.classList.add('open');
+  }
+  function closeModal(){overlay.classList.remove('open');modalConfirmHandler=null;}
+  modalConfirm.onclick=()=>{if(modalConfirmHandler) modalConfirmHandler(); closeModal();};
+  document.getElementById('modalClose').onclick=closeModal;
+  modalCancel.onclick=closeModal;
+  overlay.addEventListener('click',e=>{if(e.target===overlay) closeModal();});
+
+  function pageHead(title,desc,extra=''){
+    return `<div class="page-head"><div><h1 class="page-title">${title}</h1><div class="page-desc">${desc}</div></div><div class="head-action">${extra}</div></div>`;
+  }
+
+  function render(){
+    crumb.textContent=pageNames[state.page];
+    document.querySelectorAll('[data-page]').forEach(btn=>btn.classList.toggle('active',btn.dataset.page===state.page));
+    if(state.page==='query') renderQuery();
+    if(state.page==='intensity') renderIntensity();
+    if(state.page==='benchmark') renderBenchmark();
+    if(state.page==='flow') renderFlow();
+  }
+
+  function currentQueryDataset(){
+    const unitData=queryData[state.query.unit] || queryData.all;
+    return unitData[state.query.period] || queryData.all[state.query.period];
+  }
+
+  function renderQuery(){
+    const q=state.query;
+    const monthMode=q.period==='month';
+    const data=currentQueryDataset();
+    const max=Math.max(...data.trend)*1.15;
+    const titleUnit=q.unit==='all'?'全厂':unitLabels[q.unit];
+    const rows=data.rows.length?data.rows:queryData.all[q.period].rows.filter(r=>r.unit===titleUnit);
+    content.innerHTML=`
+      ${pageHead('能耗查询','查询和分析能源消费数据，掌握能耗趋势与能源结构。')}
+      <div class="card filter-card simple">
+        <div class="field seg-field"><label>统计周期</label><div class="seg"><button data-query-period="month" class="${monthMode?'active':''}">月度</button><button data-query-period="year" class="${!monthMode?'active':''}">年度</button></div></div>
+        <div class="field wide"><label>时间</label><input id="queryTime" type="${monthMode?'month':'number'}" value="${q.time}"></div>
+        <div class="field wide"><label>用能单元</label><select id="queryUnit"><option value="all">全部</option><option value="prodA" ${q.unit==='prodA'?'selected':''}>生产单元A</option><option value="prodB" ${q.unit==='prodB'?'selected':''}>生产单元B</option><option value="utilities" ${q.unit==='utilities'?'selected':''}>公辅系统</option></select></div>
+        <div class="filter-spacer"></div>
+        <button class="btn btn-primary" id="queryBtn">查询</button><button class="btn" id="queryReset">重置</button><button class="btn" id="queryExport">⇩ 导出明细</button>
+      </div>
+      <div class="card summary-compact ${monthMode?'':'annual'}">
+        <div class="summary-item"><div class="summary-label">综合能耗｜${titleUnit}</div><div class="summary-value big">${fmt(data.total)}<span class="unit">tce</span></div></div>
+        <div class="summary-item"><div class="summary-label">同比</div><div class="summary-value ${changeClass(data.yoy)}">${data.yoy>0?'↑':'↓'} ${pct(data.yoy)}</div></div>
+        ${monthMode?`<div class="summary-item"><div class="summary-label">环比</div><div class="summary-value ${changeClass(data.mom)}">${data.mom>0?'↑':'↓'} ${pct(data.mom)}</div></div>`:''}
+      </div>
+      <div class="grid-2">
+        <div class="card chart-card">
+          <div class="chart-head"><div><div class="chart-title">能源消费趋势（${monthMode?'2026年1—6月':'2022—2026年'}）</div><div class="chart-sub">${titleUnit}｜折标煤（tce），仅展示实际数据</div></div></div>
+          <div class="bar-chart">${data.trend.map((v,i)=>`<div class="bar-item"><div class="bar" style="height:${Math.round(v/max*180)}px"><span class="bar-value">${fmt(v)}</span></div><div class="bar-label">${data.labels[i]}</div></div>`).join('')}</div>
+        </div>
+        <div class="card chart-card">
+          <div class="chart-title">能源结构</div><div class="chart-sub">${titleUnit}</div>
+          <div class="donut-wrap"><div class="donut" style="background:conic-gradient(${data.structure.map((x,i)=>`${x[0]} ${i?data.structure.slice(0,i).reduce((a,b)=>a+b[2],0):0}% ${data.structure.slice(0,i+1).reduce((a,b)=>a+b[2],0)}%`).join(',')})"><div class="donut-center">${fmt(data.total)}<small>tce</small></div></div>
+            <div class="legend">${data.structure.map(x=>`<div class="legend-row"><span class="dot" style="background:${x[0]}"></span><span>${x[1]}</span><span>${fmt(x[2],1)}%</span><span>${fmt(x[3])} tce</span></div>`).join('')}</div>
+          </div>
+        </div>
+      </div>
+      <div class="card table-card">
+        <div class="table-toolbar"><div><div class="chart-title">能源消费明细（${titleUnit}｜${monthMode?'2026年6月':'2026年度'}）</div><div class="export-hint">导出内容与当前筛选条件一致，包含用能单元、能源品种、实物量、折标量及期间比较。</div></div></div>
+        <div class="table-wrap"><table><thead><tr><th>序号</th>${q.unit==='all'?'<th>用能单元</th>':''}<th>能源类别</th><th>能源品种</th><th>实物量</th><th>单位</th><th>折标量（tce）</th><th>占比</th><th>同比</th>${monthMode?'<th>环比</th>':''}<th>操作</th></tr></thead><tbody>
+          ${rows.map((r,i)=>`<tr><td>${i+1}</td>${q.unit==='all'?`<td>${r.unit}</td>`:''}<td>${r.category}</td><td>${r.energy}</td><td>${fmt(r.physical)}</td><td>${r.measure}</td><td>${fmt(r.tce)}</td><td>${fmt(r.share,1)}%</td><td class="${changeClass(r.yoy)}">${pct(r.yoy)}</td>${monthMode?`<td class="${changeClass(r.mom)}">${pct(r.mom)}</td>`:''}<td><button class="link query-detail" data-index="${i}">查看</button></td></tr>`).join('')}
+        </tbody><tfoot><tr><td colspan="${q.unit==='all'?6:5}">合计</td><td>${fmt(data.total)}</td><td>100.0%</td><td class="${changeClass(data.yoy)}">${pct(data.yoy)}</td>${monthMode?`<td class="${changeClass(data.mom)}">${pct(data.mom)}</td>`:''}<td>—</td></tr></tfoot></table></div>
+      </div>`;
+
+    document.querySelectorAll('[data-query-period]').forEach(btn=>btn.onclick=()=>{
+      state.query.period=btn.dataset.queryPeriod;
+      state.query.time=state.query.period==='month'?'2026-06':'2026';
+      renderQuery();
+    });
+    document.getElementById('queryBtn').onclick=()=>{
+      state.query.time=document.getElementById('queryTime').value || (monthMode?'2026-06':'2026');
+      state.query.unit=document.getElementById('queryUnit').value;
+      renderQuery();toast('查询结果已按用能单元更新');
+    };
+    document.getElementById('queryReset').onclick=()=>{state.query={period:'month',time:'2026-06',unit:'all'};renderQuery();toast('筛选条件已重置');};
+    document.getElementById('queryExport').onclick=()=>exportQueryCsv(rows,data,titleUnit,monthMode);
+    document.querySelectorAll('.query-detail').forEach(btn=>btn.onclick=()=>{
+      const r=rows[Number(btn.dataset.index)];
+      openModal('能源消费记录详情',`<div class="detail-list">${[['用能单元',r.unit],['能源类别',r.category],['能源品种',r.energy],['实物量',fmt(r.physical)+' '+r.measure],['折标量',fmt(r.tce)+' tce'],['占比',fmt(r.share,1)+'%'],['同比',pct(r.yoy)],['环比',monthMode?pct(r.mom):'—']].map(x=>`<div class="detail-box"><span>${x[0]}</span>${x[1]}</div>`).join('')}</div><div class="modal-note"><strong>数据来源：</strong>${r.source}<br><strong>折标口径：</strong>读取“能源品种”中的默认折标参数。</div>`,{showConfirm:false});
+    });
+  }
+
+  function exportQueryCsv(rows,data,titleUnit,monthMode){
+    const headers=['统计期间','用能单元','能源类别','能源品种','实物量','单位','折标量(tce)','占比','同比'];
+    if(monthMode) headers.push('环比');
+    const period=monthMode?'2026年6月':'2026年度';
+    const lines=[headers];
+    rows.forEach(r=>{
+      const line=[period,r.unit,r.category,r.energy,r.physical,r.measure,r.tce,`${r.share}%`,`${r.yoy}%`];
+      if(monthMode) line.push(`${r.mom}%`);
+      lines.push(line);
+    });
+    const csv='\uFEFF'+lines.map(row=>row.map(v=>`"${String(v).replaceAll('"','""')}"`).join(',')).join('\n');
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`能源消费明细_${titleUnit}_${period}.csv`;a.click();URL.revokeObjectURL(a.href);toast('能源消费明细已导出');
+  }
+
+  function renderIntensity(){
+    const s=state.intensity;
+    const rows=intensityData[s.org] || intensityData.factory;
+    const available=rows.filter(r=>r.type==='ok').length;
+    const pending=rows.filter(r=>r.type==='warn').length;
+    const checking=rows.filter(r=>r.type==='check').length;
+    content.innerHTML=`
+      ${pageHead('能耗强度指标','基于能源消费数据与运营数据自动计算能耗强度指标，支持查看指标结果及数据来源。')}
+      <div class="card filter-card simple"><div class="field"><label>分析年度</label><input id="intensityYear" type="number" value="${s.year}"></div><div class="field wide"><label>组织范围</label><select id="intensityOrg"><option value="factory">全厂</option><option value="prodA" ${s.org==='prodA'?'selected':''}>生产单元A</option><option value="utilities" ${s.org==='utilities'?'selected':''}>公辅系统</option></select></div><div class="filter-spacer"></div><button class="btn btn-primary" id="intensityQuery">查询</button><button class="btn" id="intensityReset">重置</button></div>
+      <div class="card table-card">
+        <div class="table-toolbar"><div><div class="chart-title">指标结果明细</div><div class="subtle-count">共生成 ${rows.length} 项指标，其中 ${available} 项可用${pending?`，${pending} 项待补充`:''}${checking?`，${checking} 项需核验`:''}</div></div><button class="btn" id="intensityExport">⇩ 导出明细台账</button></div>
+        <div class="table-wrap"><table><thead><tr><th>序号</th><th>指标名称</th><th>数值</th><th>单位</th><th>同比</th><th>结果状态</th><th>操作</th></tr></thead><tbody>
+          ${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${r.name} <button class="link intensity-info" data-index="${i}">ⓘ</button></td><td>${r.value===null?'—':fmt(r.value,r.value<1?3:1)}</td><td>${r.unit}</td><td class="${r.yoy===null?'row-muted':changeClass(r.yoy)}">${r.yoy===null?'—':pct(r.yoy)}</td><td><span class="status ${statusClass(r.type)}">${r.status}</span></td><td><button class="link intensity-action" data-index="${i}">${r.type==='warn'?'去补充':r.type==='check'?'查看问题':'查看详情'}</button></td></tr>`).join('')}
+        </tbody></table></div>
+      </div>
+      <div class="slim-note"><div class="note-main"><span class="note-icon">i</span><span>指标由能源数据与运营数据自动计算，计算依据：GB/T 2589—2020。</span></div><button class="link" id="formulaEntry">查看计算口径</button></div>`;
+    document.getElementById('intensityQuery').onclick=()=>{state.intensity.year=document.getElementById('intensityYear').value||'2026';state.intensity.org=document.getElementById('intensityOrg').value;renderIntensity();toast('指标结果已更新');};
+    document.getElementById('intensityReset').onclick=()=>{state.intensity={year:'2026',org:'factory'};renderIntensity();toast('筛选条件已重置');};
+    document.getElementById('intensityExport').onclick=()=>exportIntensityCsv(rows);
+    document.getElementById('formulaEntry').onclick=()=>openModal('能耗强度计算口径',`<div class="formula-box"><strong>单位产品综合能耗</strong>＝综合能耗 ÷ 产品产量<br><strong>单位产品电耗</strong>＝电力消费量 ÷ 产品产量<br><strong>单位产值综合能耗</strong>＝综合能耗 ÷ 工业总产值<br><strong>单位增加值综合能耗</strong>＝综合能耗 ÷ 工业增加值</div><div class="modal-note">分子与分母必须采用相同组织范围和统计期间；缺少必要运营数据时，指标状态显示“待补充”。</div>`,{showConfirm:false});
+    document.querySelectorAll('.intensity-action,.intensity-info').forEach(btn=>btn.onclick=()=>{
+      const r=rows[Number(btn.dataset.index)];
+      if(r.type==='warn' && btn.classList.contains('intensity-action')){
+        openModal('补充指标数据',`<div class="detail-list"><div class="detail-box"><span>指标名称</span>${r.name}</div><div class="detail-box"><span>缺失内容</span>${r.denominator}</div></div><div class="modal-note">${r.issue}<br>请在“数据管理—运营数据”补充相同年度、相同组织范围的数据，保存后系统自动重新计算。</div>`,{confirmText:'前往运营数据',onConfirm:()=>toast('已定位到运营数据')});
+      }else if(r.type==='check' && btn.classList.contains('intensity-action')){
+        openModal('指标核验问题',`<div class="detail-list"><div class="detail-box"><span>指标名称</span>${r.name}</div><div class="detail-box"><span>当前结果</span>${fmt(r.value,r.value<1?3:1)} ${r.unit}</div><div class="detail-box"><span>分子来源</span>${r.numerator}</div><div class="detail-box"><span>分母来源</span>${r.denominator}</div></div><div class="modal-note"><strong>需核验原因：</strong>${r.issue}</div>`,{showConfirm:false});
+      }else{
+        openModal('指标计算详情',`<div class="detail-list"><div class="detail-box"><span>指标名称</span>${r.name}</div><div class="detail-box"><span>计算结果</span>${r.value===null?'—':fmt(r.value,r.value<1?3:1)+' '+r.unit}</div><div class="detail-box"><span>分子</span>${r.numerator}</div><div class="detail-box"><span>分母</span>${r.denominator}</div><div class="detail-box"><span>统计期间</span>${r.period}</div><div class="detail-box"><span>数据来源</span>${r.source}</div></div><div class="formula-box" style="margin-top:14px"><strong>计算公式：</strong>${r.formula}</div>`,{showConfirm:false});
+      }
+    });
+  }
+
+  function exportIntensityCsv(rows){
+    const lines=[['组织范围','指标名称','数值','单位','同比','结果状态']];
+    rows.forEach(r=>lines.push([unitLabels[state.intensity.org]||'全厂',r.name,r.value===null?'':r.value,r.unit,r.yoy===null?'':`${r.yoy}%`,r.status]));
+    const csv='\uFEFF'+lines.map(row=>row.map(v=>`"${String(v).replaceAll('"','""')}"`).join(',')).join('\n');
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`能耗强度指标_${unitLabels[state.intensity.org]||'全厂'}_${state.intensity.year}.csv`;a.click();URL.revokeObjectURL(a.href);toast('指标明细台账已导出');
+  }
+
+  function benchmarkFilteredRows(){
+    if(state.benchmark.type==='all') return benchmarkRows;
+    return benchmarkRows.filter(r=>r.typeKey===state.benchmark.type);
+  }
+  function benchmarkObjects(){return [...new Set(benchmarkFilteredRows().map(r=>r.object))];}
+  function benchmarkMetrics(object){return benchmarkFilteredRows().filter(r=>r.object===object);}
+  function selectedBenchmark(){return benchmarkRows.find(r=>r.id===state.benchmark.selectedId) || benchmarkRows[0];}
+  function isBenchmarkGood(r){return r.direction==='high'?r.actual>=r.target:r.actual<=r.target;}
+
+  function renderBenchmark(){
+    const s=state.benchmark;
+    const rows=benchmarkFilteredRows();
+    const selected=selectedBenchmark();
+    const objects=benchmarkObjects();
+    const metricRows=s.type==='all'?[]:benchmarkMetrics(s.object || objects[0]);
+    const good=isBenchmarkGood(selected);
+    const diffRate=(selected.actual-selected.target)/selected.target*100;
+    const noProductData=s.type==='product' && !rows.length;
+    content.innerHTML=`
+      ${pageHead('能效对标','将实际能效指标与目标值进行对比，识别未达标对象，支撑节能管理。','<button class="btn btn-outline-brand" id="targetConfig">⚙ 指标目标配置</button>')}
+      <div class="card filter-card simple">
+        <div class="field"><label>分析年度</label><input id="benchYear" type="number" value="${s.year}"></div>
+        <div class="field seg-field"><label>对象类型</label><div class="object-seg"><button data-bench-type="all" class="${s.type==='all'?'active':''}">全部</button><button data-bench-type="unit" class="${s.type==='unit'?'active':''}">用能单元</button><button data-bench-type="product" class="${s.type==='product'?'active':''}">产品</button><button data-bench-type="device" class="${s.type==='device'?'active':''}">设备</button></div></div>
+        <div class="field wide"><label>对标对象</label><select id="benchObject" ${s.type==='all'?'disabled':''}>${s.type==='all'?'<option>选择对象</option>':objects.length?objects.map(o=>`<option ${o===s.object?'selected':''}>${o}</option>`).join(''):'<option>暂无可计算对象</option>'}</select></div>
+        <div class="field wide"><label>指标</label><select id="benchMetric" ${s.type==='all' || !metricRows.length?'disabled':''}>${s.type==='all'?'<option>选择指标</option>':metricRows.length?metricRows.map(r=>`<option value="${r.id}" ${r.id===s.selectedId?'selected':''}>${r.name}</option>`).join(''):'<option>暂无可计算指标</option>'}</select></div>
+        <div class="field"><label>时间粒度</label><select id="benchGrain"><option value="month">月度</option><option value="quarter" ${s.grain==='quarter'?'selected':''}>季度</option><option value="year" ${s.grain==='year'?'selected':''}>年度</option></select></div>
+        <div class="filter-spacer"></div><button class="btn btn-primary" id="benchQuery">查询</button><button class="btn" id="benchReset">重置</button>
+      </div>
+      ${noProductData?`<div class="card empty-state"><strong>暂无可计算的产品能效指标</strong>产品级指标需要建立产品产量与能源归属关系；当前仅展示具备数据支撑的用能单元和设备指标。</div>`:`
+      <div class="card chart-card" style="margin-bottom:14px;min-height:390px">
+        <div class="chart-head"><div><div class="chart-title">指标趋势（${selected.name}）</div><div class="chart-sub">${selected.object}｜单位：${selected.unit}</div></div><div class="chart-inline-result"><span>当前值 <b>${fmt(selected.actual,selected.actual<1?3:selected.actual<10?2:1)} ${selected.unit}</b></span><span>目标值 <b>${fmt(selected.target,selected.target<1?3:selected.target<10?2:1)} ${selected.unit}</b></span><span>偏差率 <b class="${good?'ok-text':'bad-text'}">${pct(diffRate)}</b></span><span>状态 <b class="${good?'ok-text':'bad-text'}">${good?'达标':'未达标'}</b></span></div></div>
+        <div class="line-chart">${benchmarkLineSvg(selected,s.grain)}</div>
+      </div>
+      <div class="card table-card"><div class="table-toolbar"><div><div class="chart-title">指标对标明细（${s.year}年）</div></div></div><div class="table-wrap"><table><thead><tr><th>对标对象</th><th>对象类型</th><th>指标名称</th><th>单位</th><th>实际值</th><th>目标值</th><th>偏差率</th><th>状态</th></tr></thead><tbody>
+        ${rows.map(r=>{const ok=isBenchmarkGood(r);const dr=(r.actual-r.target)/r.target*100;return `<tr class="clickable-row ${r.id===selected.id?'selected':''}" data-bench-row="${r.id}"><td>${r.object}</td><td>${r.type}</td><td>${r.name}</td><td>${r.unit}</td><td>${fmt(r.actual,r.actual<1?3:r.actual<10?2:r.actual>10000?0:1)}</td><td>${fmt(r.target,r.target<1?3:r.target<10?2:r.target>10000?0:1)}</td><td class="${ok?'down':'up'}">${pct(dr)}</td><td><span class="status ${ok?'ok':'bad'}">${ok?'达标':'未达标'}</span></td></tr>`}).join('')}
+      </tbody></table></div></div>`}`;
+
+    document.querySelectorAll('[data-bench-type]').forEach(btn=>btn.onclick=()=>{
+      state.benchmark.type=btn.dataset.benchType;
+      if(state.benchmark.type==='all'){state.benchmark.object='';state.benchmark.metric='';state.benchmark.selectedId='b1';}
+      else{
+        const items=benchmarkRows.filter(r=>r.typeKey===state.benchmark.type);
+        state.benchmark.object=items[0]?.object||'';state.benchmark.selectedId=items[0]?.id||'b1';state.benchmark.metric=items[0]?.name||'';
+      }
+      renderBenchmark();
+    });
+    const objectSelect=document.getElementById('benchObject');
+    if(objectSelect && !objectSelect.disabled) objectSelect.onchange=e=>{state.benchmark.object=e.target.value;const first=benchmarkMetrics(e.target.value)[0];if(first){state.benchmark.selectedId=first.id;state.benchmark.metric=first.name;}renderBenchmark();};
+    const metricSelect=document.getElementById('benchMetric');
+    if(metricSelect && !metricSelect.disabled) metricSelect.onchange=e=>{state.benchmark.selectedId=e.target.value;state.benchmark.metric=benchmarkRows.find(r=>r.id===e.target.value)?.name||'';renderBenchmark();};
+    document.getElementById('benchQuery').onclick=()=>{state.benchmark.year=document.getElementById('benchYear').value||'2026';state.benchmark.grain=document.getElementById('benchGrain').value;renderBenchmark();toast('对标结果已更新');};
+    document.getElementById('benchReset').onclick=()=>{state.benchmark={year:'2026',type:'all',object:'',metric:'',grain:'month',selectedId:'b1'};renderBenchmark();toast('筛选条件已重置');};
+    document.querySelectorAll('[data-bench-row]').forEach(tr=>tr.onclick=()=>{state.benchmark.selectedId=tr.dataset.benchRow;renderBenchmark();});
+    document.getElementById('targetConfig').onclick=()=>{if(noProductData) toast('当前暂无可配置的产品能效指标'); else openTargetConfig(selected);};
+  }
+
+  function benchmarkLineSvg(row,grain){
+    let values=row.trend.slice();let labels=values.map((_,i)=>`${i+1}月`);
+    if(grain==='quarter'){
+      values=[0,1,2,3].map(q=>values.slice(q*3,q*3+3).reduce((a,b)=>a+b,0)/3);labels=['一季度','二季度','三季度','四季度'];
+    }else if(grain==='year'){
+      values=[row.actual];labels=['2026年'];
+    }
+    const target=row.target,w=1120,h=300,pad={l:55,r:36,t:28,b:46};
+    const min=Math.min(...values,target),max=Math.max(...values,target),span=(max-min)||1,low=min-span*.35,high=max+span*.25;
+    const x=i=>values.length===1?w/2:pad.l+i*(w-pad.l-pad.r)/(values.length-1);const y=v=>pad.t+(high-v)*(h-pad.t-pad.b)/(high-low);
+    const points=values.map((v,i)=>`${x(i)},${y(v)}`).join(' ');
+    const grid=[0,.25,.5,.75,1].map(t=>{const yy=pad.t+t*(h-pad.t-pad.b);const val=high-t*(high-low);return `<line x1="${pad.l}" y1="${yy}" x2="${w-pad.r}" y2="${yy}" stroke="#E5EAF0" stroke-dasharray="4 4"/><text x="4" y="${yy+4}" font-size="11" fill="#8A94A3">${fmt(val,row.unit==='%'?1:row.actual<1?3:1)}</text>`}).join('');
+    return `<svg viewBox="0 0 ${w} ${h}" aria-label="指标趋势图">${grid}<line x1="${pad.l}" y1="${y(target)}" x2="${w-pad.r}" y2="${y(target)}" stroke="#00A870" stroke-width="2" stroke-dasharray="7 5"/><text x="${w-pad.r-4}" y="${y(target)-7}" text-anchor="end" font-size="11" fill="#00875A">目标值 ${fmt(target,target<1?3:target<10?2:1)}</text>${values.length>1?`<polyline points="${points}" fill="none" stroke="#1677FF" stroke-width="3"/>`:''}${values.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="5" fill="#fff" stroke="#1677FF" stroke-width="2"/><text x="${x(i)}" y="${y(v)-11}" text-anchor="middle" font-size="11" fill="#365A7A">${fmt(v,v<1?3:v<10?2:v>10000?0:1)}</text><text x="${x(i)}" y="${h-15}" text-anchor="middle" font-size="11" fill="#667085">${labels[i]}</text>`).join('')}</svg>`;
+  }
+
+  function openTargetConfig(row){
+    openModal('指标目标配置',`<div class="modal-form"><div class="field"><label>目标年度</label><input id="targetYear" type="number" value="${state.benchmark.year}"></div><div class="field"><label>对象类型</label><input value="${row.type}" readonly></div><div class="field"><label>对标对象</label><input value="${row.object}" readonly></div><div class="field"><label>指标名称</label><input value="${row.name}" readonly></div><div class="field"><label class="required-label">目标值（${row.unit}）</label><input id="targetValue" type="number" step="0.001" value="${row.target}"></div><div class="field"><label>评价方向</label><div class="target-direction"><button class="${row.direction==='low'?'active':''}" type="button">越低越好</button><button class="${row.direction==='high'?'active':''}" type="button">越高越好</button></div></div><div class="full modal-note">目标值是能效对标的唯一评价基准；实际值由能源数据、运营数据或能源转换关系自动计算。</div></div>`,{confirmText:'保存配置',onConfirm:()=>{const v=Number(document.getElementById('targetValue').value);if(Number.isFinite(v) && v>0){row.target=v;toast('指标目标值已保存');setTimeout(renderBenchmark,40);}}});
+  }
+
+
+  function renderFlow(){
+    const s=state.flow;
+    const data=flowDatasets[s.org]||flowDatasets.factory;
+    const monthMode=s.grain==='month';
+    const rows=s.org==='prodA'?flowRowsProdA:flowRows;
+    const stageName=s.level==='level1'?'能源分配':'能源利用';
+    const rateName=s.level==='level1'?'能源分配率':'能源利用归属率';
+    const capabilityTags=s.org==='prodA'
+      ? ['本级能源控制量','二级利用可展开','未配置转换关系']
+      : ['一级能源分配','2条能源转换','1条外部输出'];
+
+    const diagramContent=`
+      <div class="chart-head">
+        <div class="flow-legend">
+          <span><i class="legend-square" style="background:#1677FF"></i>能源输入</span>
+          <span><i class="legend-square" style="background:#F79009"></i>能源转换</span>
+          <span><i class="legend-square" style="background:#00A870"></i>厂内能源介质</span>
+          <span><i class="legend-square" style="background:#23A35A"></i>${s.level==='level1'?'能源分配':'能源利用'}</span>
+          <span><i class="legend-square" style="background:#7A5AF8"></i>外部输出</span>
+          <span><i class="legend-square" style="background:#98A2B3"></i>未分配</span>
+        </div>
+      </div>
+      <div id="sankeyWrap">${flowSankeySvg(s.level,s.org)}<div class="node-tooltip" id="nodeTooltip"></div></div>
+      <div class="flow-method-note">一级视图展示能源向用能单元的<strong>分配</strong>；展开二级后进一步展示工序、系统或功能区域的<strong>利用</strong>。当同一种能源同时存在外购、自产或回收来源时，系统先汇入厂内能源介质；缺少专线计量或分配规则时，不推断各终端的具体来源比例。未分配量是管理口径差额，不等同于物理损失。</div>
+      <div class="stage-note">
+        <div class="stage-note-item"><strong>能源输入</strong><span>企业边界购入、输入或可计量回收的能源。</span></div>
+        <div class="stage-note-item"><strong>能源转换</strong><span>锅炉、余热发电、自发电等已配置转换关系。</span></div>
+        <div class="stage-note-item"><strong>能源分配</strong><span>本级能源向一级用能单元的归属。</span></div>
+        <div class="stage-note-item"><strong>能源利用</strong><span>展开二级后，能源在工序、系统或区域中的实际使用。</span></div>
+      </div>
+      ${flowRankHtml(s.level,s.org)}
+    `;
+
+    const mainContent=s.tab==='diagram'
+      ? diagramContent
+      : s.tab==='balance'
+        ? energyBalanceTable(s.org,s.level)
+        : flowDetailTable(rows,s.level);
+
+    content.innerHTML=`
+      ${pageHead('能流分析','通过桑基图和能源平衡表，对能源输入、转换、分配、利用及外部输出进行管理口径分析。')}
+      <div class="card filter-card simple"><div class="field"><label>分析年度</label><input id="flowYear" type="number" value="${s.year}"></div><div class="field wide"><label>组织范围</label><select id="flowOrg"><option value="factory">全厂</option><option value="prodA" ${s.org==='prodA'?'selected':''}>生产单元A</option></select></div><div class="field"><label>时间粒度</label><select id="flowGrain"><option value="month">月度</option><option value="year" ${s.grain==='year'?'selected':''}>年度</option></select></div>${monthMode?`<div class="field"><label>月份</label><select id="flowMonth"><option>6月</option><option>5月</option><option>4月</option></select></div>`:''}<div class="filter-spacer"></div><button class="btn btn-primary" id="flowQuery">查询</button><button class="btn" id="flowReset">重置</button></div>
+      <div class="capability-strip"><div class="capability-main"><div class="capability-icon">i</div><div><strong>当前数据能力：</strong>${data.capability}</div></div><div class="capability-tags">${capabilityTags.map(tag=>`<span class="capability-tag">${tag}</span>`).join('')}</div></div>
+      <div class="card flow-summary">
+        <div class="flow-stat"><div class="flow-icon">⇥</div><div><div class="summary-label">能源输入量</div><div class="summary-value big" style="color:var(--text)">${fmt(data.input)}<span class="unit">tce</span></div></div></div>
+        <div class="flow-stat"><div class="flow-icon">✓</div><div><div class="summary-label">${stageName}量</div><div class="summary-value big" style="color:var(--text)">${fmt(data.allocated)}<span class="unit">tce</span></div></div></div>
+        <div class="flow-stat"><div class="flow-icon">!</div><div><div class="summary-label">未分配量</div><div class="summary-value big orange">${fmt(data.unallocated)}<span class="unit">tce</span></div></div></div>
+        <div class="flow-stat"><div class="flow-icon">◔</div><div><div class="summary-label">${rateName}</div><div class="summary-value big">${fmt(data.rate,1)}%</div></div></div>
+      </div>
+      <div class="card flow-main">
+        <div class="flow-tabs">
+          <button class="flow-tab ${s.tab==='diagram'?'active':''}" data-flow-tab="diagram">能流图</button>
+          <button class="flow-tab ${s.tab==='balance'?'active':''}" data-flow-tab="balance">能源平衡表</button>
+          <button class="flow-tab ${s.tab==='detail'?'active':''}" data-flow-tab="detail">流向明细</button>
+          <div class="flow-head-actions"><span class="chart-sub">展示层级：</span><div class="seg"><button data-flow-level="level1" class="${s.level==='level1'?'active':''}">一级用能单元</button><button data-flow-level="level2" class="${s.level==='level2'?'active':''}">展开到二级</button></div></div>
+        </div>
+        ${mainContent}
+      </div>
+      <div class="difference-strip"><strong>分析提示</strong><span>未分配量：<span class="warning-value">${fmt(data.unallocated)} tce</span></span><span>可计算转换损失：<span class="loss-value">${data.loss===null?'当前范围不适用':fmt(data.loss)+' tce'}</span></span>${data.external?`<span>外部输出：<strong>${fmt(data.external)} tce</strong></span>`:''}<button class="link" id="lossDetail">查看口径</button></div>
+    `;
+
+    document.getElementById('flowQuery').onclick=()=>{state.flow.year=document.getElementById('flowYear').value||'2026';state.flow.org=document.getElementById('flowOrg').value;state.flow.grain=document.getElementById('flowGrain').value;const m=document.getElementById('flowMonth');if(m)state.flow.month=m.value;renderFlow();toast('能流数据已更新');};
+    document.getElementById('flowReset').onclick=()=>{state.flow={year:'2026',org:'factory',grain:'month',month:'6月',level:'level1',tab:'diagram'};renderFlow();toast('筛选条件已重置');};
+    document.querySelectorAll('[data-flow-tab]').forEach(btn=>btn.onclick=()=>{state.flow.tab=btn.dataset.flowTab;renderFlow();});
+    document.querySelectorAll('[data-flow-level]').forEach(btn=>btn.onclick=()=>{state.flow.level=btn.dataset.flowLevel;renderFlow();});
+    document.getElementById('lossDetail').onclick=()=>openLossDetail(data);
+    document.querySelectorAll('.flow-detail').forEach(btn=>btn.onclick=()=>openFlowDetail(rows[Number(btn.dataset.index)]));
+    const detailExport=document.getElementById('flowDetailExport');
+    if(detailExport) detailExport.onclick=()=>toast('已按当前筛选条件导出能源流向明细');
+    if(s.tab==='diagram') bindSankeyInteractions();
+  }
+
+
+  function flowRankRows(level,org){
+    if(org==='prodA') return level==='level2'
+      ? [['核心工序',2959,57.3],['原料制备',1480,28.7],['包装发运',621,12.0],['未分配',100,1.9]]
+      : [['生产单元A',5060,98.1],['未分配',100,1.9]];
+    return level==='level2'
+      ? [['核心工序A',3800,28.5],['核心工序B',3480,26.1],['原料制备',2420,18.2],['空压系统',1150,8.6],['办公区域',640,4.8]]
+      : [['生产单元A',6220,46.6],['生产单元B',3480,26.1],['公辅系统',2300,17.2],['办公区域',640,4.8],['其他单元',340,2.6]];
+  }
+
+  function flowRankHtml(level,org){
+    const rows=flowRankRows(level,org);
+    const max=Math.max(...rows.map(row=>row[2]),1);
+    return `<div class="card rank-card-wide">
+      <div class="rank-head">
+        <div><div class="chart-title">重点用能单元 TOP5</div><div class="chart-sub">${level==='level1'?'按一级能源分配量排序':'按二级能源利用量排序'}｜折标量口径</div></div>
+        <span class="status check">${rows.length} 个对象</span>
+      </div>
+      <div class="rank-list">
+        ${rows.map((row,index)=>`<div class="rank-bar-row">
+          <div class="rank-badge">${index+1}</div>
+          <div class="rank-name" title="${row[0]}">${row[0]}</div>
+          <div class="rank-track"><div class="rank-fill" style="width:${Math.max(row[2]/max*100,3)}%"></div></div>
+          <div class="rank-value">${fmt(row[1])} tce</div>
+          <div class="rank-share">${fmt(row[2],1)}%</div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  function flowDetailTable(rows,level){
+    const stageLabel=level==='level1'?'能源分配':'能源利用';
+    const displayType=row=>{
+      if(['终端消费','直接消费'].includes(row.type)) return stageLabel;
+      if(['未归属','未分配'].includes(row.type)) return '未分配';
+      return row.type;
+    };
+    return `<div class="flow-detail-tab">
+      <div class="table-toolbar">
+        <div><div class="chart-title">能源流向明细</div><div class="meta">用于精确核对流向数值、查看数据来源和能源转换关系；与当前组织范围、期间和展示层级一致。</div></div>
+        <button class="btn" id="flowDetailExport">⇩ 导出当前明细</button>
+      </div>
+      <div class="flow-detail-summary"><span>当前阶段：<strong>${stageLabel}</strong></span><span>明细条数：<strong>${rows.length}</strong></span><span>计量口径：<strong>折标量（tce）</strong></span></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>能流阶段</th><th>能源介质/输入</th><th>转换单元或关系</th><th>${level==='level1'?'分配去向':'利用去向'}</th><th>折标量（tce）</th><th>占比</th><th>数据追溯</th></tr></thead>
+        <tbody>${rows.map((r,i)=>`<tr><td><span class="status ${displayType(r)==='未分配'?'warn':displayType(r)==='能源转换'?'check':'ok'}">${displayType(r)}</span></td><td>${r.input}</td><td>${r.relation}</td><td>${r.target}</td><td>${fmt(r.tce)}</td><td>${fmt(r.share,1)}%</td><td>${r.action==='none'?'—':`<button class="link flow-detail" data-index="${i}">${r.action==='source'?'查看来源':r.action==='external'?'查看数据':'查看关系'}</button>`}</td></tr>`).join('')}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+
+  function energyBalanceTable(org,level){
+    const rows=org==='prodA'?balanceRowsProdA:balanceRows;
+    const stageColumn=level==='level1'?'分配量':'利用量';
+    return `<div class="balance-card">
+      <div class="balance-title-row">
+        <div>
+          <div class="chart-title">能源平衡表</div>
+          <div class="balance-caption">按当前组织范围和折标量进行管理口径平衡校验，不等同于锅炉、窑炉等专业工艺热平衡。一级视图校验能源分配，展开二级后校验能源利用，避免父子层级重复计算。</div>
+        </div>
+        <span class="status check">${level==='level1'?'一级分配口径':'二级利用口径'}</span>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>能源品种</th><th>输入量</th><th>转换产出</th><th>转换投入</th><th>${stageColumn}</th><th>外部输出</th><th>未分配量</th><th>平衡状态</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr><td>${r.energy}</td><td>${r.boundary?fmt(r.boundary):'—'}</td><td>${r.internal?fmt(r.internal):'—'}</td><td>${r.convertIn?fmt(r.convertIn):'—'}</td><td>${r.terminal?fmt(r.terminal):'—'}</td><td>${r.external?fmt(r.external):'—'}</td><td class="${r.unallocated?'up':''}">${r.unallocated?fmt(r.unallocated):'—'}</td><td><span class="status ${r.unallocated?'warn':'ok'}">${r.status}</span></td></tr>`).join('')}</tbody></table></div>
+      <div class="flow-method-note">平衡关系：输入量 + 转换产出 = 转换投入 + ${stageColumn} + 外部输出 + 未分配量。转换产出包括能源转换产出、无投入自产能源和可计量回收能源；同一能源量不同时计入一级分配和二级利用。</div>
+    </div>`;
+  }
+
+
+  function flowSankeySvg(level,org){
+    if(org==='prodA') return flowSankeyProdASvg(level);
+
+    const node=(id,name,value,x,y,color,tip,w=118,h=50)=>`<g class="node" data-key="${id}" data-name="${name}" data-value="${value}" data-tip="${tip}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="7" fill="#fff" stroke="${color}"/><rect x="${x}" y="${y}" width="7" height="${h}" rx="3" fill="${color}"/><text x="${x+17}" y="${y+20}" font-size="11.5" fill="#172033">${name}</text><text x="${x+17}" y="${y+38}" font-size="10.5" fill="#5F6B7A">${value}</text></g>`;
+    const flow=(a,b,d,color,width)=>`<path class="flow" data-keys="${a} ${b}" d="${d}" stroke="${color}" stroke-width="${width}"/>`;
+
+    if(level==='level1'){
+      const nodes=[
+        node('purchaseElectric','外购电力','6,127 tce',18,42,'#1677FF','企业边界能源输入'),
+        node('gasSource','天然气','3,256 tce',18,112,'#1677FF','企业边界能源输入'),
+        node('coalSource','原煤','2,000 tce',18,182,'#1677FF','企业边界能源输入'),
+        node('steamSource','外购蒸汽','1,937 tce',18,252,'#1677FF','企业边界能源输入'),
+        node('heatSource','回收余热','1,120 tce',18,322,'#1677FF','可计量回收能源'),
+        node('boilerPlant','燃气锅炉','天然气→蒸汽',220,96,'#F79009','锅炉产汽/产热转换关系'),
+        node('wasteHeatPlant','余热发电系统','余热→电力',220,262,'#F79009','余热发电转换关系'),
+        node('electricPool','厂内电力','可用 7,087 tce',430,42,'#00A870','外购电力与自产电力汇总'),
+        node('gasPool','厂内天然气','终端 1,316 tce',430,122,'#00A870','转换投入后剩余可分配天然气'),
+        node('coalPool','厂内原煤','可用 2,000 tce',430,202,'#00A870','厂内原煤能源介质'),
+        node('steamPool','厂内蒸汽','可用 3,817 tce',430,282,'#00A870','外购蒸汽与锅炉产汽汇总'),
+        node('prodA','生产单元A','6,220 tce',680,42,'#23A35A','一级能源分配对象'),
+        node('prodB','生产单元B','3,480 tce',680,122,'#23A35A','一级能源分配对象'),
+        node('utilities','公辅系统','2,300 tce',680,202,'#23A35A','一级能源分配对象'),
+        node('office','办公区域','640 tce',680,282,'#23A35A','一级能源分配对象'),
+        node('external','企业外部','340 tce',930,82,'#7A5AF8','由外供能源数据自动识别'),
+        node('unallocated','未分配量','340 tce',930,262,'#98A2B3','输入量与一级分配量的管理口径差额')
+      ].join('');
+      const paths=[
+        flow('gasSource','boilerPlant','M136 137 C175 137 185 121 220 121','#1677FF',18),
+        flow('heatSource','wasteHeatPlant','M136 347 C176 347 186 287 220 287','#1677FF',13),
+        flow('purchaseElectric','electricPool','M136 67 C250 67 330 67 430 67','#1677FF',27),
+        flow('wasteHeatPlant','electricPool','M338 287 C385 255 405 86 430 67','#F79009',12),
+        flow('gasSource','gasPool','M136 137 C260 145 330 147 430 147','#1677FF',12),
+        flow('coalSource','coalPool','M136 207 C250 207 330 227 430 227','#1677FF',16),
+        flow('steamSource','steamPool','M136 277 C250 277 330 307 430 307','#1677FF',15),
+        flow('boilerPlant','steamPool','M338 121 C390 142 405 286 430 307','#F79009',18),
+        flow('electricPool','prodA','M548 67 C590 67 635 67 680 67','#00A870',18),
+        flow('electricPool','utilities','M548 67 C600 80 635 210 680 227','#00A870',10),
+        flow('gasPool','prodA','M548 147 C600 135 635 78 680 67','#00A870',8),
+        flow('gasPool','prodB','M548 147 C600 147 635 147 680 147','#00A870',10),
+        flow('coalPool','prodA','M548 227 C600 190 635 90 680 67','#00A870',12),
+        flow('coalPool','prodB','M548 227 C605 205 640 155 680 147','#00A870',7),
+        flow('steamPool','prodB','M548 307 C600 260 635 170 680 147','#00A870',11),
+        flow('steamPool','utilities','M548 307 C600 285 635 230 680 227','#00A870',8),
+        flow('electricPool','office','M548 67 C650 100 720 300 680 307','#00A870',5),
+        flow('electricPool','external','M548 67 C720 68 820 107 930 107','#7A5AF8',5),
+        flow('coalPool','unallocated','M548 227 C720 230 820 287 930 287','#98A2B3',3),
+        flow('steamPool','unallocated','M548 307 C720 307 820 287 930 287','#98A2B3',6)
+      ].join('');
+      return `<svg class="sankey" viewBox="0 0 1070 390" aria-label="企业一级能源分配图"><text x="18" y="20" font-size="13" font-weight="700">能源输入</text><text x="220" y="20" font-size="13" font-weight="700">能源转换</text><text x="430" y="20" font-size="13" font-weight="700">厂内能源介质</text><text x="680" y="20" font-size="13" font-weight="700">能源分配（一级用能单元）</text><text x="930" y="20" font-size="13" font-weight="700">外部输出 / 未分配</text>${paths}${nodes}</svg>`;
+    }
+
+    const nodes=[
+      node('purchaseElectric','外购电力','6,127 tce',12,38,'#1677FF','企业边界能源输入',104,46),
+      node('gasSource','天然气','3,256 tce',12,96,'#1677FF','企业边界能源输入',104,46),
+      node('coalSource','原煤','2,000 tce',12,154,'#1677FF','企业边界能源输入',104,46),
+      node('steamSource','外购蒸汽','1,937 tce',12,212,'#1677FF','企业边界能源输入',104,46),
+      node('heatSource','回收余热','1,120 tce',12,270,'#1677FF','可计量回收能源',104,46),
+      node('boilerPlant','燃气锅炉','天然气→蒸汽',160,82,'#F79009','锅炉产汽/产热转换关系',112,48),
+      node('wasteHeatPlant','余热发电','余热→电力',160,226,'#F79009','余热发电转换关系',112,48),
+      node('electricPool','厂内电力','7,087 tce',325,38,'#00A870','厂内能源介质汇总',112,48),
+      node('gasPool','厂内天然气','1,316 tce',325,104,'#00A870','厂内能源介质汇总',112,48),
+      node('coalPool','厂内原煤','2,000 tce',325,170,'#00A870','厂内能源介质汇总',112,48),
+      node('steamPool','厂内蒸汽','3,817 tce',325,236,'#00A870','厂内能源介质汇总',112,48),
+      node('prodA','生产单元A','6,220 tce',505,30,'#23A35A','一级能源分配对象',112,48),
+      node('prodB','生产单元B','3,480 tce',505,96,'#23A35A','一级能源分配对象',112,48),
+      node('utilities','公辅系统','2,300 tce',505,162,'#23A35A','一级能源分配对象',112,48),
+      node('office','办公区域','640 tce',505,228,'#23A35A','一级能源分配对象',112,48),
+      node('rawPrep','原料制备','2,420 tce',690,16,'#23A35A','二级能源利用环节',112,44),
+      node('coreA','核心工序A','3,800 tce',690,68,'#23A35A','二级能源利用环节',112,44),
+      node('coreB','核心工序B','3,480 tce',690,120,'#23A35A','二级能源利用环节',112,44),
+      node('air','空压系统','1,150 tce',690,172,'#23A35A','二级能源利用环节',112,44),
+      node('otherUtility','其他公辅环节','1,150 tce',690,224,'#23A35A','二级能源利用环节',112,44),
+      node('officeUse','办公区域','640 tce',690,276,'#23A35A','二级能源利用环节',112,44),
+      node('external','企业外部','340 tce',900,82,'#7A5AF8','由外供能源数据自动识别',112,48),
+      node('unallocated','未分配量','340 tce',900,240,'#98A2B3','当前层级管理口径差额',112,48)
+    ].join('');
+    const paths=[
+      flow('gasSource','boilerPlant','M116 119 C135 119 142 106 160 106','#1677FF',15),
+      flow('heatSource','wasteHeatPlant','M116 293 C135 293 145 250 160 250','#1677FF',11),
+      flow('purchaseElectric','electricPool','M116 61 C205 61 250 62 325 62','#1677FF',22),
+      flow('wasteHeatPlant','electricPool','M272 250 C300 220 310 85 325 62','#F79009',10),
+      flow('gasSource','gasPool','M116 119 C210 125 255 128 325 128','#1677FF',10),
+      flow('coalSource','coalPool','M116 177 C205 178 260 194 325 194','#1677FF',13),
+      flow('steamSource','steamPool','M116 235 C205 236 260 260 325 260','#1677FF',12),
+      flow('boilerPlant','steamPool','M272 106 C305 130 310 245 325 260','#F79009',15),
+      flow('electricPool','prodA','M437 62 C465 62 480 54 505 54','#00A870',14),
+      flow('gasPool','prodA','M437 128 C470 110 480 70 505 54','#00A870',7),
+      flow('coalPool','prodA','M437 194 C472 160 485 80 505 54','#00A870',10),
+      flow('electricPool','prodB','M437 62 C470 75 485 112 505 120','#00A870',9),
+      flow('gasPool','prodB','M437 128 C470 128 485 122 505 120','#00A870',8),
+      flow('steamPool','prodB','M437 260 C470 220 490 135 505 120','#00A870',10),
+      flow('electricPool','utilities','M437 62 C475 95 495 176 505 186','#00A870',8),
+      flow('steamPool','utilities','M437 260 C475 235 495 195 505 186','#00A870',7),
+      flow('electricPool','office','M437 62 C500 105 520 240 505 252','#00A870',4),
+      flow('prodA','rawPrep','M617 54 C645 45 665 38 690 38','#23A35A',10),
+      flow('prodA','coreA','M617 54 C648 58 670 90 690 90','#23A35A',14),
+      flow('prodB','coreB','M617 120 C648 120 670 142 690 142','#23A35A',14),
+      flow('utilities','air','M617 186 C648 184 670 194 690 194','#23A35A',8),
+      flow('utilities','otherUtility','M617 186 C650 202 672 246 690 246','#23A35A',8),
+      flow('office','officeUse','M617 252 C648 260 670 298 690 298','#23A35A',5),
+      flow('electricPool','external','M437 62 C610 62 790 105 900 106','#7A5AF8',4),
+      flow('coalPool','unallocated','M437 194 C610 200 790 264 900 264','#98A2B3',3),
+      flow('steamPool','unallocated','M437 260 C610 260 790 264 900 264','#98A2B3',5)
+    ].join('');
+    return `<svg class="sankey" viewBox="0 0 1040 350" aria-label="企业能源分配与利用图"><text x="12" y="18" font-size="12" font-weight="700">能源输入</text><text x="160" y="18" font-size="12" font-weight="700">能源转换</text><text x="325" y="18" font-size="12" font-weight="700">厂内能源介质</text><text x="505" y="18" font-size="12" font-weight="700">能源分配（一级）</text><text x="690" y="12" font-size="12" font-weight="700">能源利用（二级）</text><text x="900" y="18" font-size="12" font-weight="700">外部输出 / 未分配</text>${paths}${nodes}</svg>`;
+  }
+
+
+  function flowSankeyProdASvg(level){
+    const node=(id,name,value,x,y,color,tip,w=122,h=52)=>`<g class="node" data-key="${id}" data-name="${name}" data-value="${value}" data-tip="${tip}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="7" fill="#fff" stroke="${color}"/><rect x="${x}" y="${y}" width="7" height="${h}" rx="3" fill="${color}"/><text x="${x+18}" y="${y+21}" font-size="12" fill="#172033">${name}</text><text x="${x+18}" y="${y+40}" font-size="10.5" fill="#5F6B7A">${value}</text></g>`;
+    const flow=(a,b,d,color,width)=>`<path class="flow" data-keys="${a} ${b}" d="${d}" stroke="${color}" stroke-width="${width}"/>`;
+
+    if(level==='level1'){
+      const nodes=[
+        node('paElectric','电力','3,199 tce',35,62,'#1677FF','生产单元A本级能源输入控制量'),
+        node('paGas','天然气','1,240 tce',35,142,'#1677FF','生产单元A本级能源输入控制量'),
+        node('paSteam','蒸汽','465 tce',35,222,'#1677FF','生产单元A本级能源输入控制量'),
+        node('paOther','其他能源','256 tce',35,302,'#1677FF','压缩空气等其他能源'),
+        node('paUnit','生产单元A','已分配 5,060 tce',500,162,'#23A35A','当前组织范围向下级的能源分配量'),
+        node('paUnallocated','未分配量','100 tce',850,202,'#98A2B3','本级控制量与下级分配量差额')
+      ].join('');
+      const paths=[
+        flow('paElectric','paUnit','M157 88 C310 100 410 185 500 188','#1677FF',25),
+        flow('paGas','paUnit','M157 168 C310 168 410 188 500 188','#1677FF',17),
+        flow('paSteam','paUnit','M157 248 C320 230 420 195 500 188','#1677FF',9),
+        flow('paOther','paUnit','M157 328 C330 280 430 205 500 190','#1677FF',6),
+        flow('paOther','paUnallocated','M157 330 C470 350 720 230 850 228','#98A2B3',4)
+      ].join('');
+      return `<svg class="sankey" viewBox="0 0 1000 390" aria-label="生产单元A一级能源分配图"><text x="35" y="27" font-size="14" font-weight="700">能源输入</text><text x="500" y="27" font-size="14" font-weight="700">能源分配（一级用能单元）</text><text x="850" y="27" font-size="14" font-weight="700">未分配</text>${paths}${nodes}</svg>`;
+    }
+
+    const nodes=[
+      node('paElectric','电力','3,199 tce',25,54,'#1677FF','生产单元A本级能源输入控制量',112,48),
+      node('paGas','天然气','1,240 tce',25,124,'#1677FF','生产单元A本级能源输入控制量',112,48),
+      node('paSteam','蒸汽','465 tce',25,194,'#1677FF','生产单元A本级能源输入控制量',112,48),
+      node('paOther','其他能源','256 tce',25,264,'#1677FF','压缩空气等其他能源',112,48),
+      node('paDistribution','生产单元A','分配 5,060 tce',360,138,'#23A35A','一级能源分配对象',124,50),
+      node('paRaw','原料制备','1,480 tce',650,54,'#23A35A','二级能源利用环节',118,48),
+      node('paCore','核心工序','2,959 tce',650,144,'#23A35A','二级能源利用环节',118,48),
+      node('paPack','包装发运','621 tce',650,234,'#23A35A','二级能源利用环节',118,48),
+      node('paUnallocated','未分配量','100 tce',875,184,'#98A2B3','本级控制量与二级利用量差额',112,48)
+    ].join('');
+    const paths=[
+      flow('paElectric','paDistribution','M137 78 C235 85 300 150 360 162','#1677FF',22),
+      flow('paGas','paDistribution','M137 148 C235 148 300 160 360 162','#1677FF',15),
+      flow('paSteam','paDistribution','M137 218 C235 205 300 172 360 162','#1677FF',8),
+      flow('paOther','paDistribution','M137 288 C235 250 300 185 360 164','#1677FF',6),
+      flow('paDistribution','paRaw','M484 162 C540 125 590 80 650 78','#23A35A',11),
+      flow('paDistribution','paCore','M484 162 C540 162 590 168 650 168','#23A35A',18),
+      flow('paDistribution','paPack','M484 162 C540 205 590 258 650 258','#23A35A',8),
+      flow('paOther','paUnallocated','M137 288 C430 320 710 210 875 208','#98A2B3',4)
+    ].join('');
+    return `<svg class="sankey" viewBox="0 0 1020 350" aria-label="生产单元A能源分配与利用图"><text x="25" y="24" font-size="13" font-weight="700">能源输入</text><text x="360" y="24" font-size="13" font-weight="700">能源分配（一级）</text><text x="650" y="24" font-size="13" font-weight="700">能源利用（二级）</text><text x="875" y="24" font-size="13" font-weight="700">未分配</text>${paths}${nodes}</svg>`;
+  }
+
+  function bindSankeyInteractions(){
+    const wrap=document.getElementById('sankeyWrap');const tooltip=document.getElementById('nodeTooltip');
+    if(!wrap || !tooltip) return;
+    document.querySelectorAll('.sankey .node').forEach(node=>node.onclick=e=>{
+      const key=node.dataset.key;
+      document.querySelectorAll('.sankey .node').forEach(x=>x.classList.toggle('selected',x===node));
+      document.querySelectorAll('.sankey .flow').forEach(p=>p.classList.toggle('active',p.dataset.keys.split(' ').includes(key)));
+      const rect=wrap.getBoundingClientRect();
+      tooltip.innerHTML=`<strong>${node.dataset.name}</strong><br>${node.dataset.value}<br>${node.dataset.tip}`;
+      tooltip.style.left=`${Math.min(e.clientX-rect.left+12,rect.width-270)}px`;
+      tooltip.style.top=`${Math.max(e.clientY-rect.top-10,45)}px`;
+      tooltip.classList.add('show');
+    });
+    wrap.addEventListener('mouseleave',()=>tooltip.classList.remove('show'));
+  }
+
+
+  function openLossDetail(data){
+    openModal('能流分析口径',`<div class="detail-list"><div class="detail-box"><span>未分配量</span>${fmt(data.unallocated)} tce</div><div class="detail-box"><span>计算口径</span>本级输入控制量－当前层级分配/利用量</div><div class="detail-box"><span>可计算转换损失</span>${data.loss===null?'当前范围不适用':fmt(data.loss)+' tce'}</div><div class="detail-box"><span>计算口径</span>各能源转换关系投入折标量－产出折标量</div><div class="detail-box"><span>外部输出</span>${fmt(data.external||0)} tce</div><div class="detail-box"><span>数据来源</span>外供能源数据自动识别</div></div><div class="modal-note">未分配量属于管理口径差额，不等同于物理能源损失。输配损失只有在来源端与去向端均存在可比计量数据时才计算；一期未配置双侧计量时不展示具体数值。能源平衡表用于当前组织范围和折标量校验，不等同于专业工艺热平衡。</div>`,{showConfirm:false});
+  }
+
+  function openFlowDetail(r){
+    if(r.action==='source'){
+      openModal('能源流向来源',`<div class="detail-list"><div class="detail-box"><span>流向类型</span>${r.type}</div><div class="detail-box"><span>分配/利用去向</span>${r.target}</div><div class="detail-box"><span>能源介质</span>${r.input}</div><div class="detail-box"><span>折标量</span>${fmt(r.tce)} tce</div></div><div class="modal-note"><strong>引用数据：</strong>${r.source}<br>存在多种同类能源来源时，系统不自动拆分各分配或利用对象的具体能源来源比例。</div>`,{showConfirm:false});
+    }else if(r.action==='external'){
+      openModal('外部输出数据',`<div class="detail-list"><div class="detail-box"><span>能源品种</span>${r.input}</div><div class="detail-box"><span>输出去向</span>${r.target}</div><div class="detail-box"><span>折标量</span>${fmt(r.tce)} tce</div><div class="detail-box"><span>识别方式</span>由外供能源数据自动生成</div></div><div class="modal-note"><strong>引用数据：</strong>${r.source}</div>`,{showConfirm:false});
+    }else{
+      const extra=r.efficiency?`<div class="detail-box"><span>转换投入</span>${fmt(r.inputTce)} tce</div><div class="detail-box"><span>转换产出</span>${fmt(r.outputTce)} tce</div><div class="detail-box"><span>转换效率</span>${fmt(r.efficiency,1)}%</div><div class="detail-box"><span>转换损失</span>${fmt(r.loss)} tce</div>`:'';
+      openModal('能源转换关系',`<div class="detail-list"><div class="detail-box"><span>投入能源</span>${r.input}</div><div class="detail-box"><span>转换关系</span>${r.relation}</div><div class="detail-box"><span>产出介质</span>${r.target}</div><div class="detail-box"><span>产出折标量</span>${fmt(r.tce)} tce</div>${extra}</div><div class="modal-note"><strong>引用数据：</strong>${r.source}</div>`,{showConfirm:false});
+    }
+  }
+
+  document.querySelectorAll('[data-page]').forEach(btn=>btn.addEventListener('click',()=>{state.page=btn.dataset.page;render();}));
+  document.querySelectorAll('.side-group-title').forEach(btn=>btn.addEventListener('click',()=>btn.parentElement.classList.toggle('open')));
+  document.getElementById('collapseBtn').onclick=()=>document.body.classList.toggle('compact');
+  render();
+})();
+</script>
+</body>
+</html>

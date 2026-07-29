@@ -1,0 +1,2653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>通用能碳平台｜能源数据管理 V11</title>
+  <style>
+    :root{
+      --gcl-green:#00A870;
+      --gcl-green-dark:#00875A;
+      --gcl-green-light:#EAF8F3;
+      --gcl-green-soft:#F3FAF7;
+      --tech-blue:#1677FF;
+      --nav-bg:#142133;
+      --nav-hover:#203149;
+      --page-bg:#F4F6F8;
+      --card-bg:#FFFFFF;
+      --text:#172033;
+      --text-secondary:#5F6B7A;
+      --text-muted:#8A94A3;
+      --border:#E4E9EF;
+      --table-head:#F7F9FB;
+      --tree-parent:#FAFCFB;
+      --danger:#F04438;
+      --warning:#F79009;
+      --shadow:0 8px 28px rgba(16,24,40,.14);
+      --radius:8px;
+    }
+    *{box-sizing:border-box}
+    html,body{
+      margin:0;min-height:100%;
+      font-family:"Microsoft YaHei","PingFang SC",Arial,sans-serif;
+      color:var(--text);background:var(--page-bg)
+    }
+    button,input,select,textarea{font:inherit}
+    button{cursor:pointer}
+    .app{display:flex;min-height:100vh}
+    .sidebar{
+      width:224px;background:var(--nav-bg);color:#fff;
+      display:flex;flex-direction:column;
+      position:fixed;left:0;top:0;bottom:0;z-index:20;
+    }
+    .brand{
+      height:64px;display:flex;align-items:center;gap:10px;padding:0 18px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      font-size:16px;font-weight:600;
+    }
+    .brand-logo{
+      width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+      background:linear-gradient(135deg,#00B578 0%,#1677FF 100%);
+      font-size:12px;font-weight:700;
+      box-shadow:inset 0 0 0 2px rgba(255,255,255,.18);
+    }
+    .menu-section{padding:16px 12px 6px;font-size:12px;color:#8190A5}
+    .menu-item{
+      height:44px;margin:3px 8px;padding:0 14px;border:0;border-radius:6px;
+      background:transparent;color:#B7C2D1;display:flex;align-items:center;gap:10px;
+      width:calc(100% - 16px);text-align:left;transition:.15s;
+    }
+    .menu-item:hover{background:var(--nav-hover);color:#fff}
+    .menu-item.active{background:rgba(0,168,112,.16);color:#fff;position:relative}
+    .menu-item.active::before{
+      content:"";position:absolute;left:-8px;width:3px;height:24px;border-radius:2px;background:var(--gcl-green)
+    }
+    .menu-icon{width:18px;text-align:center;font-size:15px}
+    .sidebar-footer{
+      margin-top:auto;border-top:1px solid rgba(255,255,255,.08);
+      padding:10px 12px 16px
+    }
+    .main{margin-left:224px;width:calc(100% - 224px);min-width:0}
+    .topbar{
+      height:64px;background:#fff;border-bottom:1px solid var(--border);
+      display:flex;align-items:center;justify-content:space-between;padding:0 24px;
+      position:sticky;top:0;z-index:10;
+    }
+    .breadcrumb{font-size:14px;color:var(--text-muted)}
+    .breadcrumb strong{color:var(--text-secondary);font-weight:500}
+    .user{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text-secondary)}
+    .avatar{
+      width:30px;height:30px;border-radius:50%;background:#E8ECF1;
+      display:grid;place-items:center;color:#7A8594
+    }
+    .content{padding:24px}
+    .page-head{margin-bottom:18px}
+    .page-title{margin:0;font-size:22px;font-weight:600}
+    .page-desc{margin-top:7px;font-size:14px;color:var(--text-muted)}
+    .card{
+      background:var(--card-bg);border:1px solid var(--border);
+      border-radius:var(--radius);box-shadow:0 1px 2px rgba(28,45,72,.03)
+    }
+    .toolbar{
+      min-height:74px;padding:16px;display:flex;align-items:flex-end;
+      gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--border)
+    }
+    .field{min-width:155px}
+    .field.search{min-width:240px}
+    label{display:block;margin-bottom:6px;font-size:13px;color:var(--text-secondary)}
+    input,select,textarea{
+      width:100%;height:38px;border:1px solid #D8DEE7;border-radius:6px;
+      background:#fff;padding:0 11px;color:var(--text);outline:none;transition:.15s
+    }
+    textarea{height:86px;padding-top:9px;resize:vertical}
+    input:focus,select:focus,textarea:focus{
+      border-color:var(--gcl-green);
+      box-shadow:0 0 0 2px rgba(0,168,112,.10)
+    }
+    input[readonly]{
+      background:#F7F9FB;color:var(--text-secondary);cursor:not-allowed
+    }
+    .spacer{flex:1}
+    .btn{
+      height:38px;border-radius:6px;padding:0 15px;border:1px solid var(--border);
+      background:#fff;display:inline-flex;align-items:center;justify-content:center;
+      gap:6px;color:var(--text-secondary);transition:.15s;white-space:nowrap
+    }
+    .btn:hover{border-color:var(--gcl-green);color:var(--gcl-green)}
+    .btn-primary{background:var(--gcl-green);border-color:var(--gcl-green);color:#fff}
+    .btn-primary:hover{
+      background:var(--gcl-green-dark);border-color:var(--gcl-green-dark);color:#fff
+    }
+    .btn-link{
+      height:auto;padding:2px 4px;border:0;background:transparent;color:var(--tech-blue)
+    }
+    .btn-link.danger{color:var(--danger)}
+    .notice{
+      margin:14px 16px;padding:10px 12px;background:var(--gcl-green-soft);
+      border:1px solid #D5EFE5;border-radius:6px;color:#467565;font-size:13px
+    }
+    .notice strong{font-weight:600;color:var(--gcl-green-dark)}
+    .context-strip{
+      grid-column:1/-1;display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+      padding:11px 13px;border:1px solid #D5EFE5;border-radius:6px;
+      background:var(--gcl-green-soft);color:var(--text-secondary);font-size:13px
+    }
+    .context-strip strong{color:var(--gcl-green-dark);font-weight:600}
+    .context-divider{width:1px;height:16px;background:#D6E7E0}
+    .tabs{
+      height:50px;padding:0 16px;display:flex;gap:28px;
+      border-bottom:1px solid var(--border)
+    }
+    .tab{
+      border:0;background:transparent;color:var(--text-secondary);
+      position:relative;padding:0 2px;font-size:14px
+    }
+    .tab.active{color:var(--gcl-green);font-weight:600}
+    .tab.active::after{
+      content:"";height:2px;background:var(--gcl-green);
+      position:absolute;left:0;right:0;bottom:0
+    }
+    .level-tabs{
+      display:flex;gap:6px;padding:12px 16px 0;background:#fff;
+      border-bottom:1px solid var(--border);overflow-x:auto
+    }
+    .level-tab{
+      height:36px;padding:0 14px;border:1px solid transparent;border-radius:6px 6px 0 0;
+      background:transparent;color:var(--text-secondary);white-space:nowrap
+    }
+    .level-tab:hover{color:var(--gcl-green)}
+    .level-tab.active{
+      color:var(--gcl-green-dark);font-weight:600;background:var(--gcl-green-soft);
+      border-color:#D5EFE5;border-bottom-color:var(--gcl-green-soft)
+    }
+    .table-wrap{width:100%;overflow:auto}
+    table{width:100%;border-collapse:collapse;min-width:920px}
+    th,td{
+      height:52px;padding:0 14px;border-bottom:1px solid #EDF0F4;
+      text-align:left;font-size:14px;white-space:nowrap
+    }
+    th{
+      height:44px;background:var(--table-head);
+      font-size:13px;color:var(--text-secondary);font-weight:500
+    }
+    tbody tr:hover td{background:#FBFDFC}
+    tbody tr.parent-row td{background:var(--tree-parent)}
+    tbody tr.parent-row:hover td{background:#F5FAF8}
+    .unit-cell{display:flex;align-items:center;gap:8px}
+    .tree-toggle{
+      width:22px;height:22px;border:1px solid #DDE5E1;border-radius:4px;
+      display:grid;place-items:center;background:#fff;color:var(--gcl-green-dark);
+      padding:0;font-size:12px;flex:none
+    }
+    .parent-name{font-weight:600}
+    .child-name{padding-left:30px;position:relative}
+    .child-name::before{
+      content:"";position:absolute;left:9px;top:50%;width:13px;height:16px;
+      border-left:1px solid #C9D4CF;border-bottom:1px solid #C9D4CF;
+      transform:translateY(-10px)
+    }
+    .child-count{
+      display:inline-flex;height:22px;padding:0 7px;align-items:center;
+      border-radius:11px;background:var(--gcl-green-light);
+      color:var(--gcl-green-dark);font-size:12px;font-weight:400
+    }
+    .tag{
+      display:inline-flex;align-items:center;height:24px;padding:0 8px;
+      border-radius:4px;font-size:12px;background:var(--gcl-green-light);
+      color:var(--gcl-green-dark);border:1px solid #BFE9D9
+    }
+    .tag.blue{background:#EEF5FF;color:#1769C2;border-color:#CFE3FF}
+    .tag.gray{background:#F1F3F5;color:#667085;border-color:#E3E7EC}
+    .tag.orange{background:#FFF7E8;color:#B54708;border-color:#FDE1B4}
+    .pagination{
+      height:56px;padding:0 16px;display:flex;justify-content:flex-end;
+      align-items:center;gap:10px;color:var(--text-muted);font-size:13px
+    }
+    .page-dot{
+      width:30px;height:30px;border:1px solid var(--gcl-green);
+      color:var(--gcl-green);border-radius:5px;display:grid;place-items:center
+    }
+    .empty{
+      height:130px;text-align:center;color:var(--text-muted)
+    }
+    .overlay{
+      position:fixed;inset:0;background:rgba(16,24,40,.48);z-index:100;
+      display:none;align-items:center;justify-content:center;padding:20px
+    }
+    .overlay.open{display:flex}
+    .modal{
+      width:min(760px,96vw);max-height:90vh;overflow:auto;
+      background:#fff;border-radius:10px;box-shadow:var(--shadow)
+    }
+    .modal.small{width:min(620px,96vw)}
+    .modal-head{
+      height:60px;padding:0 22px;border-bottom:1px solid var(--border);
+      display:flex;align-items:center;justify-content:space-between
+    }
+    .modal-title{font-size:17px;font-weight:600}
+    .modal-close{border:0;background:transparent;font-size:23px;color:#8993A2}
+    .modal-body{padding:22px}
+    .form-grid{
+      display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px 18px
+    }
+    .full{grid-column:1/-1}
+    .required::before{content:"*";color:var(--danger);margin-right:4px}
+    .help{font-size:12px;color:var(--text-muted);margin-top:5px}
+    .month-grid{
+      display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:15px 14px;margin-top:20px
+    }
+    .modal-foot{
+      height:64px;padding:0 22px;border-top:1px solid var(--border);
+      display:flex;justify-content:flex-end;align-items:center;gap:10px
+    }
+    .custom-row{display:none}
+    .custom-row.show{display:block}
+    .choice-row{
+      display:flex;gap:10px;flex-wrap:wrap;margin-top:2px
+    }
+    .choice{
+      border:1px solid #D8DEE7;background:#fff;border-radius:6px;
+      padding:8px 12px;color:var(--text-secondary)
+    }
+    .choice.active{
+      border-color:var(--gcl-green);background:var(--gcl-green-soft);
+      color:var(--gcl-green-dark)
+    }
+    .form-section-title{
+      margin-top:18px;padding-bottom:9px;border-bottom:1px solid var(--border);
+      font-size:14px;font-weight:600
+    }
+    .auto-info{
+      grid-column:1/-1;display:flex;gap:22px;align-items:center;flex-wrap:wrap;
+      padding:10px 12px;background:#F7F9FB;border:1px solid var(--border);
+      border-radius:6px;color:var(--text-secondary);font-size:13px
+    }
+    .auto-info strong{color:var(--text);font-weight:600}
+    .detail-row td{background:#FAFCFB!important;padding:14px 18px}
+    .detail-panel{
+      border:1px solid #DCE9E3;border-radius:7px;background:#fff;padding:14px
+    }
+    .detail-head{
+      display:flex;justify-content:space-between;gap:12px;align-items:center;
+      margin-bottom:12px;color:var(--text-secondary);font-size:13px
+    }
+    .detail-grid{
+      display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px
+    }
+    .detail-item{
+      padding:9px 10px;border:1px solid #EDF0F4;border-radius:6px;background:#FBFCFD
+    }
+    .detail-label{font-size:12px;color:var(--text-muted)}
+    .detail-value{margin-top:3px;font-size:14px;color:var(--text)}
+    .summary-line{
+      display:flex;justify-content:flex-end;gap:8px;align-items:center;
+      margin-top:12px;color:var(--text-secondary);font-size:13px
+    }
+    .summary-line strong{color:var(--gcl-green-dark);font-size:16px}
+    @media(max-width:900px){
+      .detail-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+    }
+    .toast{
+      position:fixed;right:24px;top:82px;z-index:200;background:#fff;
+      border:1px solid #CDEBDD;box-shadow:var(--shadow);border-radius:8px;
+      padding:12px 16px;display:none;align-items:center;gap:8px;
+      color:var(--gcl-green-dark);font-size:14px
+    }
+    .toast.show{display:flex}
+    @media(max-width:900px){
+      .sidebar{width:72px}
+      .brand span,.menu-section,.menu-item span:last-child,.sidebar-footer{display:none}
+      .brand{justify-content:center;padding:0}
+      .menu-item{justify-content:center;padding:0;margin-left:8px}
+      .main{margin-left:72px;width:calc(100% - 72px)}
+      .form-grid,.month-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .full{grid-column:1/-1}
+    }
+
+    /* ===== V10 能源转换关系协同重构 ===== */
+    .relation-section{padding:16px;border-top:1px solid var(--border)}
+    .relation-section:first-child{border-top:0}
+    .relation-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+    .relation-section-title{font-size:14px;font-weight:600;color:var(--text)}
+    .relation-section-desc{font-size:12px;color:var(--text-muted);margin-top:4px;line-height:1.6}
+    .relation-editor{display:grid;gap:10px}
+    .relation-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}
+    .relation-row .btn{width:38px;padding:0}
+    .relation-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
+    .relation-summary-item{padding:10px 12px;border:1px solid var(--border);border-radius:6px;background:#F8FAFB}
+    .relation-summary-label{font-size:12px;color:var(--text-muted)}
+    .relation-summary-value{margin-top:4px;font-size:14px;font-weight:600;color:var(--text)}
+    .relation-preview{padding:12px 14px;border:1px solid #D5EFE5;border-radius:7px;background:var(--gcl-green-soft);line-height:1.7;color:var(--text-secondary)}
+    .relation-preview strong{color:var(--gcl-green-dark)}
+    .readonly-section{border-top:1px solid var(--border);padding-top:0}
+    .section-toolbar{min-height:58px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--border)}
+    .section-toolbar-title{font-size:15px;font-weight:600}
+    .section-toolbar-desc{font-size:12px;color:var(--text-muted);margin-top:4px}
+    .tag.purple{background:#F3EEFF;color:#6941C6;border-color:#DDD2FF}
+    @media(max-width:900px){.relation-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+    /* ===== V11 一期轻量化：能源量角色与场景化转换 ===== */
+    .role-tabs{display:flex;gap:8px;padding:12px 16px 0;overflow-x:auto;border-bottom:1px solid var(--border)}
+    .role-tab{height:36px;padding:0 14px;border:1px solid #D8DEE7;border-bottom:0;border-radius:7px 7px 0 0;background:#fff;color:var(--text-secondary);white-space:nowrap}
+    .role-tab.active{background:var(--gcl-green-soft);border-color:#BFE9D9;color:var(--gcl-green-dark);font-weight:600}
+    .stage-map{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .stage-pill{display:inline-flex;align-items:center;height:25px;padding:0 9px;border-radius:13px;background:#EEF5FF;color:#1769C2;font-size:12px}
+    .stage-arrow{color:var(--text-muted)}
+    .conversion-mark{display:inline-flex;align-items:center;height:24px;padding:0 8px;border:1px solid #F3D7A7;border-radius:4px;background:#FFF8E8;color:#B54708;font-size:12px}
+    .scene-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .scene-card{min-height:72px;padding:12px;border:1px solid #D8DEE7;border-radius:8px;background:#fff;text-align:left;color:var(--text-secondary)}
+    .scene-card strong{display:block;color:var(--text);font-size:14px;margin-bottom:5px}
+    .scene-card span{font-size:12px;line-height:1.5}
+    .scene-card.active{border-color:var(--gcl-green);background:var(--gcl-green-soft);box-shadow:0 0 0 2px rgba(0,168,112,.08)}
+    .scene-card.active strong{color:var(--gcl-green-dark)}
+    .simple-relation-grid{display:grid;grid-template-columns:1fr 50px 1fr;gap:12px;align-items:end}
+    .relation-arrow{height:38px;display:grid;place-items:center;color:var(--gcl-green-dark);font-size:22px}
+    .advanced-link{border:0;background:transparent;color:var(--tech-blue);padding:4px 0;font-size:13px}
+    .advanced-box{display:none;padding:12px;border:1px dashed #CDD6E0;border-radius:7px;background:#FAFCFD}
+    .advanced-box.show{display:block}
+    @media(max-width:900px){
+      .scene-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .simple-relation-grid{grid-template-columns:1fr}
+      .relation-arrow{height:18px;transform:rotate(90deg)}
+    }
+
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">AI</div>
+      <span>协鑫能碳管理平台</span>
+    </div>
+
+    <div class="menu-section">数据管理</div>
+    <button class="menu-item active" data-page="units">
+      <span class="menu-icon">▦</span><span>用能单元</span>
+    </button>
+    <button class="menu-item" data-page="energy">
+      <span class="menu-icon">◈</span><span>能源品种</span>
+    </button>
+    <button class="menu-item" data-page="records">
+      <span class="menu-icon">▤</span><span>能源数据</span>
+    </button>
+    <button class="menu-item" data-page="operations">
+      <span class="menu-icon">◫</span><span>运营数据</span>
+    </button>
+    <button class="menu-item" data-page="devices">
+      <span class="menu-icon">⚙</span><span>重点设备</span>
+    </button>
+
+    <div class="sidebar-footer">
+      <button class="menu-item">
+        <span class="menu-icon">⚙</span><span>系统设置</span>
+      </button>
+      <button class="menu-item">
+        <span class="menu-icon">?</span><span>帮助文档</span>
+      </button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="breadcrumb">
+        首页&nbsp;&nbsp;/&nbsp;&nbsp;数据管理&nbsp;&nbsp;/&nbsp;&nbsp;<strong id="crumb">用能单元</strong>
+      </div>
+      <div class="user"><div class="avatar">人</div><span>管理员</span></div>
+    </header>
+
+    <section class="content">
+      <div class="page-head">
+        <h1 class="page-title" id="pageTitle">用能单元管理</h1>
+        <div class="page-desc" id="pageDesc">配置企业用能单元及上下级关系，用于能源数据归属、查询与分析。</div>
+      </div>
+      <div class="card" id="screen"></div>
+    </section>
+  </main>
+</div>
+
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal" id="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="modalTitle">新增</div>
+      <button class="modal-close" id="modalClose" type="button" aria-label="关闭">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot">
+      <button class="btn" id="modalCancel" type="button">取消</button>
+      <button class="btn btn-primary" id="modalSave" type="button">确定</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" aria-live="polite">
+  <span>✓</span><span id="toastText">保存成功</span>
+</div>
+
+<script>
+(() => {
+  let nextId = 100;
+
+  const analysisCategories = [
+    '电力','热力','化石燃料','可再生及替代能源','回收能源','其他能源'
+  ];
+
+  const unitTypes = ['生产单元','工序/环节','公辅系统','建筑/区域','其他'];
+
+  const operationPreset = {
+    '产量与业务量':{
+      '产品产量':{unit:'t',method:'月度填报'},
+      '熟料产量':{unit:'t',method:'月度填报'},
+      '水泥产量':{unit:'t',method:'月度填报'},
+      '服务量':{unit:'项',method:'月度填报'},
+      '运输量':{unit:'t',method:'月度填报'}
+    },
+    '经济指标':{
+      '工业总产值':{unit:'万元',method:'年度填报'},
+      '工业增加值':{unit:'万元',method:'年度填报'},
+      '营业收入':{unit:'万元',method:'年度填报'}
+    }
+  };
+
+  const genericDeviceTypes = [
+    '动力设备','泵类设备','风机设备','空压设备',
+    '制冷/空调设备','加热/锅炉设备','输送设备','其他（自定义）'
+  ];
+
+  const energyPreset = {
+    '电力':{category:'电力',unit:'kWh',factor:0.1229,factorUnit:'kgce/kWh'},
+    '蒸汽':{category:'热力',unit:'GJ',factor:0.0341,factorUnit:'tce/GJ'},
+    '热水':{category:'热力',unit:'GJ',factor:0.0341,factorUnit:'tce/GJ'},
+    '原煤':{category:'化石燃料',unit:'t',factor:0.7143,factorUnit:'tce/t'},
+    '烟煤':{category:'化石燃料',unit:'t',factor:0.7143,factorUnit:'tce/t'},
+    '石油焦':{category:'化石燃料',unit:'t',factor:1.0918,factorUnit:'tce/t'},
+    '柴油':{category:'化石燃料',unit:'t',factor:1.4571,factorUnit:'tce/t'},
+    '天然气':{category:'化石燃料',unit:'Nm³',factor:1.3300,factorUnit:'kgce/Nm³'},
+    '生物质燃料':{category:'可再生及替代能源',unit:'t',factor:0.5000,factorUnit:'tce/t'},
+    'RDF':{category:'可再生及替代能源',unit:'t',factor:0.6000,factorUnit:'tce/t'},
+    '废轮胎':{category:'可再生及替代能源',unit:'t',factor:0.8000,factorUnit:'tce/t'},
+    '余热':{category:'回收能源',unit:'GJ',factor:0.0341,factorUnit:'tce/GJ'},
+    '回收蒸汽':{category:'回收能源',unit:'GJ',factor:0.0341,factorUnit:'tce/GJ'},
+    '压缩空气':{category:'其他能源',unit:'Nm³',factor:0,factorUnit:'kgce/Nm³'}
+  };
+
+  const state = {
+    page:'records',
+    recordsTab:'consumption',
+    consumptionLevel:'all',
+    energyDataRole:'能源消费',
+    editing:null,
+    modalMode:null,
+    saveHandler:null,
+    recordDetailId:null,
+    flowDetailId:null,
+    operationDetailId:null,
+    expanded:new Set([1,4,7,10]),
+
+    units:[
+      {
+        id:1,name:'1号熟料生产线',level:1,type:'生产单元',remark:'',referenced:true,
+        children:[
+          {id:2,name:'原料制备',level:2,type:'工序/环节',remark:'',referenced:true},
+          {id:3,name:'熟料烧成',level:2,type:'工序/环节',remark:'',referenced:true}
+        ]
+      },
+      {
+        id:4,name:'水泥粉磨线',level:1,type:'生产单元',remark:'',referenced:true,
+        children:[
+          {id:5,name:'水泥粉磨',level:2,type:'工序/环节',remark:'',referenced:true},
+          {id:6,name:'包装发运',level:2,type:'工序/环节',remark:'',referenced:false}
+        ]
+      },
+      {
+        id:7,name:'公辅系统',level:1,type:'公辅系统',remark:'',referenced:true,
+        children:[
+          {id:8,name:'空压系统',level:2,type:'公辅系统',remark:'',referenced:true,conversionCategory:'其他转换'},
+          {id:9,name:'余热发电系统',level:2,type:'公辅系统',remark:'',referenced:true,conversionCategory:'余热发电'},
+          {id:12,name:'燃气锅炉',level:2,type:'公辅系统',remark:'',referenced:true,conversionCategory:'锅炉产汽/产热'},
+          {id:13,name:'分布式光伏系统',level:2,type:'公辅系统',remark:'',referenced:true,conversionCategory:'自发电'}
+        ]
+      },
+      {
+        id:10,name:'办公楼',level:1,type:'建筑/区域',remark:'',referenced:false,
+        children:[
+          {id:11,name:'空调系统',level:2,type:'公辅系统',remark:'',referenced:false}
+        ]
+      }
+    ],
+
+    energy:[
+      {id:20,category:'电力',name:'电力',unit:'kWh',factor:0.1229,factorUnit:'kgce/kWh',remark:'',referenced:true},
+      {id:21,category:'热力',name:'蒸汽',unit:'GJ',factor:0.0341,factorUnit:'tce/GJ',remark:'',referenced:true},
+      {id:22,category:'化石燃料',name:'原煤',unit:'t',factor:0.7143,factorUnit:'tce/t',remark:'',referenced:true},
+      {id:23,category:'化石燃料',name:'石油焦',unit:'t',factor:1.0918,factorUnit:'tce/t',remark:'',referenced:false},
+      {id:24,category:'化石燃料',name:'天然气',unit:'Nm³',factor:1.3300,factorUnit:'kgce/Nm³',remark:'',referenced:true},
+      {id:25,category:'可再生及替代能源',name:'RDF',unit:'t',factor:0.6000,factorUnit:'tce/t',remark:'',referenced:true},
+      {id:26,category:'可再生及替代能源',name:'生物质燃料',unit:'t',factor:0.5000,factorUnit:'tce/t',remark:'',referenced:false},
+      {id:27,category:'回收能源',name:'余热',unit:'GJ',factor:0.0341,factorUnit:'tce/GJ',remark:'',referenced:true},
+      {id:28,category:'其他能源',name:'压缩空气',unit:'Nm³',factor:0,factorUnit:'kgce/Nm³',remark:'内部能源介质',referenced:true}
+    ],
+
+    consumption:[
+      {
+        id:30,year:2026,level:'企业',unitName:'全厂',dataType:'能源消费',
+        category:'电力',energy:'电力',unit:'kWh',method:'月度填报',annual:0,
+        m:[4100000,4050000,4220000,4300000,4380000,4450000,4520000,4480000,4410000,4390000,4460000,4590000]
+      },
+      {
+        id:31,year:2026,level:'一级用能单元',unitName:'1号熟料生产线',dataType:'能源消费',
+        category:'化石燃料',energy:'原煤',unit:'t',method:'月度填报',annual:0,
+        m:[690,670,705,720,730,740,752,746,735,728,742,816]
+      },
+      {
+        id:32,year:2026,level:'一级用能单元',unitName:'1号熟料生产线',dataType:'能源消费',
+        category:'可再生及替代能源',energy:'RDF',unit:'t',method:'月度填报',annual:0,
+        m:[160,155,168,175,180,185,190,188,182,178,185,194]
+      },
+      {
+        id:33,year:2026,level:'二级用能单元',unitName:'余热发电系统',dataType:'能源产出',
+        category:'电力',energy:'电力',unit:'kWh',method:'月度填报',annual:0,
+        m:[530000,520000,550000,570000,590000,610000,620000,615000,600000,590000,605000,630000]
+      },
+      {
+        id:34,year:2026,level:'二级用能单元',unitName:'余热发电系统',dataType:'回收能源',
+        category:'回收能源',energy:'余热',unit:'GJ',method:'月度填报',annual:0,
+        m:[6200,6100,6300,6500,6700,6800,6900,6880,6750,6680,6800,7100]
+      },
+      {
+        id:35,year:2026,level:'二级用能单元',unitName:'余热发电系统',dataType:'外供能源',
+        category:'电力',energy:'电力',unit:'kWh',method:'月度填报',annual:0,
+        m:[30000,28000,32000,35000,36000,38000,40000,39000,37000,36000,38000,41000]
+      },
+      {
+        id:36,year:2026,level:'二级用能单元',unitName:'燃气锅炉',dataType:'能源消费',
+        category:'化石燃料',energy:'天然气',unit:'Nm³',method:'月度填报',annual:0,
+        m:[112000,108000,118000,121000,126000,129000,132000,131000,128000,125000,127000,136000]
+      },
+      {
+        id:37,year:2026,level:'二级用能单元',unitName:'燃气锅炉',dataType:'能源产出',
+        category:'热力',energy:'蒸汽',unit:'GJ',method:'月度填报',annual:0,
+        m:[4200,4100,4400,4550,4700,4850,4960,4910,4780,4690,4800,5050]
+      },
+      {
+        id:38,year:2026,level:'二级用能单元',unitName:'分布式光伏系统',dataType:'能源产出',
+        category:'电力',energy:'电力',unit:'kWh',method:'月度填报',annual:0,
+        m:[120000,135000,158000,176000,192000,205000,214000,208000,187000,165000,142000,118000]
+      }
+    ],
+
+    flows:[
+      {
+        id:80,year:2026,processUnit:'余热发电系统',scenario:'能源转换',sceneType:'余热发电',
+        inputRecordIds:[34],outputRecordIds:[33],
+        remark:'余热由烧成环节回收后进入余热发电系统，产出电力总量。'
+      },
+      {
+        id:81,year:2026,processUnit:'燃气锅炉',scenario:'能源转换',sceneType:'锅炉产汽/产热',
+        inputRecordIds:[36],outputRecordIds:[37],
+        remark:'天然气经燃气锅炉转换为蒸汽，供厂内生产和公辅系统使用。'
+      },
+      {
+        id:82,year:2026,processUnit:'分布式光伏系统',scenario:'无投入自产',sceneType:'自发电',
+        inputRecordIds:[],outputRecordIds:[38],
+        remark:'光伏系统无可计量燃料投入，直接形成电力产出。'
+      }
+    ],
+
+    costs:[
+      {id:40,year:2026,energy:'电力',m:[310,306,318,325,330,334,339,336,331,329,335,345]},
+      {id:41,year:2026,energy:'原煤',m:[78,75,80,82,83,84,86,85,84,83,85,93]},
+      {id:42,year:2026,energy:'RDF',m:[13,12.5,13.4,14,14.5,14.8,15.2,15,14.6,14.2,14.8,15.5]}
+    ],
+
+    operations:[
+      {id:50,year:2026,level:'企业',unitName:'全厂',category:'经济指标',aggregate:'年度单值',name:'工业增加值',unit:'万元',method:'年度填报',annual:56000,m:[]},
+      {id:51,year:2026,level:'一级用能单元',unitName:'1号熟料生产线',category:'产量与业务量',aggregate:'月度求和',name:'熟料产量',unit:'t',method:'月度填报',annual:0,m:[76000,73500,78000,79200,80500,81200,82000,81600,80400,79800,81000,83500]},
+      {id:52,year:2026,level:'一级用能单元',unitName:'水泥粉磨线',category:'产量与业务量',aggregate:'月度求和',name:'水泥产量',unit:'t',method:'月度填报',annual:0,m:[91000,89500,92500,94000,95800,97000,98200,97800,96500,95200,97000,100000]}
+    ],
+
+    devices:[
+      {id:60,name:'生料磨1',type:'生料磨',unitName:'原料制备',energy:'电力',remark:'水泥行业自定义设备',unit:'kWh',m:[255000,250000,260000,265000,270000,272000,276000,274000,269000,268000,272000,280000]},
+      {id:61,name:'水泥磨1',type:'水泥磨',unitName:'水泥粉磨',energy:'电力',remark:'水泥行业自定义设备',unit:'kWh',m:[310000,305000,315000,322000,328000,332000,337000,335000,329000,326000,332000,342000]},
+      {id:62,name:'空压机1',type:'空压设备',unitName:'空压系统',energy:'电力',remark:'',unit:'kWh',m:[83000,81000,82000,84000,85000,86000,85500,85000,83000,82000,81900,84900]}
+    ],
+
+    filters:{
+      units:{keyword:'',type:''},
+      energy:{keyword:'',category:''},
+      consumption:{year:'2026',unitName:'',category:'',keyword:''},
+      flows:{year:'2026',unitName:'',keyword:''},
+      costs:{year:'2026',energy:''},
+      operations:{year:'2026',category:'',keyword:''},
+      devices:{keyword:'',unitName:'',energy:''}
+    }
+  };
+
+  const pageMeta = {
+    units:{
+      title:'用能单元管理',
+      desc:'配置企业用能单元及上下级关系，用于能源数据归属、查询与分析。',
+      crumb:'用能单元'
+    },
+    energy:{
+      title:'能源品种',
+      desc:'管理企业实际使用的能源品种、计量单位及默认折标参数。',
+      crumb:'能源品种'
+    },
+    records:{
+      title:'能源数据',
+      desc:'按数据角色和组织层级录入能源量数据，系统自动形成输入、分配、利用和外部输出，仅对锅炉、余热发电等配置转换关系。',
+      crumb:'能源数据'
+    },
+    operations:{
+      title:'运营数据',
+      desc:'录入产量、业务量和经济指标，支撑能耗强度、能效对标与预算分析。',
+      crumb:'运营数据'
+    },
+    devices:{
+      title:'重点设备',
+      desc:'维护重点设备基础档案及其用能归属，为后续设备级分析提供基础。',
+      crumb:'重点设备'
+    }
+  };
+
+  const $ = selector => document.querySelector(selector);
+  const screen = $('#screen');
+  const overlay = $('#overlay');
+
+  function escapeHtml(text){
+    return String(text ?? '')
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;')
+      .replaceAll("'","&#039;");
+  }
+
+  function fmt(value, digits=0){
+    return Number(value || 0).toLocaleString('zh-CN',{
+      minimumFractionDigits:digits,
+      maximumFractionDigits:digits
+    });
+  }
+
+  function sum(values){
+    return (values || []).reduce((total,value)=>total+Number(value || 0),0);
+  }
+
+  function toast(text){
+    $('#toastText').textContent = text;
+    $('#toast').classList.add('show');
+    setTimeout(()=>$('#toast').classList.remove('show'),1800);
+  }
+
+  function allUnits(){
+    const list = [{name:'全厂',level:'企业'}];
+    state.units.forEach(parent=>{
+      list.push({name:parent.name,level:'一级用能单元'});
+      parent.children.forEach(child=>{
+        list.push({name:child.name,level:'二级用能单元'});
+      });
+    });
+    return list;
+  }
+
+  function findUnitByName(name){
+    for(const parent of state.units){
+      if(parent.name===name) return parent;
+      const child=parent.children.find(item=>item.name===name);
+      if(child) return child;
+    }
+    return null;
+  }
+
+  function conversionUnits(scene=''){
+    const list=[];
+    state.units.forEach(parent=>{
+      if(parent.conversionCategory) list.push(parent);
+      parent.children.forEach(child=>{if(child.conversionCategory) list.push(child);});
+    });
+    if(!scene || scene==='其他转换') return list;
+    return list.filter(item=>item.conversionCategory===scene);
+  }
+
+  function conversionUnitOptions(scene='',selected=''){
+    const list=conversionUnits(scene);
+    const head=list.length?'':'<option value="">暂无匹配单元，请先在“用能单元”中设置能源转换场景</option>';
+    return head+list.map(item=>`<option value="${escapeHtml(item.name)}" ${item.name===selected?'selected':''}>${escapeHtml(item.name)}</option>`).join('');
+  }
+
+  function energyRoleStage(role,level){
+    if(role==='能源消费'){
+      if(level==='企业') return '能源输入';
+      if(level==='一级用能单元') return '能源分配';
+      return '能源利用';
+    }
+    if(role==='回收能源') return '回收来源';
+    if(role==='能源产出') return '转换产出';
+    if(role==='外供能源') return '外部输出';
+    return '能源数据';
+  }
+
+  function unitOptions(selected='', includeFactory=true){
+    return allUnits()
+      .filter(item=>includeFactory || item.name!=='全厂')
+      .map(item=>`<option ${item.name===selected?'selected':''}>${escapeHtml(item.name)}</option>`)
+      .join('');
+  }
+
+  function energyOptions(selected='', category=''){
+    return state.energy
+      .filter(item=>!category || item.category===category)
+      .map(item=>`<option ${item.name===selected?'selected':''}>${escapeHtml(item.name)}</option>`)
+      .join('');
+  }
+
+  function groupedUnitOptions(selected=''){
+    const enterprise = `<optgroup label="企业"><option ${selected==='全厂'?'selected':''}>全厂</option></optgroup>`;
+    const roots = `<optgroup label="一级用能单元">${
+      state.units.map(item=>`<option ${selected===item.name?'selected':''}>${escapeHtml(item.name)}</option>`).join('')
+    }</optgroup>`;
+    const children = `<optgroup label="二级用能单元">${
+      state.units.flatMap(item=>item.children)
+        .map(item=>`<option ${selected===item.name?'selected':''}>${escapeHtml(item.name)}</option>`).join('')
+    }</optgroup>`;
+    return enterprise + roots + children;
+  }
+
+  function unitsByLevel(level){
+    if(level==='enterprise') return [{name:'全厂',level:'企业'}];
+    if(level==='level1') return state.units.map(item=>({name:item.name,level:'一级用能单元'}));
+    if(level==='level2') return state.units.flatMap(parent=>parent.children.map(item=>({name:item.name,level:'二级用能单元',parentName:parent.name})));
+    return allUnits();
+  }
+
+  function unitOptionsByLevel(level,selected=''){
+    const items=unitsByLevel(level);
+    return items.map(item=>`<option value="${escapeHtml(item.name)}" ${item.name===selected?'selected':''}>${escapeHtml(item.parentName?item.parentName+' / '+item.name:item.name)}</option>`).join('');
+  }
+
+  function levelLabel(level){
+    return ({all:'全部层级',enterprise:'企业级',level1:'一级用能单元',level2:'二级用能单元'})[level]||'全部层级';
+  }
+
+  function groupedEnergyOptions(selected=''){
+    return analysisCategories.map(category=>{
+      const options = state.energy
+        .filter(item=>item.category===category)
+        .map(item=>`<option ${selected===item.name?'selected':''}>${escapeHtml(item.name)}</option>`)
+        .join('');
+      return options ? `<optgroup label="${escapeHtml(category)}">${options}</optgroup>` : '';
+    }).join('');
+  }
+
+  function recordAnnual(item){
+    return item.method==='年度填报'
+      ? Number(item.annual || 0)
+      : sum(item.m || []);
+  }
+
+  function optionalMonthInputs(values=[]){
+    return `
+      <div class="month-grid">
+        ${Array.from({length:12},(_,index)=>{
+          const value = values[index];
+          const displayValue = value===null || value===undefined ? '' : value;
+          return `
+            <div>
+              <label for="m${index}">${index+1}月</label>
+              <input id="m${index}" type="number" min="0" step="0.01"
+                value="${displayValue}" placeholder="请输入">
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  function readOptionalMonths(){
+    return Array.from({length:12},(_,index)=>{
+      const raw = $('#m'+index).value.trim();
+      return raw==='' ? null : Number(raw);
+    });
+  }
+
+
+  function prefixedOptionalMonthInputs(values=[],prefix='flow',label='月度数据'){
+    return `
+      <div class="form-section-title">${escapeHtml(label)}</div>
+      <div class="month-grid">
+        ${Array.from({length:12},(_,index)=>{
+          const value = values[index];
+          const displayValue = value===null || value===undefined ? '' : value;
+          return `
+            <div>
+              <label for="${prefix}${index}">${index+1}月</label>
+              <input id="${prefix}${index}" type="number" min="0" step="0.01"
+                value="${displayValue}" placeholder="请输入">
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  function readPrefixedOptionalMonths(prefix){
+    return Array.from({length:12},(_,index)=>{
+      const raw = $('#'+prefix+index).value.trim();
+      return raw==='' ? null : Number(raw);
+    });
+  }
+
+  function optionalDisplay(value,digits=0){
+    return value===null || value===undefined ? '—' : fmt(value,digits);
+  }
+
+  function selectOptions(items, selected='', includeAll=false){
+    const head = includeAll ? '<option value="">全部</option>' : '';
+    return head + items.map(item=>`
+      <option value="${escapeHtml(item)}" ${item===selected?'selected':''}>${escapeHtml(item)}</option>
+    `).join('');
+  }
+
+  function actionButtons(index){
+    return `
+      <button class="btn-link edit-row" data-index="${index}" type="button">编辑</button>
+      <button class="btn-link danger delete-row" data-index="${index}" type="button">删除</button>
+    `;
+  }
+
+  function tableEmpty(columns){
+    return `<tr><td colspan="${columns}" class="empty">暂无匹配数据</td></tr>`;
+  }
+
+  function pagination(count){
+    return `
+      <div class="pagination">
+        <span>共 ${count} 条</span>
+        <span class="page-dot">1</span>
+      </div>
+    `;
+  }
+
+  function toolbar(content, buttonText){
+    return `
+      <div class="toolbar">
+        ${content}
+        <div class="spacer"></div>
+        <button class="btn btn-primary" id="addBtn" type="button">＋ ${buttonText}</button>
+      </div>
+    `;
+  }
+
+  function render(){
+    const meta = pageMeta[state.page];
+    $('#pageTitle').textContent = meta.title;
+    $('#pageDesc').textContent = meta.desc;
+    $('#crumb').textContent = meta.crumb;
+
+    document.querySelectorAll('.menu-item[data-page]').forEach(button=>{
+      button.classList.toggle('active',button.dataset.page===state.page);
+    });
+
+    if(state.page==='units') renderUnits();
+    if(state.page==='energy') renderEnergy();
+    if(state.page==='records') renderRecords();
+    if(state.page==='operations') renderOperations();
+    if(state.page==='devices') renderDevices();
+  }
+
+  /* =========================
+     用能单元
+  ========================== */
+
+
+  function renderUnits(){
+    const filter = state.filters.units;
+    const rows = [];
+
+    state.units.forEach(parent=>{
+      const parentMatches =
+        (!filter.keyword || parent.name.includes(filter.keyword)) &&
+        (!filter.type || parent.type===filter.type);
+
+      const matchedChildren = parent.children.filter(child=>
+        (!filter.keyword || child.name.includes(filter.keyword)) &&
+        (!filter.type || child.type===filter.type)
+      );
+
+      if(!parentMatches && matchedChildren.length===0) return;
+
+      const expanded = state.expanded.has(parent.id) || filter.keyword || filter.type;
+      const parentConversion = parent.conversionCategory
+        ? `<span class="conversion-mark">${escapeHtml(parent.conversionCategory)}</span>` : '—';
+
+      rows.push(`
+        <tr class="parent-row">
+          <td>
+            <div class="unit-cell">
+              <button class="tree-toggle" type="button" data-toggle="${parent.id}">
+                ${expanded?'−':'+'}
+              </button>
+              <span class="parent-name">${escapeHtml(parent.name)}</span>
+              <span class="child-count">${parent.children.length}个下级</span>
+            </div>
+          </td>
+          <td><span class="tag">一级</span></td>
+          <td>${escapeHtml(parent.type)}</td>
+          <td>${parentConversion}</td>
+          <td>
+            <button class="btn-link add-child" data-parent="${parent.id}" type="button">添加下级</button>
+            <button class="btn-link edit-unit" data-id="${parent.id}" data-level="1" type="button">编辑</button>
+            <button class="btn-link danger delete-unit" data-id="${parent.id}" data-level="1" type="button">删除</button>
+          </td>
+        </tr>
+      `);
+
+      if(expanded){
+        const children = (filter.keyword || filter.type) ? matchedChildren : parent.children;
+        children.forEach(child=>{
+          const conversion = child.conversionCategory
+            ? `<span class="conversion-mark">${escapeHtml(child.conversionCategory)}</span>` : '—';
+          rows.push(`
+            <tr>
+              <td><div class="unit-cell child-name">${escapeHtml(child.name)}</div></td>
+              <td><span class="tag blue">二级</span></td>
+              <td>${escapeHtml(child.type)}</td>
+              <td>${conversion}</td>
+              <td>
+                <button class="btn-link edit-unit" data-id="${child.id}" data-level="2" data-parent="${parent.id}" type="button">编辑</button>
+                <button class="btn-link danger delete-unit" data-id="${child.id}" data-level="2" data-parent="${parent.id}" type="button">删除</button>
+              </td>
+            </tr>
+          `);
+        });
+      }
+    });
+
+    const total = state.units.reduce((n,parent)=>n+1+parent.children.length,0);
+
+    screen.innerHTML = `
+      ${toolbar(`
+        <div class="field search">
+          <label for="unitKeyword">关键字</label>
+          <input id="unitKeyword" value="${escapeHtml(filter.keyword)}" placeholder="搜索用能单元名称">
+        </div>
+        <div class="field">
+          <label for="unitTypeFilter">单元类型</label>
+          <select id="unitTypeFilter">
+            ${selectOptions(unitTypes,filter.type,true)}
+          </select>
+        </div>
+      `,'新增一级用能单元')}
+      <div class="notice">
+        一期采用两级结构。仅锅炉、余热发电、光伏等系统需要设置“能源转换场景”，用于在新增转换关系时自动筛选，普通车间、工序和办公区域无需设置。
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th style="width:32%">用能单元</th><th>层级</th><th>单元类型</th><th>能源转换场景</th><th>操作</th></tr>
+          </thead>
+          <tbody>${rows.length?rows.join(''):tableEmpty(5)}</tbody>
+        </table>
+      </div>
+      ${pagination(total)}
+    `;
+
+    $('#addBtn').addEventListener('click',openAddRootUnit);
+    $('#unitKeyword').addEventListener('input',event=>{
+      state.filters.units.keyword = event.target.value;
+      renderUnits();
+    });
+    $('#unitTypeFilter').addEventListener('change',event=>{
+      state.filters.units.type = event.target.value;
+      renderUnits();
+    });
+
+    document.querySelectorAll('[data-toggle]').forEach(button=>{
+      button.addEventListener('click',()=>{
+        const id = Number(button.dataset.toggle);
+        state.expanded.has(id) ? state.expanded.delete(id) : state.expanded.add(id);
+        renderUnits();
+      });
+    });
+
+    document.querySelectorAll('.add-child').forEach(button=>{
+      button.addEventListener('click',()=>openAddChildUnit(Number(button.dataset.parent)));
+    });
+
+    document.querySelectorAll('.edit-unit').forEach(button=>{
+      button.addEventListener('click',()=>{
+        openEditUnit(
+          Number(button.dataset.id),
+          Number(button.dataset.level),
+          button.dataset.parent ? Number(button.dataset.parent) : null
+        );
+      });
+    });
+
+    document.querySelectorAll('.delete-unit').forEach(button=>{
+      button.addEventListener('click',()=>{
+        deleteUnit(
+          Number(button.dataset.id),
+          Number(button.dataset.level),
+          button.dataset.parent ? Number(button.dataset.parent) : null
+        );
+      });
+    });
+  }
+
+
+  function unitForm(data={}, level=1, parent=null, editing=false){
+    const options = level===1
+      ? ['生产单元','公辅系统','建筑/区域','其他']
+      : ['工序/环节','公辅系统','建筑/区域','其他'];
+
+    const context = level===2 ? `
+      <div class="context-strip">
+        <span>所属一级单元：<strong>${escapeHtml(parent.name)}</strong></span>
+        <span class="context-divider"></span>
+        <span>${editing?'当前层级':'新增层级'}：<strong>二级用能单元</strong></span>
+      </div>
+    ` : '';
+
+    return `
+      <div class="form-grid">
+        ${context}
+        <div>
+          <label class="required" for="unitType">单元类型</label>
+          <select id="unitType">${selectOptions(options,data.type||options[0])}</select>
+        </div>
+        <div>
+          <label class="required" for="unitName">用能单元名称</label>
+          <input id="unitName" value="${escapeHtml(data.name||'')}" placeholder="">
+        </div>
+        <div class="full">
+          <label for="unitConversionCategory">能源转换场景（选填）</label>
+          <select id="unitConversionCategory">
+            <option value="">不涉及能源转换</option>
+            ${selectOptions(['锅炉产汽/产热','余热发电','自发电','其他转换'],data.conversionCategory||'')}
+          </select>
+          <div class="help">只有该单元承担锅炉产汽、余热发电、光伏发电等能源转换或产出功能时才设置。</div>
+        </div>
+        <div class="full">
+          <label for="unitRemark">备注</label>
+          <textarea id="unitRemark" placeholder="选填">${escapeHtml(data.remark||'')}</textarea>
+        </div>
+      </div>
+    `;
+  }
+
+  function bindUnitNameHint(level){
+    const type = $('#unitType');
+    const name = $('#unitName');
+    if(!type || !name) return;
+
+    const placeholders = {
+      '生产单元':'如：1号熟料生产线、生产车间一',
+      '工序/环节':'如：熟料烧成、包装发运',
+      '公辅系统':'如：空压系统、供配电系统',
+      '建筑/区域':'如：办公楼、仓储区域',
+      '其他':'请输入具体用能单元名称'
+    };
+
+    const update = ()=>{
+      name.placeholder = placeholders[type.value] || '请输入用能单元名称';
+    };
+    type.addEventListener('change',update);
+    update();
+  }
+
+  function openAddRootUnit(){
+    openModal('新增一级用能单元',unitForm({},1,null,false),()=>{
+      const name = $('#unitName').value.trim();
+      if(!name) return alert('请填写用能单元名称。');
+      if(unitNameExists(name)) return alert('用能单元名称已存在。');
+
+      state.units.push({
+        id:nextId++,name,level:1,type:$('#unitType').value,
+        conversionCategory:$('#unitConversionCategory').value,
+        remark:$('#unitRemark').value.trim(),
+        referenced:false,children:[]
+      });
+      closeModal();renderUnits();toast('保存成功');
+    },true);
+    bindUnitNameHint(1);
+  }
+
+  function openAddChildUnit(parentId){
+    const parent = state.units.find(item=>item.id===parentId);
+    if(!parent) return;
+
+    openModal('添加下级用能单元',unitForm({},2,parent,false),()=>{
+      const name = $('#unitName').value.trim();
+      if(!name) return alert('请填写用能单元名称。');
+      if(unitNameExists(name)) return alert('用能单元名称已存在。');
+
+      parent.children.push({
+        id:nextId++,name,level:2,type:$('#unitType').value,
+        conversionCategory:$('#unitConversionCategory').value,
+        remark:$('#unitRemark').value.trim(),
+        referenced:false
+      });
+      state.expanded.add(parent.id);
+      closeModal();renderUnits();toast('保存成功');
+    },true);
+    bindUnitNameHint(2);
+  }
+
+  function openEditUnit(id,level,parentId){
+    if(level===1){
+      const item = state.units.find(unit=>unit.id===id);
+      if(!item) return;
+
+      openModal('编辑一级用能单元',unitForm(item,1,null,true),()=>{
+        const name = $('#unitName').value.trim();
+        if(!name) return alert('请填写用能单元名称。');
+        if(unitNameExists(name,id)) return alert('用能单元名称已存在。');
+
+        Object.assign(item,{
+          name,type:$('#unitType').value,
+          conversionCategory:$('#unitConversionCategory').value,
+          remark:$('#unitRemark').value.trim()
+        });
+        closeModal();renderUnits();toast('保存成功');
+      },true);
+      bindUnitNameHint(1);
+    }else{
+      const parent = state.units.find(unit=>unit.id===parentId);
+      const item = parent?.children.find(child=>child.id===id);
+      if(!parent || !item) return;
+
+      openModal('编辑下级用能单元',unitForm(item,2,parent,true),()=>{
+        const name = $('#unitName').value.trim();
+        if(!name) return alert('请填写用能单元名称。');
+        if(unitNameExists(name,id)) return alert('用能单元名称已存在。');
+
+        Object.assign(item,{
+          name,type:$('#unitType').value,
+          conversionCategory:$('#unitConversionCategory').value,
+          remark:$('#unitRemark').value.trim()
+        });
+        closeModal();renderUnits();toast('保存成功');
+      },true);
+      bindUnitNameHint(2);
+    }
+  }
+
+  function unitNameExists(name,excludeId=null){
+    return state.units.some(parent=>{
+      if(parent.id!==excludeId && parent.name===name) return true;
+      return parent.children.some(child=>child.id!==excludeId && child.name===name);
+    });
+  }
+
+  function deleteUnit(id,level,parentId){
+    let item;
+    if(level===1) item = state.units.find(unit=>unit.id===id);
+    else item = state.units.find(unit=>unit.id===parentId)?.children.find(child=>child.id===id);
+    if(!item) return;
+
+    if(level===1 && item.children.length){
+      return alert('该一级用能单元仍包含下级单元，请先删除下级单元。');
+    }
+    if(item.referenced){
+      return alert('该用能单元已关联能源、运营或设备数据，暂不能删除。');
+    }
+    if(!confirm(`确认删除“${item.name}”吗？`)) return;
+
+    if(level===1){
+      state.units = state.units.filter(unit=>unit.id!==id);
+    }else{
+      const parent = state.units.find(unit=>unit.id===parentId);
+      parent.children = parent.children.filter(child=>child.id!==id);
+    }
+    renderUnits();toast('删除成功');
+  }
+
+  /* =========================
+     能源品种
+  ========================== */
+
+  function renderEnergy(){
+    const filter = state.filters.energy;
+    const list = state.energy.filter(item=>
+      (!filter.keyword || item.name.includes(filter.keyword)) &&
+      (!filter.category || item.category===filter.category)
+    );
+
+    screen.innerHTML = `
+      ${toolbar(`
+        <div class="field search">
+          <label for="energyKeyword">关键字</label>
+          <input id="energyKeyword" value="${escapeHtml(filter.keyword)}" placeholder="搜索能源品种">
+        </div>
+        <div class="field">
+          <label for="energyCategoryFilter">分析类别</label>
+          <select id="energyCategoryFilter">
+            ${selectOptions(analysisCategories,filter.category,true)}
+          </select>
+        </div>
+      `,'新增能源品种')}
+      <div class="notice">
+        <strong>分析类别</strong>用于能耗查询和结构汇总；能源品种只维护基础属性，能源转换关系在“能源转换关系”中配置；外部输出由外供能源数据自动识别。
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>分析类别</th><th>能源品种</th><th>计量单位</th>
+              <th>折标系数</th><th>折标单位</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${list.length?list.map(item=>{
+              const index = state.energy.findIndex(row=>row.id===item.id);
+              return `
+                <tr>
+                  <td>${escapeHtml(item.category)}</td>
+                  <td>${escapeHtml(item.name)}</td>
+                  <td>${escapeHtml(item.unit)}</td>
+                  <td>${fmt(item.factor,4)}</td>
+                  <td>${escapeHtml(item.factorUnit)}</td>
+                  <td>${actionButtons(index)}</td>
+                </tr>
+              `;
+            }).join(''):tableEmpty(6)}
+          </tbody>
+        </table>
+      </div>
+      ${pagination(list.length)}
+    `;
+
+    $('#addBtn').addEventListener('click',()=>openEnergyModal(null));
+    $('#energyKeyword').addEventListener('input',event=>{
+      state.filters.energy.keyword = event.target.value;
+      renderEnergy();
+    });
+    $('#energyCategoryFilter').addEventListener('change',event=>{
+      state.filters.energy.category = event.target.value;
+      renderEnergy();
+    });
+
+    bindRowActions('energy',openEnergyModal,deleteEnergy);
+  }
+
+  function openEnergyModal(index){
+    const current = index===null ? null : state.energy[index];
+    const currentIsPreset = !!(current && energyPreset[current.name]);
+    const initialCategory = current?.category || '电力';
+
+    const presetNamesFor = category =>
+      Object.keys(energyPreset).filter(name=>energyPreset[name].category===category);
+
+    const initialPresetNames = presetNamesFor(initialCategory);
+    const initialEnergyValue = currentIsPreset
+      ? current.name
+      : (current ? '其他（自定义）' : (initialPresetNames[0] || '其他（自定义）'));
+
+    const body = `
+      <div class="form-grid">
+        <div>
+          <label class="required" for="energyCategory">分析类别</label>
+          <select id="energyCategory">
+            ${selectOptions(analysisCategories,initialCategory)}
+          </select>
+        </div>
+
+        <div>
+          <label class="required" for="energyNameSelect">能源品种</label>
+          <select id="energyNameSelect"></select>
+          <div class="help">仅显示当前分析类别下的预置能源品种。</div>
+        </div>
+
+        <div id="customEnergyRow" class="${current && !currentIsPreset?'':'custom-row'}">
+          <label class="required" for="customEnergyName">自定义能源名称</label>
+          <input id="customEnergyName" value="${current && !currentIsPreset?escapeHtml(current.name):''}" placeholder="如：企业特殊能源介质">
+        </div>
+
+        <div>
+          <label class="required" for="energyUnit">计量单位</label>
+          <select id="energyUnit">
+            ${selectOptions(['kWh','t','kg','Nm³','m³','GJ','MJ','其他'],current?.unit||'kWh')}
+          </select>
+        </div>
+
+        <div>
+          <label class="required" for="energyFactor">折标系数</label>
+          <input id="energyFactor" type="number" step="0.0001" min="0" value="${current?.factor??0.1229}">
+        </div>
+
+        <div>
+          <label for="factorUnit">折标单位</label>
+          <input id="factorUnit" value="${escapeHtml(current?.factorUnit||'kgce/kWh')}" readonly>
+        </div>
+
+        <div class="full">
+          <label for="energyRemark">备注</label>
+          <textarea id="energyRemark" placeholder="选填，可说明企业采用的特殊参数口径">${escapeHtml(current?.remark||'')}</textarea>
+        </div>
+      </div>
+    `;
+
+    openModal(index===null?'新增能源品种':'编辑能源品种',body,()=>{
+      const selected = $('#energyNameSelect').value;
+      const custom = selected==='其他（自定义）';
+      const name = custom ? $('#customEnergyName').value.trim() : selected;
+
+      if(!name) return alert('请填写能源品种名称。');
+
+      const duplicate = state.energy.some((item,i)=>i!==index && item.name===name);
+      if(duplicate) return alert('该能源品种已存在。');
+
+      const item = {
+        id:current?.id || nextId++,
+        category:$('#energyCategory').value,
+        name,
+        unit:$('#energyUnit').value,
+        factor:Number($('#energyFactor').value||0),
+        factorUnit:$('#factorUnit').value,
+        remark:$('#energyRemark').value.trim(),
+        referenced:current?.referenced || false
+      };
+
+      if(index===null) state.energy.push(item);
+      else state.energy[index] = item;
+
+      closeModal();renderEnergy();toast('保存成功');
+    });
+
+    const updateFactorUnit = ()=>{
+      const unit = $('#energyUnit').value;
+      const prefix = unit==='t' || unit==='GJ' ? 'tce' : 'kgce';
+      $('#factorUnit').value = `${prefix}/${unit}`;
+    };
+
+    const applyPreset = name=>{
+      const preset = energyPreset[name];
+      if(!preset) return;
+      $('#energyUnit').value = preset.unit;
+      $('#energyFactor').value = preset.factor;
+      $('#energyUnit').disabled = true;
+      updateFactorUnit();
+    };
+
+    const renderEnergyNames = (category,preferred='')=>{
+      const names = presetNamesFor(category);
+      $('#energyNameSelect').innerHTML =
+        names.map(name=>`<option ${name===preferred?'selected':''}>${escapeHtml(name)}</option>`).join('') +
+        `<option ${preferred==='其他（自定义）'?'selected':''}>其他（自定义）</option>`;
+
+      if(!preferred || (![...names,'其他（自定义）'].includes(preferred))){
+        $('#energyNameSelect').value = names[0] || '其他（自定义）';
+      }
+      syncEnergyMode();
+    };
+
+    const syncEnergyMode = ()=>{
+      const selected = $('#energyNameSelect').value;
+      const custom = selected==='其他（自定义）';
+      $('#customEnergyRow').classList.toggle('custom-row',!custom);
+      $('#energyUnit').disabled = !custom;
+      if(custom){
+        updateFactorUnit();
+      }else{
+        applyPreset(selected);
+      }
+    };
+
+    $('#energyCategory').addEventListener('change',event=>{
+      renderEnergyNames(event.target.value,'');
+    });
+    $('#energyNameSelect').addEventListener('change',syncEnergyMode);
+    $('#energyUnit').addEventListener('change',updateFactorUnit);
+
+    renderEnergyNames(initialCategory,initialEnergyValue);
+  }
+
+  function deleteEnergy(index){
+    const item = state.energy[index];
+    if(item.referenced){
+      return alert('该能源品种已关联能源、成本或设备数据，暂不能删除。');
+    }
+    if(!confirm(`确认删除“${item.name}”吗？`)) return;
+    state.energy.splice(index,1);
+    renderEnergy();toast('删除成功');
+  }
+
+  /* =========================
+     能源数据
+  ========================== */
+
+
+  function renderRecords(){
+    screen.innerHTML = `
+      <div class="tabs">
+        <button class="tab ${state.recordsTab==='consumption'?'active':''}" data-tab="consumption" type="button">能源量数据</button>
+        <button class="tab ${state.recordsTab==='costs'?'active':''}" data-tab="costs" type="button">能源成本</button>
+        <button class="tab ${state.recordsTab==='flows'?'active':''}" data-tab="flows" type="button">能源转换关系</button>
+      </div>
+      ${state.recordsTab==='consumption' ? consumptionContent() : state.recordsTab==='costs' ? costContent() : flowContent()}
+    `;
+
+    document.querySelectorAll('[data-tab]').forEach(button=>{
+      button.addEventListener('click',()=>{
+        state.recordsTab = button.dataset.tab;
+        renderRecords();
+      });
+    });
+
+    if(state.recordsTab==='consumption') bindConsumption();
+    else if(state.recordsTab==='costs') bindCosts();
+    else bindFlows();
+  }
+
+
+  function consumptionContent(){
+    const f = state.filters.consumption;
+    const role = state.energyDataRole;
+    const baseList = state.consumption.filter(item=>
+      item.dataType===role &&
+      String(item.year)===String(f.year) &&
+      (!f.category || item.category===f.category) &&
+      (!f.keyword || item.energy.includes(f.keyword) || item.unitName.includes(f.keyword))
+    );
+
+    const levelKey=item=>item.level==='企业'?'enterprise':item.level==='一级用能单元'?'level1':'level2';
+    const counts={
+      all:baseList.length,
+      enterprise:baseList.filter(item=>levelKey(item)==='enterprise').length,
+      level1:baseList.filter(item=>levelKey(item)==='level1').length,
+      level2:baseList.filter(item=>levelKey(item)==='level2').length
+    };
+    const list = state.consumptionLevel==='all'
+      ? baseList
+      : baseList.filter(item=>levelKey(item)===state.consumptionLevel);
+
+    const rows = [];
+    list.forEach(item=>{
+      const index = state.consumption.findIndex(row=>row.id===item.id);
+      const isMonthly = (item.method || '月度填报')==='月度填报';
+      const detailOpen = state.recordDetailId===item.id;
+      const filled = isMonthly ? (item.m||[]).filter(value=>value!==null && value!==undefined && value!=='').length : null;
+      const progress = isMonthly ? `已填 ${filled}/12 月` : '年度值';
+      const progressClass = isMonthly && filled<12 ? 'orange' : '';
+      const stage = energyRoleStage(item.dataType,item.level);
+
+      rows.push(`
+        <tr>
+          <td><span class="tag ${item.dataType==='外供能源'?'orange':item.dataType==='能源产出'?'purple':item.dataType==='回收能源'?'blue':''}">${escapeHtml(item.dataType)}</span></td>
+          <td>${escapeHtml(item.unitName)}</td>
+          <td><span class="tag blue">${escapeHtml(item.level)}</span></td>
+          <td><span class="stage-pill">${escapeHtml(stage)}</span></td>
+          <td>${escapeHtml(item.category)}</td>
+          <td>${escapeHtml(item.energy)}</td>
+          <td>${escapeHtml(item.unit)}</td>
+          <td><span class="tag ${progressClass}">${progress}</span></td>
+          <td>${fmt(recordAnnual(item))}</td>
+          <td>
+            ${isMonthly?`<button class="btn-link detail-record" data-id="${item.id}" type="button">${detailOpen?'收起明细':'月度明细'}</button>`:''}
+            <button class="btn-link edit-row" data-index="${index}" type="button">编辑</button>
+            <button class="btn-link danger delete-row" data-index="${index}" type="button">删除</button>
+          </td>
+        </tr>
+      `);
+
+      if(detailOpen && isMonthly){
+        rows.push(`
+          <tr class="detail-row">
+            <td colspan="10">
+              <div class="detail-panel">
+                <div class="detail-head">
+                  <span>${escapeHtml(item.dataType)}｜${escapeHtml(item.unitName)}｜${escapeHtml(item.energy)}月度明细</span>
+                  <span>单位：${escapeHtml(item.unit)}</span>
+                </div>
+                <div class="detail-grid">
+                  ${(item.m || []).map((value,index)=>`
+                    <div class="detail-item">
+                      <div class="detail-label">${index+1}月</div>
+                      <div class="detail-value">${optionalDisplay(value)}</div>
+                    </div>
+                  `).join('')}
+                </div>
+                <div class="summary-line">年度合计：<strong>${fmt(recordAnnual(item))}</strong> ${escapeHtml(item.unit)}</div>
+              </div>
+            </td>
+          </tr>
+        `);
+      }
+    });
+
+    const roleDescriptions={
+      '能源消费':'企业级记录用于输入控制量；一级单元记录形成能源分配；二级单元记录形成能源利用。',
+      '回收能源':'记录可再次利用的余热、回收蒸汽等，是能源转换关系的可选投入。',
+      '能源产出':'记录锅炉产汽、余热发电、光伏发电等系统的总产出量。',
+      '外供能源':'记录对企业边界外输出的电力、蒸汽等，系统自动进入能流分析。'
+    };
+
+    return `
+      ${toolbar(`
+        <div class="field">
+          <label for="recordYear">年度</label>
+          <select id="recordYear">${selectOptions(['2026','2025'],f.year)}</select>
+        </div>
+        <div class="field">
+          <label for="recordCategory">分析类别</label>
+          <select id="recordCategory">${selectOptions(analysisCategories,f.category,true)}</select>
+        </div>
+        <div class="field search">
+          <label for="recordKeyword">关键字</label>
+          <input id="recordKeyword" value="${escapeHtml(f.keyword)}" placeholder="搜索能源品种或归属范围">
+        </div>
+      `,'新增能源数据')}
+      <div class="role-tabs">
+        ${['能源消费','回收能源','能源产出','外供能源'].map(item=>`<button class="role-tab ${role===item?'active':''}" data-role-tab="${item}" type="button">${item}</button>`).join('')}
+      </div>
+      <div class="level-tabs">
+        ${[
+          ['all','全部层级'],['enterprise','企业级'],['level1','一级用能单元'],['level2','二级用能单元']
+        ].map(([key,label])=>`<button class="level-tab ${state.consumptionLevel===key?'active':''}" data-level-tab="${key}" type="button">${label}（${counts[key]}）</button>`).join('')}
+      </div>
+      <div class="notice">
+        <div class="stage-map"><strong>${escapeHtml(role)}</strong><span class="stage-arrow">→</span><span>${escapeHtml(roleDescriptions[role])}</span></div>
+        数据管理仍按“数据角色＋归属范围”录入，不要求用户分别维护输入、分配和利用关系。
+      </div>
+      <div class="table-wrap">
+        <table style="min-width:1120px">
+          <thead>
+            <tr>
+              <th>数据角色</th><th>归属范围</th><th>归属层级</th><th>能流阶段</th><th>分析类别</th><th>能源品种</th>
+              <th>单位</th><th>数据进度</th><th>年度合计</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody>${rows.length?rows.join(''):tableEmpty(10)}</tbody>
+        </table>
+      </div>
+      ${pagination(list.length)}
+    `;
+  }
+
+
+  function bindConsumption(){
+    $('#addBtn').addEventListener('click',()=>openConsumptionModal(null,state.consumptionLevel,state.energyDataRole));
+
+    document.querySelectorAll('[data-role-tab]').forEach(button=>{
+      button.addEventListener('click',()=>{
+        state.energyDataRole=button.dataset.roleTab;
+        state.recordDetailId=null;
+        renderRecords();
+      });
+    });
+
+    document.querySelectorAll('[data-level-tab]').forEach(button=>{
+      button.addEventListener('click',()=>{
+        state.consumptionLevel=button.dataset.levelTab;
+        state.recordDetailId=null;
+        renderRecords();
+      });
+    });
+
+    const mappings = {
+      recordYear:'year',
+      recordCategory:'category'
+    };
+
+    Object.entries(mappings).forEach(([id,key])=>{
+      $('#'+id).addEventListener('change',event=>{
+        state.filters.consumption[key] = event.target.value;
+        renderRecords();
+      });
+    });
+
+    $('#recordKeyword').addEventListener('input',event=>{
+      state.filters.consumption.keyword = event.target.value;
+      renderRecords();
+    });
+
+    document.querySelectorAll('.detail-record').forEach(button=>{
+      button.addEventListener('click',()=>{
+        const id = Number(button.dataset.id);
+        state.recordDetailId = state.recordDetailId===id ? null : id;
+        renderRecords();
+      });
+    });
+
+    bindRowActions('consumption',index=>openConsumptionModal(index,'all',state.consumption[index]?.dataType||state.energyDataRole),index=>{
+      const item=state.consumption[index];
+      const referenced=state.flows.some(flow=>(flow.inputRecordIds||[]).includes(item.id)||(flow.outputRecordIds||[]).includes(item.id));
+      if(referenced) return alert('该能源数据已被能源转换关系引用，请先调整对应关系。');
+      if(!confirm(`确认删除该${item.dataType}数据吗？`)) return;
+      const deletedId = item.id;
+      state.consumption.splice(index,1);
+      if(state.recordDetailId===deletedId) state.recordDetailId=null;
+      renderRecords();toast('删除成功');
+    });
+  }
+
+
+  function openConsumptionModal(index,preferredLevel='all',preferredRole='能源消费'){
+    const current = index===null ? null : state.consumption[index];
+    const role=current?.dataType || preferredRole || '能源消费';
+    let effectiveLevel = current ? (current.level==='企业'?'enterprise':current.level==='一级用能单元'?'level1':'level2') : preferredLevel;
+    if(index===null && effectiveLevel==='all' && role!=='能源消费') effectiveLevel='level2';
+
+    const roleCandidates=()=>{
+      let items=unitsByLevel(effectiveLevel);
+      if(role==='能源产出'){
+        const names=new Set(conversionUnits('').map(item=>item.name));
+        items=items.filter(item=>names.has(item.name));
+      }else if(role==='回收能源' || role==='外供能源'){
+        items=items.filter(item=>item.name!=='全厂');
+      }
+      return items;
+    };
+
+    const candidateUnits = roleCandidates();
+    const initialScope = current?.unitName || candidateUnits[0]?.name || (role==='能源消费'?'全厂':'');
+    const initialEnergy = current?.energy || (role==='回收能源'?'余热':role==='能源产出'||role==='外供能源'?'电力':state.energy[0]?.name||'');
+    const initialMethod = current?.method || '月度填报';
+    const scopeOptions=candidateUnits.length
+      ? candidateUnits.map(item=>`<option value="${escapeHtml(item.name)}" ${item.name===initialScope?'selected':''}>${escapeHtml(item.parentName?item.parentName+' / '+item.name:item.name)}</option>`).join('')
+      : '<option value="">暂无可选范围，请先维护用能单元及能源转换场景</option>';
+
+    const roleHelp={
+      '能源消费':'企业级数据用于能源输入控制；一级数据形成分配；二级数据形成利用。',
+      '回收能源':'记录余热、回收蒸汽等可再次利用的能源，可作为转换关系投入。',
+      '能源产出':'记录锅炉产汽、余热发电、光伏发电等系统的总产出量。',
+      '外供能源':'记录向企业边界外输出的能源，系统自动形成外部输出。'
+    };
+
+    openModal(index===null?`新增${role}`:`编辑${role}`,`
+      <div class="form-grid">
+        <div class="context-strip">
+          <span>数据角色：<strong>${escapeHtml(role)}</strong></span>
+          <span class="context-divider"></span>
+          <span>${escapeHtml(roleHelp[role])}</span>
+        </div>
+        <div>
+          <label class="required" for="dataScope">归属范围</label>
+          <select id="dataScope">${scopeOptions}</select>
+          ${role==='能源产出'?'<div class="help">仅显示已设置能源转换场景的锅炉、余热发电、光伏等系统。</div>':''}
+        </div>
+        <div>
+          <label class="required" for="dataEnergy">能源品种</label>
+          <select id="dataEnergy">${groupedEnergyOptions(initialEnergy)}</select>
+        </div>
+
+        <div class="auto-info">
+          <span>能流阶段：<strong id="autoStage">—</strong></span>
+          <span>分析类别：<strong id="autoCategory">—</strong></span>
+          <span>计量单位：<strong id="autoUnit">—</strong></span>
+          <span>归属层级：<strong id="autoLevel">—</strong></span>
+        </div>
+
+        <div class="full">
+          <label class="required">填报口径</label>
+          <div class="choice-row">
+            <button class="choice ${initialMethod==='月度填报'?'active':''}" data-record-method="月度填报" type="button">按月填报</button>
+            <button class="choice ${initialMethod==='年度填报'?'active':''}" data-record-method="年度填报" type="button">仅填年度值</button>
+          </div>
+          <input id="recordMethodValue" type="hidden" value="${initialMethod}">
+        </div>
+
+        <div id="annualRecordWrap" class="full ${initialMethod==='年度填报'?'':'custom-row'}">
+          <label class="required" for="annualRecordValue">年度能源量</label>
+          <input id="annualRecordValue" type="number" min="0" step="0.01"
+            value="${current?.annual ?? ''}" placeholder="请输入年度值">
+        </div>
+      </div>
+
+      <div id="monthlyRecordWrap" class="${initialMethod==='月度填报'?'':'custom-row'}">
+        <div class="form-section-title">月度数据</div>
+        ${optionalMonthInputs(current?.m)}
+        <div class="summary-line">当前合计：<strong id="recordLiveTotal">0</strong> <span id="recordTotalUnit"></span></div>
+      </div>
+    `,()=>{
+      const energy = state.energy.find(item=>item.name===$('#dataEnergy').value);
+      if(!energy) return alert('请选择能源品种。');
+
+      const scope = $('#dataScope').value;
+      if(!scope) return alert('请选择归属范围。');
+      const scopeItem = allUnits().find(item=>item.name===scope);
+      const method = $('#recordMethodValue').value;
+      let months = [];
+      let annual = 0;
+
+      if(method==='月度填报'){
+        months = readOptionalMonths();
+        if(!months.some(value=>value!==null)) return alert('请至少填写一个月份的数据。');
+      }else{
+        const annualRaw = $('#annualRecordValue').value.trim();
+        if(annualRaw==='') return alert('请填写年度能源量。');
+        annual = Number(annualRaw);
+      }
+
+      const duplicate = state.consumption.some((item,i)=>
+        i!==index && item.dataType===role && String(item.year)===String(state.filters.consumption.year) &&
+        item.unitName===scope && item.energy===energy.name
+      );
+      if(duplicate) return alert(`同一归属范围和能源品种已存在${role}记录，请直接编辑原记录。`);
+
+      const item = {
+        id:current?.id || nextId++,year:Number(state.filters.consumption.year),
+        level:scopeItem?.level || '企业',unitName:scope,
+        dataType:role,
+        category:energy.category,energy:energy.name,unit:energy.unit,
+        method,annual,m:months
+      };
+
+      if(index===null) state.consumption.push(item);
+      else state.consumption[index] = item;
+      closeModal();renderRecords();toast(`${role}已保存`);
+    });
+
+    const updateAutoInfo = ()=>{
+      const energy = state.energy.find(item=>item.name===$('#dataEnergy').value);
+      const scope = allUnits().find(item=>item.name===$('#dataScope').value);
+      $('#autoCategory').textContent = energy?.category || '—';
+      $('#autoUnit').textContent = energy?.unit || '—';
+      $('#autoLevel').textContent = scope?.level || '—';
+      $('#autoStage').textContent = energyRoleStage(role,scope?.level||'企业');
+      $('#recordTotalUnit').textContent = energy?.unit || '';
+    };
+    const updateLiveTotal = ()=>{
+      const total = Array.from({length:12},(_,i)=>{
+        const raw = $('#m'+i)?.value.trim() || '';
+        return raw==='' ? 0 : Number(raw);
+      }).reduce((a,b)=>a+b,0);
+      $('#recordLiveTotal').textContent = fmt(total);
+    };
+
+    document.querySelectorAll('[data-record-method]').forEach(button=>{
+      button.addEventListener('click',()=>{
+        document.querySelectorAll('[data-record-method]').forEach(item=>item.classList.remove('active'));
+        button.classList.add('active');
+        const method = button.dataset.recordMethod;
+        $('#recordMethodValue').value = method;
+        $('#monthlyRecordWrap').classList.toggle('custom-row',method!=='月度填报');
+        $('#annualRecordWrap').classList.toggle('custom-row',method!=='年度填报');
+      });
+    });
+    $('#dataScope').addEventListener('change',updateAutoInfo);
+    $('#dataEnergy').addEventListener('change',updateAutoInfo);
+    Array.from({length:12},(_,i)=>$('#m'+i)).forEach(input=>{
+      if(input) input.addEventListener('input',updateLiveTotal);
+    });
+    updateAutoInfo();
+    updateLiveTotal();
+  }
+
+  function relationRecord(id){
+    return state.consumption.find(item=>item.id===Number(id));
+  }
+
+  function relationRecordLabel(item){
+    if(!item) return '—';
+    return `${item.unitName}｜${item.energy}｜${item.dataType}｜${item.year}`;
+  }
+
+  function relationRecordOptions(selectedId='',types=[],placeholder='请选择已有能源数据'){
+    const year = Number(state.filters.flows.year);
+    const candidates = state.consumption.filter(item=>
+      (!types.length || types.includes(item.dataType)) &&
+      (!year || Number(item.year)===year)
+    );
+    return `<option value="">${escapeHtml(placeholder)}</option>` + candidates.map(item=>`
+      <option value="${item.id}" ${Number(selectedId)===item.id?'selected':''}>${escapeHtml(relationRecordLabel(item))}</option>
+    `).join('');
+  }
+
+  function recordTce(item){
+    if(!item) return 0;
+    const energy = state.energy.find(row=>row.name===item.energy);
+    if(!energy) return 0;
+    const amount = recordAnnual(item);
+    return String(energy.factorUnit||'').startsWith('kgce/')
+      ? amount * Number(energy.factor||0) / 1000
+      : amount * Number(energy.factor||0);
+  }
+
+  function recordHasFactor(item){
+    const energy = state.energy.find(row=>row.name===item?.energy);
+    return !!energy && Number(energy.factor||0)>0;
+  }
+
+  function relationInputs(item){
+    const ids = item.inputRecordIds || (item.inputRecordId && item.inputRecordId!=='none' ? [item.inputRecordId] : []);
+    return ids.map(relationRecord).filter(Boolean);
+  }
+
+  function relationOutputs(item){
+    const ids = item.outputRecordIds || (item.outputRecordId ? [item.outputRecordId] : []);
+    return ids.map(relationRecord).filter(Boolean);
+  }
+
+  function relationScenario(item){
+    return item.sceneType || (relationInputs(item).length ? '其他转换' : '自发电');
+  }
+
+  function relationStatus(item){
+    const inputs=relationInputs(item);
+    const outputs=relationOutputs(item);
+    if(!outputs.length) return {text:'待补充产出',className:'orange'};
+    const all=[...inputs,...outputs];
+    if(all.some(record=>Number(record.year)!==Number(item.year))) return {text:'期间不一致',className:'orange'};
+    if(all.some(record=>!recordHasFactor(record))) return {text:'缺少折标参数',className:'orange'};
+    return {text:inputs.length?'可计算':'可生成关系',className:''};
+  }
+
+  function relationEfficiency(item){
+    const inputs=relationInputs(item);
+    const outputs=relationOutputs(item);
+    if(!inputs.length || !outputs.length) return null;
+    const inputTce=inputs.reduce((total,row)=>total+recordTce(row),0);
+    const outputTce=outputs.reduce((total,row)=>total+recordTce(row),0);
+    return inputTce>0 ? outputTce/inputTce*100 : null;
+  }
+
+  function relationLoss(item){
+    const efficiency=relationEfficiency(item);
+    if(efficiency===null) return null;
+    const inputTce=relationInputs(item).reduce((total,row)=>total+recordTce(row),0);
+    const outputTce=relationOutputs(item).reduce((total,row)=>total+recordTce(row),0);
+    return Math.max(inputTce-outputTce,0);
+  }
+
+  function relationInputText(item){
+    const inputs=relationInputs(item);
+    return inputs.length ? inputs.map(row=>row.energy).join(' + ') : '无可计量投入';
+  }
+
+  function relationOutputText(item){
+    const outputs=relationOutputs(item);
+    return outputs.length ? outputs.map(row=>row.energy).join(' + ') : '—';
+  }
+
+  function relationPreview(item){
+    return `${relationInputText(item)} → ${item.processUnit||'转换/生产单元'} → ${relationOutputText(item)}`;
+  }
+
+  function externalOutputRecords(){
+    return state.consumption.filter(item=>
+      item.dataType==='外供能源' && String(item.year)===String(state.filters.flows.year)
+    );
+  }
+
+
+  function flowContent(){
+    const f=state.filters.flows;
+    const list=state.flows.filter(item=>{
+      const searchText=[item.processUnit,relationScenario(item),relationInputText(item),relationOutputText(item),item.remark].join(' ');
+      return String(item.year)===String(f.year) &&
+        (!f.unitName || item.processUnit===f.unitName || relationInputs(item).some(row=>row.unitName===f.unitName) || relationOutputs(item).some(row=>row.unitName===f.unitName)) &&
+        (!f.keyword || searchText.includes(f.keyword));
+    });
+    const external=externalOutputRecords();
+    const rows=[];
+
+    list.forEach(item=>{
+      const index=state.flows.findIndex(row=>row.id===item.id);
+      const status=relationStatus(item);
+      const detailOpen=state.flowDetailId===item.id;
+      const inputs=relationInputs(item);
+      const outputs=relationOutputs(item);
+      const efficiency=relationEfficiency(item);
+      const loss=relationLoss(item);
+      rows.push(`
+        <tr>
+          <td>${escapeHtml(relationScenario(item))}</td>
+          <td>${escapeHtml(item.processUnit)}</td>
+          <td>${escapeHtml(relationInputText(item))}</td>
+          <td>${escapeHtml(relationOutputText(item))}</td>
+          <td>${item.year}</td>
+          <td><span class="tag ${status.className}">${status.text}</span></td>
+          <td>
+            <button class="btn-link detail-flow" data-id="${item.id}" type="button">${detailOpen?'收起':'查看'}</button>
+            <button class="btn-link edit-flow" data-index="${index}" type="button">编辑</button>
+            <button class="btn-link danger delete-flow" data-index="${index}" type="button">删除</button>
+          </td>
+        </tr>
+      `);
+      if(detailOpen){
+        rows.push(`
+          <tr class="detail-row"><td colspan="7"><div class="detail-panel">
+            <div class="detail-head"><span>${escapeHtml(relationPreview(item))}</span><span>${escapeHtml(relationScenario(item))}</span></div>
+            <div class="relation-summary">
+              <div class="relation-summary-item"><div class="relation-summary-label">投入折标量</div><div class="relation-summary-value">${inputs.length?fmt(inputs.reduce((t,r)=>t+recordTce(r),0),1)+' tce':'不适用'}</div></div>
+              <div class="relation-summary-item"><div class="relation-summary-label">产出折标量</div><div class="relation-summary-value">${fmt(outputs.reduce((t,r)=>t+recordTce(r),0),1)} tce</div></div>
+              <div class="relation-summary-item"><div class="relation-summary-label">转换效率</div><div class="relation-summary-value">${efficiency===null?'不计算':fmt(efficiency,1)+'%'}</div></div>
+              <div class="relation-summary-item"><div class="relation-summary-label">转换损失</div><div class="relation-summary-value">${loss===null?'不计算':fmt(loss,1)+' tce'}</div></div>
+            </div>
+            <div class="summary-line">投入：${inputs.length?inputs.map(relationRecordLabel).map(escapeHtml).join('；'):'无可计量投入'}<br>产出：${outputs.map(relationRecordLabel).map(escapeHtml).join('；')}</div>
+          </div></td></tr>
+        `);
+      }
+    });
+
+    return `
+      ${toolbar(`
+        <div class="field"><label for="flowYear">年度</label><select id="flowYear">${selectOptions(['2026','2025'],f.year)}</select></div>
+        <div class="field"><label for="flowUnitFilter">转换单元</label><select id="flowUnitFilter"><option value="">全部</option>${conversionUnitOptions('',f.unitName)}</select></div>
+        <div class="field search"><label for="flowKeyword">关键字</label><input id="flowKeyword" value="${escapeHtml(f.keyword)}" placeholder="搜索场景、转换单元或能源品种"></div>
+      `,'新增能源转换关系')}
+      <div class="notice">
+        <strong>仅在这里配置真实发生的能源转换：</strong>锅炉产汽/产热、余热发电、自发电或其他转换。外购能源由企业级能源消费识别，一级和二级消费分别形成能源分配与利用，外供能源由系统自动识别。
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>转换场景</th><th>转换单元</th><th>投入能源</th><th>产出能源</th><th>数据期间</th><th>计算状态</th><th>操作</th></tr></thead>
+        <tbody>${rows.length?rows.join(''):tableEmpty(7)}</tbody>
+      </table></div>${pagination(list.length)}
+      <div class="readonly-section">
+        <div class="section-toolbar"><div><div class="section-toolbar-title">已识别的外部输出</div><div class="section-toolbar-desc">来源于能源量数据中的“外供能源”记录，无需再次建立转换关系。</div></div><span class="tag orange">${external.length} 条</span></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>来源单元</th><th>能源品种</th><th>能流阶段</th><th>年度</th><th>年度外供量</th><th>单位</th><th>处理方式</th></tr></thead>
+          <tbody>${external.length?external.map(row=>`<tr><td>${escapeHtml(row.unitName)}</td><td>${escapeHtml(row.energy)}</td><td><span class="stage-pill">外部输出</span></td><td>${row.year}</td><td>${fmt(recordAnnual(row))}</td><td>${escapeHtml(row.unit)}</td><td>系统自动识别</td></tr>`).join(''):tableEmpty(7)}</tbody>
+        </table></div>
+      </div>
+    `;
+  }
+
+  function bindFlows(){
+    $('#addBtn').addEventListener('click',()=>openFlowModal(null));
+    $('#flowYear').addEventListener('change',event=>{state.filters.flows.year=event.target.value;renderRecords();});
+    $('#flowUnitFilter').addEventListener('change',event=>{state.filters.flows.unitName=event.target.value;renderRecords();});
+    $('#flowKeyword').addEventListener('input',event=>{state.filters.flows.keyword=event.target.value;renderRecords();});
+    document.querySelectorAll('.detail-flow').forEach(button=>button.addEventListener('click',()=>{
+      const id=Number(button.dataset.id);state.flowDetailId=state.flowDetailId===id?null:id;renderRecords();
+    }));
+    document.querySelectorAll('.edit-flow').forEach(button=>button.addEventListener('click',()=>openFlowModal(Number(button.dataset.index))));
+    document.querySelectorAll('.delete-flow').forEach(button=>button.addEventListener('click',()=>{
+      const index=Number(button.dataset.index);
+      if(!confirm('确认删除该能源转换关系吗？')) return;
+      const id=state.flows[index].id;state.flows.splice(index,1);
+      if(state.flowDetailId===id) state.flowDetailId=null;
+      renderRecords();toast('删除成功');
+    }));
+  }
+
+
+  function openFlowModal(index){
+    const current=index===null?null:state.flows[index];
+    let scene=current?.sceneType || (current?.scenario==='无投入自产'?'自发电':'余热发电');
+    let inputIds=(current?.inputRecordIds||[]).slice();
+    let outputIds=(current?.outputRecordIds||[]).slice();
+    let processUnit=current?.processUnit || '';
+
+    const sceneDefaults={
+      '锅炉产汽/产热':{unit:'燃气锅炉',inputs:[36],outputs:[37]},
+      '余热发电':{unit:'余热发电系统',inputs:[34],outputs:[33]},
+      '自发电':{unit:'分布式光伏系统',inputs:[],outputs:[38]},
+      '其他转换':{unit:conversionUnits('')[0]?.name||'',inputs:[],outputs:[]}
+    };
+    if(index===null){
+      const d=sceneDefaults[scene];
+      processUnit=d.unit;inputIds=d.inputs.slice();outputIds=d.outputs.slice();
+    }
+    if(!outputIds.length) outputIds=[''];
+
+    const sceneCards=[
+      ['锅炉产汽/产热','燃料 → 锅炉 → 蒸汽/热水'],
+      ['余热发电','回收余热 → 余热发电 → 电力'],
+      ['自发电','光伏/风电等 → 电力'],
+      ['其他转换','其他一进一出或多投入/多产出场景']
+    ];
+
+    openModal(index===null?'新增能源转换关系':'编辑能源转换关系',`
+      <div class="form-grid">
+        <div class="full">
+          <label class="required">选择转换场景</label>
+          <div class="scene-grid">
+            ${sceneCards.map(([key,desc])=>`<button class="scene-card ${scene===key?'active':''}" data-scene="${key}" type="button"><strong>${key}</strong><span>${desc}</span></button>`).join('')}
+          </div>
+          <input id="relationSceneValue" type="hidden" value="${scene}">
+        </div>
+
+        <div class="full">
+          <label class="required" for="flowProcessUnit">转换单元</label>
+          <select id="flowProcessUnit"></select>
+          <div class="help" id="processUnitHelp">只显示已在“用能单元”中设置为当前转换场景的系统。</div>
+        </div>
+
+        <div class="full relation-section">
+          <div class="relation-section-head">
+            <div>
+              <div class="relation-section-title">关联已有能源量数据</div>
+              <div class="relation-section-desc" id="relationSceneDesc">系统根据转换场景筛选可选的投入与产出数据。</div>
+            </div>
+          </div>
+          <div class="simple-relation-grid">
+            <div id="primaryInputWrap">
+              <label id="primaryInputLabel">投入能源数据</label>
+              <select id="primaryInput"></select>
+            </div>
+            <div class="relation-arrow">→</div>
+            <div>
+              <label class="required">产出能源数据</label>
+              <select id="primaryOutput"></select>
+            </div>
+          </div>
+          <button class="advanced-link" id="toggleAdvancedRelation" type="button">需要多种投入或多种产出？展开高级关联</button>
+          <div class="advanced-box" id="advancedRelationBox">
+            <div class="relation-section-head" style="margin-bottom:8px">
+              <div><div class="relation-section-title">其他投入与产出</div><div class="relation-section-desc">一期常规场景通常无需使用。</div></div>
+              <div><button class="btn" id="addInputRelation" type="button">＋ 其他投入</button> <button class="btn" id="addOutputRelation" type="button">＋ 其他产出</button></div>
+            </div>
+            <div class="relation-editor" id="extraInputRows"></div>
+            <div class="relation-editor" id="extraOutputRows" style="margin-top:10px"></div>
+          </div>
+        </div>
+
+        <div class="full relation-preview">
+          关系预览：<strong id="relationPreviewText">—</strong><br>
+          <span id="relationCalcText">选择数据后自动校验期间、折标参数和转换效率。</span>
+        </div>
+
+        <div class="full">
+          <label for="flowRemark">备注</label>
+          <textarea id="flowRemark" placeholder="选填，可说明关系口径或数据来源">${escapeHtml(current?.remark||'')}</textarea>
+        </div>
+
+        <div class="full notice" style="margin:0">
+          本页只关联已有能源量数据，不重复填月度数值。外购能源、一级分配、二级利用和外部输出均由系统从能源量数据中自动形成。
+        </div>
+      </div>
+    `,()=>{
+      const selectedScene=$('#relationSceneValue').value;
+      const selectedProcess=$('#flowProcessUnit').value;
+      const primaryInput=$('#primaryInput').value ? [Number($('#primaryInput').value)] : [];
+      const primaryOutput=$('#primaryOutput').value ? [Number($('#primaryOutput').value)] : [];
+      const extraInputs=Array.from(document.querySelectorAll('#extraInputRows select')).map(s=>Number(s.value)).filter(Boolean);
+      const extraOutputs=Array.from(document.querySelectorAll('#extraOutputRows select')).map(s=>Number(s.value)).filter(Boolean);
+      const selectedInputs=selectedScene==='自发电'?[]:[...primaryInput,...extraInputs];
+      const selectedOutputs=[...primaryOutput,...extraOutputs];
+
+      if(!selectedProcess) return alert('请选择转换单元。');
+      if(selectedScene!=='自发电' && !selectedInputs.length) return alert('请选择投入能源数据。');
+      if(!selectedOutputs.length) return alert('请选择产出能源数据。');
+      if(new Set(selectedInputs).size!==selectedInputs.length || new Set(selectedOutputs).size!==selectedOutputs.length) return alert('同一能源数据不能重复选择。');
+
+      const all=[...selectedInputs,...selectedOutputs].map(relationRecord).filter(Boolean);
+      if(all.some(row=>Number(row.year)!==Number(state.filters.flows.year))) return alert('投入与产出数据必须属于当前年度。');
+      if(selectedOutputs.some(id=>relationRecord(id)?.unitName!==selectedProcess)) return alert('产出能源数据应归属于所选转换单元。');
+      const duplicate=state.flows.some((row,i)=>i!==index && (row.outputRecordIds||[]).some(id=>selectedOutputs.includes(Number(id))));
+      if(duplicate) return alert('所选产出能源数据已被其他转换关系引用，请编辑原关系。');
+
+      const item={
+        id:current?.id||nextId++,year:Number(state.filters.flows.year),processUnit:selectedProcess,
+        sceneType:selectedScene,scenario:selectedScene==='自发电'?'无投入自产':'能源转换',
+        inputRecordIds:selectedInputs,outputRecordIds:selectedOutputs,
+        remark:$('#flowRemark').value.trim()
+      };
+      if(index===null) state.flows.push(item); else state.flows[index]=item;
+      closeModal();renderRecords();toast('能源转换关系已保存');
+    });
+
+    function candidates(kind){
+      const year=Number(state.filters.flows.year);
+      return state.consumption.filter(row=>{
+        if(Number(row.year)!==year) return false;
+        if(kind==='output' && row.unitName!==processUnit) return false;
+        if(scene==='锅炉产汽/产热'){
+          return kind==='input'
+            ? row.dataType==='能源消费' && ['化石燃料','可再生及替代能源'].includes(row.category)
+            : row.dataType==='能源产出' && ['蒸汽','热水'].includes(row.energy);
+        }
+        if(scene==='余热发电'){
+          return kind==='input'
+            ? row.dataType==='回收能源'
+            : row.dataType==='能源产出' && row.energy==='电力';
+        }
+        if(scene==='自发电'){
+          return kind==='input'
+            ? false
+            : row.dataType==='能源产出' && row.energy==='电力';
+        }
+        return kind==='input'
+          ? ['能源消费','回收能源'].includes(row.dataType)
+          : row.dataType==='能源产出';
+      });
+    }
+
+    function optionHtml(kind,selectedId='',placeholder='请选择已有能源数据'){
+      return `<option value="">${placeholder}</option>`+candidates(kind).map(row=>`<option value="${row.id}" ${Number(selectedId)===row.id?'selected':''}>${escapeHtml(relationRecordLabel(row))}</option>`).join('');
+    }
+
+    function renderUnitOptions(){
+      const list=conversionUnits(scene);
+      if(!list.some(item=>item.name===processUnit)) processUnit=list[0]?.name||'';
+      $('#flowProcessUnit').innerHTML=conversionUnitOptions(scene,processUnit);
+      $('#flowProcessUnit').value=processUnit;
+      $('#processUnitHelp').textContent=list.length
+        ? `已按“${scene}”筛选 ${list.length} 个可选单元。`
+        : `暂无“${scene}”单元，请先在用能单元中设置能源转换场景。`;
+    }
+
+    function renderPrimary(){
+      const noInput=scene==='自发电';
+      $('#primaryInputWrap').style.display=noInput?'none':'block';
+      $('.relation-arrow').style.display=noInput?'none':'grid';
+      $('#primaryInput').innerHTML=optionHtml('input',inputIds[0]||'',
+        scene==='余热发电'?'请选择回收余热数据':scene==='锅炉产汽/产热'?'请选择燃料消费数据':'请选择投入能源数据');
+      $('#primaryOutput').innerHTML=optionHtml('output',outputIds[0]||'',
+        scene==='锅炉产汽/产热'?'请选择蒸汽或热水产出':scene==='余热发电'||scene==='自发电'?'请选择电力产出数据':'请选择能源产出数据');
+      $('#primaryInputLabel').textContent=scene==='余热发电'?'回收余热数据':scene==='锅炉产汽/产热'?'燃料消费数据':'投入能源数据';
+      $('#relationSceneDesc').textContent={
+        '锅炉产汽/产热':'选择锅炉使用的燃料消费数据和蒸汽/热水总产出数据。',
+        '余热发电':'选择回收余热数据和余热发电系统的电力总产出数据。',
+        '自发电':'无需选择燃料投入，只关联光伏、风电等系统的电力产出数据。',
+        '其他转换':'选择已有投入与产出能源数据，必要时使用高级关联。'
+      }[scene];
+      $('#primaryInput').addEventListener('change',syncPreview);
+      $('#primaryOutput').addEventListener('change',syncPreview);
+    }
+
+    function extraRow(kind,id,index){
+      return `<div class="relation-row"><div><label>${kind==='input'?'其他投入':'其他产出'}</label><select>${optionHtml(kind,id,kind==='input'?'请选择其他投入':'请选择其他产出')}</select></div><button class="btn remove-extra" data-kind="${kind}" data-index="${index}" type="button">×</button></div>`;
+    }
+
+    function renderExtras(){
+      const extraInputs=inputIds.slice(1);
+      const extraOutputs=outputIds.slice(1);
+      $('#extraInputRows').innerHTML=extraInputs.map((id,i)=>extraRow('input',id,i)).join('');
+      $('#extraOutputRows').innerHTML=extraOutputs.map((id,i)=>extraRow('output',id,i)).join('');
+      document.querySelectorAll('#advancedRelationBox select').forEach(s=>s.addEventListener('change',syncPreview));
+      document.querySelectorAll('.remove-extra').forEach(button=>button.addEventListener('click',()=>{
+        const target=button.dataset.kind==='input'?inputIds:outputIds;
+        target.splice(Number(button.dataset.index)+1,1);
+        renderExtras();syncPreview();
+      }));
+      if(extraInputs.length||extraOutputs.length) $('#advancedRelationBox').classList.add('show');
+    }
+
+    function selectedRows(){
+      const ins=scene==='自发电'?[]:[
+        relationRecord($('#primaryInput').value),
+        ...Array.from(document.querySelectorAll('#extraInputRows select')).map(s=>relationRecord(s.value))
+      ].filter(Boolean);
+      const outs=[
+        relationRecord($('#primaryOutput').value),
+        ...Array.from(document.querySelectorAll('#extraOutputRows select')).map(s=>relationRecord(s.value))
+      ].filter(Boolean);
+      return {ins,outs};
+    }
+
+    function syncPreview(){
+      processUnit=$('#flowProcessUnit').value||processUnit;
+      const {ins,outs}=selectedRows();
+      const inputText=ins.length?ins.map(r=>r.energy).join(' + '):(scene==='自发电'?'自然能源':'待选择');
+      const outputText=outs.length?outs.map(r=>r.energy).join(' + '):'待选择';
+      $('#relationPreviewText').textContent=`${inputText} → ${processUnit||'转换单元'} → ${outputText}`;
+      const inputTce=ins.reduce((t,r)=>t+recordTce(r),0);
+      const outputTce=outs.reduce((t,r)=>t+recordTce(r),0);
+      const all=[...ins,...outs];
+      if(scene==='自发电'){
+        $('#relationCalcText').textContent=`产出折标量 ${fmt(outputTce,1)} tce；自发电场景不计算燃料转换效率。`;
+      }else if(ins.length&&outs.length&&all.every(recordHasFactor)){
+        $('#relationCalcText').textContent=`投入 ${fmt(inputTce,1)} tce；产出 ${fmt(outputTce,1)} tce；转换效率 ${inputTce?fmt(outputTce/inputTce*100,1):'—'}%。`;
+      }else{
+        $('#relationCalcText').textContent='选择完整数据后，系统自动计算折标投入、产出和转换效率。';
+      }
+    }
+
+    function applyScene(nextScene,applyDefaults=true){
+      scene=nextScene;$('#relationSceneValue').value=scene;
+      document.querySelectorAll('[data-scene]').forEach(card=>card.classList.toggle('active',card.dataset.scene===scene));
+      if(applyDefaults){
+        const d=sceneDefaults[scene];
+        processUnit=d.unit;inputIds=d.inputs.slice();outputIds=d.outputs.slice();
+        if(!outputIds.length) outputIds=[''];
+      }
+      renderUnitOptions();renderPrimary();renderExtras();syncPreview();
+    }
+
+    document.querySelectorAll('[data-scene]').forEach(card=>card.addEventListener('click',()=>applyScene(card.dataset.scene,true)));
+    $('#flowProcessUnit').addEventListener('change',()=>{
+      processUnit=$('#flowProcessUnit').value;
+      renderPrimary();renderExtras();syncPreview();
+    });
+    $('#toggleAdvancedRelation').addEventListener('click',()=>$('#advancedRelationBox').classList.toggle('show'));
+    $('#addInputRelation').addEventListener('click',()=>{inputIds.push('');renderExtras();syncPreview();});
+    $('#addOutputRelation').addEventListener('click',()=>{outputIds.push('');renderExtras();syncPreview();});
+    applyScene(scene,false);
+  }
+
+  function costContent(){
+    const f = state.filters.costs;
+    const list = state.costs.filter(item=>
+      String(item.year)===String(f.year) &&
+      (!f.energy || item.energy===f.energy)
+    );
+
+    return `
+      ${toolbar(`
+        <div class="field">
+          <label for="costYear">年度</label>
+          <select id="costYear">${selectOptions(['2026','2025'],f.year)}</select>
+        </div>
+        <div class="field">
+          <label for="costEnergy">能源品种</label>
+          <select id="costEnergy"><option value="">全部</option>${energyOptions(f.energy)}</select>
+        </div>
+      `,'新增成本数据')}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>能源品种</th><th>1月成本（万元）</th><th>2月</th>
+              <th>…</th><th>12月</th><th>年度合计（万元）</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${list.length?list.map(item=>{
+              const index = state.costs.findIndex(row=>row.id===item.id);
+              return `
+                <tr>
+                  <td>${escapeHtml(item.energy)}</td>
+                  <td>${fmt(item.m[0],2)}</td>
+                  <td>${fmt(item.m[1],2)}</td>
+                  <td>…</td>
+                  <td>${fmt(item.m[11],2)}</td>
+                  <td>${fmt(sum(item.m),2)}</td>
+                  <td>${actionButtons(index)}</td>
+                </tr>
+              `;
+            }).join(''):tableEmpty(7)}
+          </tbody>
+        </table>
+      </div>
+      ${pagination(list.length)}
+    `;
+  }
+
+  function bindCosts(){
+    $('#addBtn').addEventListener('click',()=>openCostModal(null));
+    $('#costYear').addEventListener('change',event=>{
+      state.filters.costs.year = event.target.value;
+      renderRecords();
+    });
+    $('#costEnergy').addEventListener('change',event=>{
+      state.filters.costs.energy = event.target.value;
+      renderRecords();
+    });
+
+    bindRowActions('costs',openCostModal,index=>{
+      if(!confirm('确认删除该成本数据吗？')) return;
+      state.costs.splice(index,1);
+      renderRecords();toast('删除成功');
+    });
+  }
+
+  function openCostModal(index){
+    const current = index===null ? null : state.costs[index];
+
+    openModal(index===null?'新增能源成本':'编辑能源成本',`
+      <div class="form-grid">
+        <div>
+          <label class="required" for="costModalEnergy">能源品种</label>
+          <select id="costModalEnergy">${energyOptions(current?.energy||state.energy[0]?.name)}</select>
+        </div>
+        <div>
+          <label for="costUnit">成本单位</label>
+          <input id="costUnit" value="万元" readonly>
+        </div>
+      </div>
+      ${monthInputs(current?.m)}
+      <div class="help">年度成本由系统根据1—12月数据自动汇总。</div>
+    `,()=>{
+      const item = {
+        id:current?.id || nextId++,
+        year:2026,
+        energy:$('#costModalEnergy').value,
+        m:readMonths()
+      };
+
+      if(index===null) state.costs.push(item);
+      else state.costs[index] = item;
+
+      closeModal();renderRecords();toast('能源成本已保存');
+    });
+  }
+
+  /* =========================
+     运营数据
+  ========================== */
+
+  function operationAnnual(item){
+    return item.method==='年度填报' ? Number(item.annual || 0) : sum(item.m || []);
+  }
+
+  function renderOperations(){
+    const f = state.filters.operations;
+    const categories = ['产量与业务量','经济指标'];
+    const list = state.operations.filter(item=>
+      String(item.year)===String(f.year) &&
+      (!f.category || item.category===f.category) &&
+      (!f.keyword || item.name.includes(f.keyword) || item.unitName.includes(f.keyword))
+    );
+    const rows = [];
+    list.forEach(item=>{
+      const index = state.operations.findIndex(row=>row.id===item.id);
+      const monthly = item.method==='月度填报';
+      const detailOpen = state.operationDetailId===item.id;
+      rows.push(`
+        <tr>
+          <td>${escapeHtml(item.unitName)}</td><td>${escapeHtml(item.category)}</td>
+          <td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.unit)}</td>
+          <td>${fmt(operationAnnual(item))}</td>
+          <td>
+            ${monthly?`<button class="btn-link operation-detail" data-id="${item.id}" type="button">${detailOpen?'收起明细':'月度明细'}</button>`:''}
+            <button class="btn-link edit-row" data-index="${index}" type="button">编辑</button>
+            <button class="btn-link danger delete-row" data-index="${index}" type="button">删除</button>
+          </td>
+        </tr>
+      `);
+      if(detailOpen && monthly){
+        rows.push(`
+          <tr class="detail-row"><td colspan="6"><div class="detail-panel">
+            <div class="detail-head">
+              <span>${escapeHtml(item.unitName)}｜${escapeHtml(item.name)}月度明细</span>
+              <span>单位：${escapeHtml(item.unit)}</span>
+            </div>
+            <div class="detail-grid">
+              ${(item.m || []).map((value,index)=>`
+                <div class="detail-item"><div class="detail-label">${index+1}月</div>
+                <div class="detail-value">${optionalDisplay(value)}</div></div>
+              `).join('')}
+            </div>
+            <div class="summary-line">年度合计：<strong>${fmt(operationAnnual(item))}</strong> ${escapeHtml(item.unit)}</div>
+          </div></td></tr>
+        `);
+      }
+    });
+
+    screen.innerHTML = `
+      ${toolbar(`
+        <div class="field"><label for="operationYear">年度</label>
+          <select id="operationYear">${selectOptions(['2026','2025'],f.year)}</select></div>
+        <div class="field"><label for="operationCategory">指标类别</label>
+          <select id="operationCategory">${selectOptions(categories,f.category,true)}</select></div>
+        <div class="field search"><label for="operationKeyword">关键字</label>
+          <input id="operationKeyword" value="${escapeHtml(f.keyword)}" placeholder="搜索指标或归属范围"></div>
+      `,'新增运营数据')}
+      <div class="notice">
+        一期仅采集直接用于能耗强度和经营分析的<strong>产量与业务量、经济指标</strong>；规模和运行参数后续按实际功能需要扩展。
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>归属范围</th><th>指标类别</th><th>指标名称</th><th>单位</th><th>年度值</th><th>操作</th></tr></thead>
+        <tbody>${rows.length?rows.join(''):tableEmpty(6)}</tbody>
+      </table></div>${pagination(list.length)}
+    `;
+
+    $('#addBtn').addEventListener('click',()=>openOperationModal(null));
+    $('#operationYear').addEventListener('change',event=>{state.filters.operations.year=event.target.value;renderOperations();});
+    $('#operationCategory').addEventListener('change',event=>{state.filters.operations.category=event.target.value;renderOperations();});
+    $('#operationKeyword').addEventListener('input',event=>{state.filters.operations.keyword=event.target.value;renderOperations();});
+    document.querySelectorAll('.operation-detail').forEach(button=>{
+      button.addEventListener('click',()=>{
+        const id=Number(button.dataset.id);
+        state.operationDetailId=state.operationDetailId===id?null:id;
+        renderOperations();
+      });
+    });
+    bindRowActions('operations',openOperationModal,index=>{
+      if(!confirm('确认删除该运营数据吗？')) return;
+      const id=state.operations[index].id;
+      state.operations.splice(index,1);
+      if(state.operationDetailId===id) state.operationDetailId=null;
+      renderOperations();toast('删除成功');
+    });
+  }
+
+  function openOperationModal(index){
+    const current=index===null?null:state.operations[index];
+    const categories=Object.keys(operationPreset);
+    const initialCategory=current?.category||'产量与业务量';
+    const names=Object.keys(operationPreset[initialCategory]||{});
+    const currentIsPreset=!!operationPreset[initialCategory]?.[current?.name];
+    const initialMetric=current?(currentIsPreset?current.name:'其他（自定义）'):names[0];
+
+    openModal(index===null?'新增运营数据':'编辑运营数据',`
+      <div class="form-grid">
+        <div><label class="required" for="operationType">指标类别</label>
+          <select id="operationType">${selectOptions(categories,initialCategory)}</select></div>
+        <div><label class="required" for="operationMetric">指标名称</label>
+          <select id="operationMetric"></select></div>
+        <div id="customMetricWrap" class="${current && !currentIsPreset?'':'custom-row'}">
+          <label class="required" for="customMetricName">自定义指标名称</label>
+          <input id="customMetricName" value="${current && !currentIsPreset?escapeHtml(current.name):''}" placeholder="请输入指标名称"></div>
+        <div><label class="required" for="operationScope">归属范围</label>
+          <select id="operationScope">${groupedUnitOptions(current?.unitName||'全厂')}</select></div>
+        <div id="customUnitWrap" class="${current && !currentIsPreset?'':'custom-row'}">
+          <label class="required" for="operationUnitValue">单位</label>
+          <input id="operationUnitValue" value="${current && !currentIsPreset?escapeHtml(current.unit):''}" placeholder="如：t、万元"></div>
+        <div id="customMethodWrap" class="${current && !currentIsPreset?'':'custom-row'}">
+          <label class="required" for="operationMethod">填报方式</label>
+          <select id="operationMethod">${selectOptions(['月度填报','年度填报'],current?.method||'月度填报')}</select></div>
+        <div class="auto-info">
+          <span>计量单位：<strong id="operationAutoUnit">—</strong></span>
+          <span>填报口径：<strong id="operationAutoMethod">—</strong></span>
+        </div>
+        <div id="annualValueWrap" class="full custom-row">
+          <label class="required" for="annualValue">年度值</label>
+          <input id="annualValue" type="number" min="0" step="0.01" value="${current?.annual ?? ''}" placeholder="请输入年度值"></div>
+      </div>
+      <div id="monthlyOperationWrap" class="custom-row">
+        <div class="form-section-title">月度数据</div>${optionalMonthInputs(current?.m)}
+        <div class="summary-line">当前合计：<strong id="operationLiveTotal">0</strong> <span id="operationTotalUnit"></span></div>
+      </div>
+    `,()=>{
+      const category=$('#operationType').value;
+      const selected=$('#operationMetric').value;
+      const custom=selected==='其他（自定义）';
+      const preset=operationPreset[category]?.[selected];
+      const name=custom?$('#customMetricName').value.trim():selected;
+      const unit=custom?$('#operationUnitValue').value.trim():preset.unit;
+      const method=custom?$('#operationMethod').value:preset.method;
+      const scope=$('#operationScope').value;
+      const scopeItem=allUnits().find(item=>item.name===scope);
+      if(!name) return alert('请填写指标名称。');
+      if(!unit) return alert('请填写单位。');
+      let months=[],annual=0;
+      if(method==='月度填报'){
+        months=readOptionalMonths();
+        if(!months.some(value=>value!==null)) return alert('请至少填写一个月份的数据。');
+      }else{
+        const raw=$('#annualValue').value.trim();
+        if(raw==='') return alert('请填写年度值。');
+        annual=Number(raw);
+      }
+      const duplicate=state.operations.some((item,i)=>i!==index && String(item.year)==='2026' && item.unitName===scope && item.name===name);
+      if(duplicate) return alert('该归属范围下已存在同名指标，请直接编辑原记录。');
+      const item={id:current?.id||nextId++,year:2026,level:scopeItem?.level||'企业',
+        unitName:scope,category,name,unit,method,
+        aggregate:method==='月度填报'?'月度求和':'年度单值',annual,m:months};
+      if(index===null) state.operations.push(item); else state.operations[index]=item;
+      closeModal();renderOperations();toast('运营数据已保存');
+    });
+
+    const renderMetrics=(category,preferred='')=>{
+      const metrics=Object.keys(operationPreset[category]||{});
+      $('#operationMetric').innerHTML=metrics.map(name=>`<option ${name===preferred?'selected':''}>${escapeHtml(name)}</option>`).join('')+
+        `<option ${preferred==='其他（自定义）'?'selected':''}>其他（自定义）</option>`;
+      if(!preferred||![...metrics,'其他（自定义）'].includes(preferred)) $('#operationMetric').value=metrics[0]||'其他（自定义）';
+      syncMetric();
+    };
+    const updateLiveTotal=()=>{
+      const total=Array.from({length:12},(_,i)=>{const raw=$('#m'+i)?.value.trim()||'';return raw===''?0:Number(raw);}).reduce((a,b)=>a+b,0);
+      $('#operationLiveTotal').textContent=fmt(total);
+    };
+    const syncMetric=()=>{
+      const category=$('#operationType').value;
+      const metric=$('#operationMetric').value;
+      const custom=metric==='其他（自定义）';
+      const preset=operationPreset[category]?.[metric];
+      const unit=custom?($('#operationUnitValue').value||'待填写'):preset.unit;
+      const method=custom?$('#operationMethod').value:preset.method;
+      $('#customMetricWrap').classList.toggle('custom-row',!custom);
+      $('#customUnitWrap').classList.toggle('custom-row',!custom);
+      $('#customMethodWrap').classList.toggle('custom-row',!custom);
+      $('#operationAutoUnit').textContent=unit;
+      $('#operationAutoMethod').textContent=method==='月度填报'?'按月填报':'年度填报';
+      $('#operationTotalUnit').textContent=unit;
+      $('#monthlyOperationWrap').classList.toggle('custom-row',method!=='月度填报');
+      $('#annualValueWrap').classList.toggle('custom-row',method!=='年度填报');
+    };
+    $('#operationType').addEventListener('change',event=>renderMetrics(event.target.value,''));
+    $('#operationMetric').addEventListener('change',syncMetric);
+    $('#operationMethod').addEventListener('change',syncMetric);
+    $('#operationUnitValue').addEventListener('input',syncMetric);
+    Array.from({length:12},(_,i)=>$('#m'+i)).forEach(input=>{if(input) input.addEventListener('input',updateLiveTotal);});
+    renderMetrics(initialCategory,initialMetric);
+    if(current && !currentIsPreset){$('#operationMethod').value=current.method;$('#operationUnitValue').value=current.unit;}
+    syncMetric();updateLiveTotal();
+  }
+
+  /* =========================
+     重点设备
+  ========================== */
+
+  function renderDevices(){
+    const f=state.filters.devices;
+    const list=state.devices.filter(item=>
+      (!f.keyword||item.name.includes(f.keyword)||item.type.includes(f.keyword)) &&
+      (!f.unitName||item.unitName===f.unitName) &&
+      (!f.energy||item.energy===f.energy)
+    );
+    screen.innerHTML=`
+      ${toolbar(`
+        <div class="field search"><label for="deviceKeyword">关键字</label>
+          <input id="deviceKeyword" value="${escapeHtml(f.keyword)}" placeholder="搜索设备名称或类型"></div>
+        <div class="field"><label for="deviceUnitFilter">所属用能单元</label>
+          <select id="deviceUnitFilter"><option value="">全部</option>${unitOptions(f.unitName,false)}</select></div>
+        <div class="field"><label for="deviceEnergyFilter">主要能源品种</label>
+          <select id="deviceEnergyFilter"><option value="">全部</option>${energyOptions(f.energy)}</select></div>
+      `,'新增重点设备')}
+      <div class="notice">一期仅维护设备基础档案，不在本页重复录入月度能耗；后续如需设备级计量，统一进入能源数据台账。</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>所属用能单元</th><th>设备名称</th><th>设备类型</th><th>主要能源品种</th><th>备注</th><th>操作</th></tr></thead>
+        <tbody>${list.length?list.map(item=>{
+          const index=state.devices.findIndex(row=>row.id===item.id);
+          return `<tr><td>${escapeHtml(item.unitName)}</td><td>${escapeHtml(item.name)}</td>
+            <td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.energy)}</td>
+            <td>${escapeHtml(item.remark||'—')}</td><td>${actionButtons(index)}</td></tr>`;
+        }).join(''):tableEmpty(6)}</tbody>
+      </table></div>${pagination(list.length)}
+    `;
+    $('#addBtn').addEventListener('click',()=>openDeviceModal(null));
+    $('#deviceKeyword').addEventListener('input',event=>{state.filters.devices.keyword=event.target.value;renderDevices();});
+    $('#deviceUnitFilter').addEventListener('change',event=>{state.filters.devices.unitName=event.target.value;renderDevices();});
+    $('#deviceEnergyFilter').addEventListener('change',event=>{state.filters.devices.energy=event.target.value;renderDevices();});
+    bindRowActions('devices',openDeviceModal,index=>{
+      if(!confirm('确认删除该重点设备吗？')) return;
+      state.devices.splice(index,1);renderDevices();toast('删除成功');
+    });
+  }
+
+  function openDeviceModal(index){
+    const current=index===null?null:state.devices[index];
+    const isGeneric=genericDeviceTypes.slice(0,-1).includes(current?.type);
+    const initialType=current?(isGeneric?current.type:'其他（自定义）'):genericDeviceTypes[0];
+    openModal(index===null?'新增重点设备':'编辑重点设备',`
+      <div class="form-grid">
+        <div class="full"><label class="required" for="deviceUnitName">所属用能单元</label>
+          <select id="deviceUnitName">${unitOptions(current?.unitName||state.units[0].children[0].name,false)}</select></div>
+        <div><label class="required" for="deviceType">设备类型</label>
+          <select id="deviceType">${selectOptions(genericDeviceTypes,initialType)}</select></div>
+        <div id="customDeviceTypeWrap" class="${current && !isGeneric?'':'custom-row'}">
+          <label class="required" for="customDeviceType">自定义设备类型</label>
+          <input id="customDeviceType" value="${current && !isGeneric?escapeHtml(current.type):''}" placeholder="如：生料磨、水泥磨、回转窑"></div>
+        <div><label class="required" for="deviceName">设备名称</label>
+          <input id="deviceName" value="${escapeHtml(current?.name||'')}" placeholder="如：1号空压机"></div>
+        <div><label class="required" for="deviceEnergy">主要能源品种</label>
+          <select id="deviceEnergy">${energyOptions(current?.energy||'电力')}</select></div>
+        <div class="full"><label for="deviceRemark">备注</label>
+          <textarea id="deviceRemark" placeholder="选填">${escapeHtml(current?.remark||'')}</textarea></div>
+      </div>
+    `,()=>{
+      const name=$('#deviceName').value.trim();
+      const selectedType=$('#deviceType').value;
+      const type=selectedType==='其他（自定义）'?$('#customDeviceType').value.trim():selectedType;
+      if(!type) return alert('请填写设备类型。');
+      if(!name) return alert('请填写设备名称。');
+      const item={id:current?.id||nextId++,name,type,unitName:$('#deviceUnitName').value,
+        energy:$('#deviceEnergy').value,remark:$('#deviceRemark').value.trim()};
+      if(index===null) state.devices.push(item); else state.devices[index]=item;
+      closeModal();renderDevices();toast('重点设备已保存');
+    });
+    const hints={'动力设备':'如：1号电机','泵类设备':'如：循环水泵1','风机设备':'如：窑尾高温风机',
+      '空压设备':'如：1号空压机','制冷/空调设备':'如：中央空调主机1',
+      '加热/锅炉设备':'如：燃气锅炉1','输送设备':'如：皮带输送机1',
+      '其他（自定义）':'请输入具体设备名称'};
+    const sync=()=>{
+      const type=$('#deviceType').value;
+      $('#customDeviceTypeWrap').classList.toggle('custom-row',type!=='其他（自定义）');
+      $('#deviceName').placeholder=hints[type]||'请输入设备名称';
+    };
+    $('#deviceType').addEventListener('change',sync);sync();
+  }
+
+  /* =========================
+     通用组件与事件
+  ========================== */
+
+  function monthInputs(values=[]){
+    return `
+      <div class="month-grid">
+        ${Array.from({length:12},(_,index)=>`
+          <div>
+            <label class="required" for="m${index}">${index+1}月</label>
+            <input id="m${index}" type="number" min="0" step="0.01" value="${values[index]??0}">
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function readMonths(){
+    return Array.from({length:12},(_,index)=>Number($('#m'+index).value||0));
+  }
+
+  function bindRowActions(key,editHandler,deleteHandler){
+    document.querySelectorAll('.edit-row').forEach(button=>{
+      button.addEventListener('click',()=>editHandler(Number(button.dataset.index)));
+    });
+    document.querySelectorAll('.delete-row').forEach(button=>{
+      button.addEventListener('click',()=>deleteHandler(Number(button.dataset.index)));
+    });
+  }
+
+  function openModal(title,body,onSave,small=false){
+    $('#modalTitle').textContent = title;
+    $('#modalBody').innerHTML = body;
+    $('#modal').classList.toggle('small',small);
+    state.saveHandler = onSave;
+    overlay.classList.add('open');
+  }
+
+  function closeModal(){
+    overlay.classList.remove('open');
+    state.saveHandler = null;
+  }
+
+  $('#modalClose').addEventListener('click',closeModal);
+  $('#modalCancel').addEventListener('click',closeModal);
+  $('#modalSave').addEventListener('click',()=>{
+    if(state.saveHandler) state.saveHandler();
+  });
+  overlay.addEventListener('click',event=>{
+    if(event.target===overlay) closeModal();
+  });
+
+  document.querySelectorAll('.menu-item[data-page]').forEach(button=>{
+    button.addEventListener('click',()=>{
+      state.page = button.dataset.page;
+      render();
+    });
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

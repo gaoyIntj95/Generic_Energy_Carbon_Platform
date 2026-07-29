@@ -1,0 +1,3 @@
+.breadcrumb { display: flex; align-items: center; gap: 9px; min-height: 25px; color: #687482; font-size: 12px; }
+.separator { color: #b4bdc5; }
+.breadcrumb strong { color: #334155; font-weight: 600; }

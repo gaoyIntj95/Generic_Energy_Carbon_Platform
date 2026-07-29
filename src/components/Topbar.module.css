@@ -1,0 +1,5 @@
+.topbar { position: sticky; top: 0; z-index: 5; display: flex; height: var(--topbar-height); align-items: center; justify-content: space-between; padding: 0 24px; background: rgb(255 255 255 / 96%); border-bottom: 1px solid var(--color-border); }
+.tools button, .actions button { width: 30px; height: 30px; color: #405063; background: transparent; border: 0; border-radius: 6px; font-size: 18px; cursor: pointer; }
+.tools button:hover, .actions button:hover { background: #f2f5f7; }
+.actions { display: flex; align-items: center; gap: 14px; }
+.avatar { display: grid; width: 30px; height: 30px; place-items: center; color: var(--color-brand); background: var(--color-brand-soft); border: 1px solid #d4eee4; border-radius: 50%; font-size: 12px; font-weight: 700; }

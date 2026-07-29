@@ -1,0 +1,10 @@
+.flowToolbar { display: flex; align-items: center; justify-content: space-between; }
+.flowToolbar > div:first-child { min-width: 330px; }
+.flowCanvas { overflow: auto; min-height: 480px; border: 1px solid #e3e9e7; background: linear-gradient(#fff,#fbfcfc); }
+.flowCanvas svg { min-width: 940px; width: 100%; height: 520px; }
+.stageLabels text { fill: #65727b; font-size: 12px; font-weight: 600; }
+.node { cursor: pointer; transition: opacity .18s; }.node text { fill: #fff; font-size: 11px; pointer-events: none; }.node text:nth-of-type(1) { font-weight: 700; }
+.links path { fill: none; stroke: #9ebcb5; stroke-width: 7; stroke-linecap: round; opacity: .42; marker-end: url(#arrow); }
+.dim { opacity: .25; }
+.tooltip rect { fill: #263b42; opacity: .94; }.tooltip text { fill: #fff; font-size: 11px; }.tooltip text:last-child { fill: #cbd8d5; }
+.analysis { display: flex; min-height: 54px; align-items: center; gap: 16px; padding: 10px 14px; background: #f2f8f6; border: 1px solid #dcebe6; border-top: 0; }.analysis b { color: #078c64; }.analysis span { flex: 1; color: #59666f; }

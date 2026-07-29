@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>通用能碳平台｜碳排放核算与合规</title>
+<style>
+:root{
+  --gcl:#139b72;
+  --gcl-dark:#08785a;
+  --gcl-light:#eaf7f2;
+  --cyan:#1e9ce5;
+  --blue:#3977e8;
+  --bg:#f5f8f8;
+  --panel:#ffffff;
+  --line:#e8eeee;
+  --text:#273239;
+  --muted:#78858d;
+  --head:#f0f8f5;
+  --warn:#f59e0b;
+  --danger:#e94b54;
+  --shadow:0 6px 22px rgba(40,72,64,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font-family:"Microsoft YaHei","PingFang SC",Arial,sans-serif;color:var(--text);background:var(--bg);font-size:14px}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+.app{height:100vh;display:grid;grid-template-columns:240px 1fr;grid-template-rows:48px 1fr;overflow:hidden}
+.topbar{grid-column:1/3;background:linear-gradient(90deg,#f8fffd,#eef9f7);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 18px;z-index:30}
+.brand{display:flex;align-items:center;gap:12px;font-weight:700;font-size:17px;white-space:nowrap}
+.brand-mark{position:relative;width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#1ea87e,#3b82f6);transform:rotate(12deg)}
+.brand-mark:after{content:"";position:absolute;inset:6px;background:#fff;border-radius:50%}
+.top-actions{display:flex;gap:20px;align-items:center;color:#63727a}
+.top-actions span{white-space:nowrap}
+.sidebar{grid-row:2;background:#fff;border-right:1px solid var(--line);padding:18px 14px 12px;overflow:auto;display:flex;flex-direction:column}
+.module-title{font-size:17px;font-weight:700;padding:8px 8px 18px;display:flex;align-items:center;gap:10px}
+.module-title .hamb{font-size:18px}
+.tree-title{font-weight:600;padding:10px 8px;display:flex;align-items:center;justify-content:space-between}
+.tree-title .left{display:flex;gap:10px;align-items:center}
+.nav{display:flex;flex-direction:column;gap:4px}
+.nav-item{padding:11px 12px 11px 38px;border-radius:7px;color:#46535a;cursor:pointer;transition:.15s;position:relative}
+.nav-item:hover{background:#f4faf8}
+.nav-item.active{background:#e9f5f2;color:var(--gcl);font-weight:600}
+.nav-item.active:before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;background:var(--gcl);border-radius:3px}
+.sidebar-spacer{flex:1}
+.collapse-side{padding:12px;color:#6c7980;border-top:1px solid var(--line)}
+.main{grid-row:2;overflow:auto;padding:16px 24px 28px}
+.page{display:none;min-width:1100px}
+.page.active{display:block}
+.page-title{font-size:19px;font-weight:700;margin:0 0 14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}
+.taskbar{padding:14px 16px;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.task-left{display:flex;align-items:center;gap:12px}
+.task-icon{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#d9f5ec,#f4fbf8);display:flex;align-items:center;justify-content:center;color:var(--gcl);font-size:25px}
+.task-main{display:flex;flex-direction:column;gap:7px}
+.task-line{display:flex;align-items:center;gap:10px}
+.task-line b{font-size:15px}
+.task-select{border:1px solid #dce6e2;background:#fff;border-radius:6px;padding:7px 34px 7px 10px;min-width:255px}
+.meta{color:#68757c;display:flex;gap:12px;align-items:center}
+.sep{height:13px;width:1px;background:#d5dfdc}
+.task-actions{display:flex;gap:10px}
+.btn{border:1px solid transparent;border-radius:6px;padding:8px 14px;background:#fff;color:#4d5a60;display:inline-flex;align-items:center;gap:6px;justify-content:center}
+.btn.primary{background:var(--gcl);color:#fff;border-color:var(--gcl)}
+.btn.outline{border-color:var(--gcl);color:var(--gcl)}
+.btn.gray{background:#f5f7f7;border-color:#e2e8e6}
+.btn.danger{border-color:#f2a2a6;color:var(--danger)}
+.btn.link{padding:0;border:0;color:var(--gcl);background:transparent}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.filterbar{padding:10px 14px;display:flex;gap:16px;align-items:center;margin-bottom:10px}
+.search{position:relative;min-width:330px}
+.search input{width:100%;height:36px;border:1px solid #dfe8e5;border-radius:6px;padding:0 36px 0 12px;outline:none}
+.search:after{content:"⌕";position:absolute;right:12px;top:6px;color:#748188;font-size:20px}
+.select-row{display:flex;align-items:center;gap:8px}
+.select-row select{height:36px;border:1px solid #dfe8e5;border-radius:6px;padding:0 34px 0 10px;min-width:180px;background:#fff}
+.filter-spacer{flex:1}
+.table-shell{padding:0 14px 14px}
+.group-card{border:1px solid #e2ebe8;border-radius:8px;overflow:hidden;margin-bottom:7px}
+.group-head{height:34px;background:linear-gradient(90deg,#eaf7f3,#f4faf8);display:flex;align-items:center;padding:0 12px;font-weight:700;cursor:pointer}
+.group-head .arrow{width:18px;color:#4e6960}
+.group-head .count{margin-left:6px;font-weight:500}
+.group-head .subtotal{margin-left:auto;color:#3676d8;font-weight:600}
+.group-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.group-table th{height:31px;background:#fbfcfc;border-bottom:1px solid #e6ecea;text-align:left;padding:0 14px;font-weight:600}
+.group-table td{height:42px;border-bottom:1px solid #eef2f1;padding:7px 14px;vertical-align:middle}
+.group-table tr:last-child td{border-bottom:0}
+.group-table .actions{white-space:nowrap}
+.action-link{color:var(--gcl);margin-right:14px;cursor:pointer}
+.action-link.warn{color:#ef8c24}
+.action-link.red{color:var(--danger)}
+.more-btn{border:0;background:transparent;font-size:18px;color:#4c5c62;padding:0 5px}
+.muted{color:var(--muted);font-size:12px}
+.tag{display:inline-flex;align-items:center;padding:3px 9px;border-radius:12px;font-size:12px}
+.tag.green{background:#e8f8f0;color:#168456}
+.tag.blue{background:#eaf2ff;color:#3977e8}
+.tag.orange{background:#fff3df;color:#e48a00}
+.tag.gray{background:#eef1f2;color:#6c787e}
+.tag.red{background:#fdebed;color:#dd4751}
+.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}
+.summary-card{padding:18px 18px;display:flex;align-items:center;gap:15px;min-height:116px}
+.summary-icon{width:58px;height:58px;border-radius:50%;border:1px solid #bfe9d8;background:#f2fbf7;display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--gcl)}
+.summary-card .value{font-size:29px;color:var(--gcl);font-weight:700;margin:5px 0 6px}
+.summary-card .label{font-weight:700}
+.summary-card .sub{color:#647178}
+.analysis-grid{display:grid;grid-template-columns:1.05fr 1.25fr 1fr;gap:14px;margin-bottom:14px}
+.analysis-card{padding:16px;min-height:295px}
+.card-title{font-size:16px;font-weight:700;margin-bottom:2px}
+.unit{color:#7e8a90;font-size:12px;margin-bottom:12px}
+.donut-wrap{display:flex;align-items:center;gap:24px;margin-top:26px}
+.donut{width:170px;height:170px;border-radius:50%;background:conic-gradient(#16a36f 0 24.67%,#4b9dec 24.67% 96.46%,#dbe3e6 96.46% 100%);position:relative;flex:none}
+.donut:after{content:"";position:absolute;inset:38px;background:#fff;border-radius:50%}
+.donut-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;z-index:1;font-weight:700}
+.donut-center strong{font-size:18px}
+.legend{display:flex;flex-direction:column;gap:13px}
+.legend-item{display:grid;grid-template-columns:10px 1fr;gap:8px;align-items:start}
+.dot{width:9px;height:9px;border-radius:3px;margin-top:4px}
+.chart{height:205px;display:flex;align-items:flex-end;gap:24px;padding:14px 16px 24px 40px;position:relative;border-left:1px solid #e6ecea;border-bottom:1px solid #e6ecea;margin-top:25px}
+.chart:before,.chart:after{content:"";position:absolute;left:0;right:0;border-top:1px dashed #edf1f0}
+.chart:before{top:35%}.chart:after{top:68%}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;position:relative;z-index:1}
+.bar-val{font-size:11px;margin-bottom:5px}
+.bar{width:29px;background:linear-gradient(#9fdfbd,#49b884);border-radius:3px 3px 0 0}
+.bar.current{background:linear-gradient(#4dbb88,#129a70)}
+.bar-year{font-size:11px;margin-top:8px;color:#657179}
+.rank-table{width:100%;border-collapse:collapse;margin-top:8px}
+.rank-table th,.rank-table td{padding:10px;border-bottom:1px solid #e9eeec;text-align:left}
+.rank-table th{font-size:12px}
+.detail-panel{padding:13px 16px}
+.detail-panel .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+.detail-table{width:100%;border-collapse:collapse}
+.detail-table th{background:#f6faf9}
+.detail-table th,.detail-table td{padding:8px 13px;border:1px solid #edf1ef;text-align:left}
+.note{font-size:12px;color:#7b878d;margin-top:10px}
+.support-layout{display:grid;grid-template-columns:minmax(780px,1fr) 330px;gap:0}
+.support-main{border-right:1px solid var(--line)}
+.support-head{padding:14px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}
+.support-info{padding:12px 16px;background:#f2fbf7;border-left:3px solid var(--gcl);font-size:12px;color:#56656c}
+.tabs{display:flex;gap:30px;border-bottom:1px solid var(--line);padding:0 18px}
+.tab{padding:14px 0;color:#56636a;cursor:pointer;position:relative}
+.tab.active{color:#2f70de;font-weight:600}
+.tab.active:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:#2f70de}
+.support-toolbar{padding:12px 16px;display:flex;gap:14px;align-items:center}
+.support-table{width:100%;border-collapse:collapse}
+.support-table th{background:#f6f8f9;padding:10px;text-align:left;font-size:12px}
+.support-table td{padding:10px;border-bottom:1px solid #edf1ef;font-size:12px}
+.support-group td{background:#f8faf9;font-weight:700;padding:8px 10px}
+.drawer-pane{padding:16px;background:#fff;min-height:650px}
+.drawer-title{font-size:16px;font-weight:700;display:flex;justify-content:space-between;align-items:center;padding-bottom:16px;border-bottom:1px solid var(--line)}
+.detail-block{margin:16px 0}
+.detail-block h4{font-size:13px;margin:0 0 10px}
+.kv{display:grid;grid-template-columns:90px 1fr;gap:8px;font-size:12px;line-height:1.7}
+.material-list{display:flex;flex-direction:column;gap:10px}
+.file-row{border:1px solid #e6ecea;border-radius:7px;padding:9px;display:flex;align-items:center;gap:9px}
+.file-icon{width:27px;height:34px;background:#e6464b;color:#fff;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px}
+.file-meta{flex:1}
+.file-name{font-size:12px}
+.file-sub{font-size:11px;color:#879197;margin-top:3px}
+.textarea{width:100%;min-height:90px;border:1px solid #dfe7e5;border-radius:7px;padding:10px;resize:vertical}
+.factor-layout{display:grid;grid-template-columns:minmax(800px,1fr) 330px;gap:14px}
+.factor-main{padding:0 14px 14px}
+.factor-tip{margin:0 0 12px;background:linear-gradient(90deg,#e9f8f2,#f5fbf8);padding:11px 14px;border-radius:5px;color:#597068}
+.factor-filter{padding:12px 0;display:flex;flex-wrap:wrap;gap:12px}
+.factor-filter input,.factor-filter select{height:36px;border:1px solid #dfe8e5;border-radius:6px;padding:0 10px;background:#fff}
+.factor-filter input{min-width:260px}
+.factor-tabs{display:flex;gap:30px;border-bottom:1px solid var(--line);padding-top:3px}
+.factor-table{width:100%;border-collapse:collapse}
+.factor-table th{height:42px;text-align:left;font-size:12px}
+.factor-table td{height:48px;border-bottom:1px solid #edf1ef}
+.factor-table tr.selected{background:#eaf7f2}
+.factor-side{padding:16px;background:#fff;min-height:650px}
+.factor-kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.factor-kpi div{background:#fafcfc;border:1px solid #e9efed;border-radius:7px;padding:10px 6px;text-align:center}
+.factor-kpi strong{display:block;color:var(--gcl);font-size:18px;margin-bottom:4px}
+.pagination{display:flex;align-items:center;justify-content:space-between;padding-top:16px;color:#657179}
+.pages{display:flex;gap:7px;align-items:center}
+.page-btn{border:1px solid #dce5e2;background:#fff;border-radius:5px;width:30px;height:30px}
+.page-btn.active{border-color:#3986ed;color:#3986ed}
+.overlay{position:fixed;inset:0;background:rgba(31,45,40,.26);z-index:80;display:none}
+.overlay.show{display:block}
+.modal{position:fixed;z-index:90;left:50%;top:50%;transform:translate(-50%,-50%);width:620px;max-height:86vh;overflow:auto;background:#fff;border-radius:11px;box-shadow:0 18px 60px rgba(20,45,36,.22);display:none}
+.modal.show{display:block}
+.modal-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-size:17px;font-weight:700}
+.modal-body{padding:18px 20px}
+.modal-foot{padding:13px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-item{display:flex;flex-direction:column;gap:7px}
+.form-item.full{grid-column:1/3}
+.form-item label{font-size:13px;font-weight:600}
+.form-item input,.form-item select,.form-item textarea{border:1px solid #dbe5e2;border-radius:6px;padding:9px 10px;background:#fff}
+.form-item textarea{min-height:76px}
+.form-hint{font-size:11px;color:#879197}
+.drawer{position:fixed;z-index:95;top:0;right:-520px;width:500px;height:100%;background:#fff;box-shadow:-10px 0 30px rgba(20,45,36,.15);transition:.25s;display:flex;flex-direction:column}
+.drawer.show{right:0}
+.drawer-head{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-size:18px;font-weight:700}
+.drawer-body{padding:18px 20px;overflow:auto;flex:1}
+.drawer-foot{padding:13px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
+.close-x{border:0;background:transparent;font-size:22px;color:#637178}
+.toast{position:fixed;z-index:120;left:50%;top:72px;transform:translateX(-50%);background:#fff;border:1px solid #dfe8e5;border-radius:7px;box-shadow:var(--shadow);padding:10px 18px;display:none}
+.toast.show{display:block}
+.popmenu{position:fixed;z-index:110;background:#fff;border:1px solid #dfe8e5;border-radius:7px;box-shadow:var(--shadow);min-width:130px;padding:5px;display:none}
+.popmenu div{padding:8px 10px;cursor:pointer;border-radius:5px}
+.popmenu div:hover{background:#f1f7f5}
+.hidden{display:none!important}
+@media(max-width:1300px){
+  .app{grid-template-columns:210px 1fr}
+  .sidebar{padding-left:10px;padding-right:10px}
+  .main{padding-left:16px;padding-right:16px}
+}
+
+/* v2：页面与弹窗/抽屉职责分离 */
+.support-layout{display:block}
+.support-main{border-right:0}
+.factor-layout{display:block}
+.factor-main{width:100%;padding:0 14px 14px}
+.factor-table{table-layout:fixed}
+.factor-table th,.factor-table td{padding:9px 8px;vertical-align:middle;word-break:normal}
+.factor-table th:nth-child(1){width:14%}
+.factor-table th:nth-child(2){width:8%}
+.factor-table th:nth-child(3){width:10%}
+.factor-table th:nth-child(4){width:13%}
+.factor-table th:nth-child(5){width:9%}
+.factor-table th:nth-child(6){width:10%}
+.factor-table th:nth-child(7){width:7%}
+.factor-table th:nth-child(8){width:9%}
+.factor-table th:nth-child(9){width:7%}
+.factor-table th:nth-child(10){width:13%}
+.factor-table td:last-child{white-space:nowrap}
+.factor-table tr{cursor:pointer}
+.factor-table tr:hover{background:#f5faf8}
+.factor-table tr.selected{background:#eaf7f2}
+.drawer{width:520px;right:-540px}
+.drawer-body{background:#fbfdfc}
+.drawer-body>.detail-block{background:#fff;border:1px solid #e7eeeb;border-radius:9px;padding:14px;margin:0 0 12px}
+.drawer-foot{background:#fff}
+.support-table td:last-child{white-space:nowrap}
+.support-table tbody tr:not(.support-group):hover{background:#f7fbfa}
+.source-detail-panel{padding:15px 18px 13px}
+.source-detail-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.emission-list{border:1px solid #e7eeeb;border-radius:8px;overflow:hidden}
+.emission-list-head,.emission-row{display:grid;grid-template-columns:1.12fr 1.25fr 1.45fr .78fr 1fr;align-items:center}
+.emission-list-head{min-height:40px;background:#f4f8f7;color:#4d5c62;font-weight:600;font-size:13px}
+.emission-list-head>div,.emission-row>div{padding:9px 14px}
+.emission-row{min-height:56px;background:#fff;border-top:1px solid #edf1ef}
+.emission-row:hover{background:#fafdfc}
+.boundary-chip{display:inline-flex;align-items:center;max-width:100%;padding:5px 9px;border-radius:5px;background:#edf8f4;color:#147b5d;font-size:12px}
+.source-name{font-weight:600;color:#273239}
+.source-sub,.activity-source{font-size:12px;color:#879197;margin-top:4px}
+.activity-value{font-weight:600}
+.emission-value{text-align:right;font-weight:700;color:#26343a}
+.ratio-cell{display:flex;align-items:center;gap:10px}
+.ratio-num{width:52px;text-align:right;font-weight:600}
+.ratio-track{flex:1;height:6px;background:#edf2f1;border-radius:4px;overflow:hidden}
+.ratio-fill{height:100%;background:linear-gradient(90deg,#47bd8a,#149a70);border-radius:4px}
+.source-detail-note{font-size:12px;color:#7c898f;margin-top:10px}
+@media(max-width:1350px){
+  .emission-list-head,.emission-row{grid-template-columns:1.1fr 1.2fr 1.35fr .75fr .95fr}
+}
+
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark"></span><span>GCL</span><span style="font-weight:400;color:#6c797f">|</span><span>绿色低碳数字化平台</span></div>
+    <div class="top-actions">
+      <span>♙ 切换组织</span><span>⛶</span><span>◆</span><span>🔔</span><span>● 管理员⌄</span>
+    </div>
+  </header>
+
+  <aside class="sidebar">
+    <div class="module-title"><span class="hamb">☰</span> 碳排放核算与合规</div>
+    <div class="tree-title"><span class="left"><span>⌄</span>碳排放核算</span><span>⌃</span></div>
+    <nav class="nav">
+      <div class="nav-item" data-page="preview">碳排放预览</div>
+      <div class="nav-item active" data-page="inventory">碳核算清单</div>
+      <div class="nav-item" data-page="support">碳核查支撑</div>
+      <div class="nav-item" data-page="report">碳排报告</div>
+      <div class="nav-item" data-page="factor">碳因子库</div>
+    </nav>
+    <div class="tree-title" style="margin-top:18px"><span class="left"><span>⌄</span>供应链碳管理</span><span>⌃</span></div>
+    <nav class="nav">
+      <div class="nav-item">供应商数据采集</div>
+      <div class="nav-item">碳足迹交付管理</div>
+    </nav>
+    <div class="sidebar-spacer"></div>
+    <div class="collapse-side">≪　收起来单</div>
+  </aside>
+
+  <main class="main">
+    <!-- 预览 -->
+    <section class="page" id="page-preview">
+      <h1 class="page-title">碳排放结果预览　<span style="font-size:14px;color:#879197">ⓘ</span></h1>
+      <div class="panel taskbar">
+        <div class="task-left">
+          <div class="task-main">
+            <div class="task-line">
+              <b>当前核算任务：</b><span>2026年度组织温室气体核算</span>
+              <span class="tag green">通用工业企业</span><span class="tag green">GB/T 32150—2025</span><span class="tag green">企业法人边界</span>
+            </div>
+          </div>
+        </div>
+        <button class="btn outline" data-open-modal="task">⚙ 核算设置</button>
+      </div>
+
+      <div class="summary-grid">
+        <div class="panel summary-card"><div class="summary-icon">♧</div><div><div class="label">温室气体排放总量</div><div class="value">12,580.45 <span style="font-size:13px;color:#4b5a60;font-weight:500">tCO₂e</span></div><div class="sub">较上年　<span style="color:#159b71">↓ 2.35%</span></div></div></div>
+        <div class="panel summary-card"><div class="summary-icon">▥</div><div><div class="label">直接排放</div><div class="value">3,102.45 <span style="font-size:13px;color:#4b5a60;font-weight:500">tCO₂e</span></div><div class="sub">占比　24.67%</div></div></div>
+        <div class="panel summary-card"><div class="summary-icon">ϟ</div><div><div class="label">购入电力与热力产生的排放</div><div class="value">9,025.34 <span style="font-size:13px;color:#4b5a60;font-weight:500">tCO₂e</span></div><div class="sub">占比　71.79%</div></div></div>
+        <div class="panel summary-card"><div class="summary-icon">▥</div><div><div class="label">排放强度</div><div class="value">0.68 <span style="font-size:13px;color:#4b5a60;font-weight:500">tCO₂e/单位</span></div><div class="sub">较上年　<span style="color:#159b71">↓ 2.40%</span></div></div></div>
+      </div>
+
+      <div class="analysis-grid">
+        <div class="panel analysis-card">
+          <div class="card-title">排放构成（按核算边界）</div><div class="unit">单位：tCO₂e</div>
+          <div class="donut-wrap">
+            <div class="donut"><div class="donut-center"><strong>12,580.45</strong><span>tCO₂e</span></div></div>
+            <div class="legend">
+              <div class="legend-item"><span class="dot" style="background:#16a36f"></span><div>直接排放<br><span class="muted">3,102.45（24.67%）</span></div></div>
+              <div class="legend-item"><span class="dot" style="background:#4b9dec"></span><div>购入电力与热力产生的排放<br><span class="muted">9,025.34（71.79%）</span></div></div>
+              <div class="legend-item"><span class="dot" style="background:#dbe3e6"></span><div>其他间接排放<br><span class="muted">452.66（3.54%）</span></div></div>
+            </div>
+          </div>
+          <div class="note">注：因四舍五入，可能存在分项合计不等于总计的情形。</div>
+        </div>
+
+        <div class="panel analysis-card">
+          <div class="card-title">排放趋势（近5年）</div><div class="unit">单位：tCO₂e</div>
+          <div class="chart">
+            <div class="bar-col"><span class="bar-val">11,320.20</span><div class="bar" style="height:62%"></div><span class="bar-year">2022年</span></div>
+            <div class="bar-col"><span class="bar-val">11,845.60</span><div class="bar" style="height:67%"></div><span class="bar-year">2023年</span></div>
+            <div class="bar-col"><span class="bar-val">12,120.30</span><div class="bar" style="height:72%"></div><span class="bar-year">2024年</span></div>
+            <div class="bar-col"><span class="bar-val">12,887.10</span><div class="bar" style="height:79%"></div><span class="bar-year">2025年</span></div>
+            <div class="bar-col"><span class="bar-val">12,580.45</span><div class="bar current" style="height:76%"></div><span class="bar-year">2026年</span></div>
+          </div>
+        </div>
+
+        <div class="panel analysis-card">
+          <div class="card-title">主要排放源排行</div><div class="unit">单位：tCO₂e</div>
+          <table class="rank-table"><thead><tr><th>排名</th><th>排放源</th><th>排放量</th><th>占比</th></tr></thead>
+          <tbody><tr><td>🥇</td><td>天然气燃烧</td><td>3,102.45</td><td>24.67%</td></tr>
+          <tr><td>🥈</td><td>外购电力</td><td>9,025.34</td><td>71.79%</td></tr>
+          <tr><td>🥉</td><td>柴油燃烧</td><td>278.00</td><td>2.21%</td></tr>
+          <tr><td>4</td><td>工业过程排放</td><td>174.66</td><td>1.39%</td></tr>
+          <tr><td colspan="2"><b>合计</b></td><td><b>12,580.45</b></td><td><b>100.00%</b></td></tr></tbody></table>
+        </div>
+      </div>
+
+      
+      <div class="panel source-detail-panel">
+        <div class="source-detail-top">
+          <div><div class="card-title">主要排放源明细</div><div class="unit">按本次核算清单汇总｜单位：tCO₂e</div></div>
+          <button class="btn outline sm" data-go-page="inventory">查看核算清单</button>
+        </div>
+        <div class="emission-list">
+          <div class="emission-list-head"><div>核算边界</div><div>排放源</div><div>活动数据</div><div style="text-align:right">排放量</div><div>占比</div></div>
+          <div class="emission-row">
+            <div><span class="boundary-chip">化石燃料燃烧排放</span></div>
+            <div><div class="source-name">天然气燃烧</div><div class="source-sub">固定燃烧源 · 锅炉房</div></div>
+            <div><div class="activity-value">天然气消耗量：120,000 Nm³</div><div class="activity-source">数据管理 · 能源消费</div></div>
+            <div class="emission-value">3,102.45</div>
+            <div class="ratio-cell"><span class="ratio-num">24.67%</span><div class="ratio-track"><div class="ratio-fill" style="width:24.67%"></div></div></div>
+          </div>
+          <div class="emission-row">
+            <div><span class="boundary-chip">购入电力与热力产生的排放</span></div>
+            <div><div class="source-name">外购电力</div><div class="source-sub">购入电力 · 企业整体</div></div>
+            <div><div class="activity-value">外购电量：18,600 MWh</div><div class="activity-source">数据管理 · 能源消费</div></div>
+            <div class="emission-value">9,025.34</div>
+            <div class="ratio-cell"><span class="ratio-num">71.79%</span><div class="ratio-track"><div class="ratio-fill" style="width:71.79%"></div></div></div>
+          </div>
+          <div class="emission-row">
+            <div><span class="boundary-chip">化石燃料燃烧排放</span></div>
+            <div><div class="source-name">柴油燃烧</div><div class="source-sub">移动燃烧源 · 厂内车辆</div></div>
+            <div><div class="activity-value">柴油消耗量：15.6 t</div><div class="activity-source">数据管理 · 能源消费</div></div>
+            <div class="emission-value">278.00</div>
+            <div class="ratio-cell"><span class="ratio-num">2.21%</span><div class="ratio-track"><div class="ratio-fill" style="width:2.21%"></div></div></div>
+          </div>
+          <div class="emission-row">
+            <div><span class="boundary-chip">生产过程排放</span></div>
+            <div><div class="source-name">工业过程排放</div><div class="source-sub">行业扩展 · 水泥熟料生产</div></div>
+            <div><div class="activity-value">熟料产量：25,000 t</div><div class="activity-source">核算清单 · 在线录入</div></div>
+            <div class="emission-value">174.66</div>
+            <div class="ratio-cell"><span class="ratio-num">1.39%</span><div class="ratio-track"><div class="ratio-fill" style="width:1.39%"></div></div></div>
+          </div>
+        </div>
+        <div class="source-detail-note">数据来源于当前核算任务的碳核算清单；完整参数、因子和计算过程请在清单详情中查看。</div>
+      </div>
+    </section>
+
+    <!-- 核算清单 -->
+    <section class="page active" id="page-inventory">
+      <h1 class="page-title">碳核算清单</h1>
+      <div class="panel taskbar">
+        <div class="task-left">
+          <div class="task-icon">▣</div>
+          <div class="task-main">
+            <div class="task-line"><b>当前核算任务：</b>
+              <select class="task-select" id="inventoryTaskSelect"><option>2026年度组织温室气体核算</option><option>2025年度组织温室气体核算</option></select>
+            </div>
+            <div class="meta"><span id="industryMeta">通用工业企业</span><span class="sep"></span><span>GB/T 32150—2025</span><span class="sep"></span><span>企业法人边界</span></div>
+          </div>
+        </div>
+        <div class="task-actions"><button class="btn outline" data-open-modal="task">⊕ 新建任务</button><button class="btn gray" data-open-modal="taskSettings">⚙ 核算设置</button></div>
+      </div>
+
+      <div class="panel filterbar">
+        <div class="search"><input id="inventorySearch" placeholder="搜索排放源" /></div>
+        <div class="select-row"><span>核算边界</span><select id="boundaryFilter"><option value="">全部</option><option>化石燃料燃烧排放</option><option>生产过程排放</option><option>废弃物处理处置排放</option><option>逸散排放</option><option>购入电力与热力产生的排放</option></select></div>
+        <div class="filter-spacer"></div>
+        <button class="btn primary" data-open-modal="source">⊕ 新增排放源</button>
+      </div>
+
+      <div class="panel table-shell" id="inventoryGroups">
+        <!-- JS渲染 -->
+      </div>
+    </section>
+
+    <!-- 核查支撑 -->
+    <section class="page" id="page-support">
+      <h1 class="page-title">碳核查支撑　<span style="font-size:14px;color:#879197">ⓘ</span></h1>
+      <div class="panel support-head">
+        <div>
+          <div class="task-line"><b>当前核算任务：</b><span style="font-size:16px;font-weight:700">2026年度组织温室气体核算</span><span class="tag blue">通用工业企业</span></div>
+          <div class="meta" style="margin-top:12px"><span>核算年度：2026年度</span><span style="margin-left:40px">核算周期：2026-01-01 ~ 2026-12-31</span><span style="margin-left:40px">依据标准：GB/T 32150—2025</span></div>
+        </div>
+        <button class="btn outline" data-go-page="inventory">← 返回核算清单</button>
+      </div>
+
+      <div class="panel support-layout" style="margin-top:12px">
+        <div class="support-main">
+          <div class="tabs"><div class="tab active" data-support-tab="basic">核算基础材料</div><div class="tab" data-support-tab="source">排放源支撑材料</div></div>
+          <div class="support-info" id="supportInfo">说明：基础材料用于证明核算主体、组织边界和核算制度。材料可在本页上传与维护；点击“查看”或“材料管理”打开右侧抽屉。</div>
+          <div class="support-toolbar"><div class="search" style="min-width:340px"><input id="supportSearch" placeholder="搜索核查事项、排放源或材料名称" /></div>
+            <div class="select-row"><span>状态</span><select id="supportStateFilter"><option value="">全部</option><option>已上传</option><option>待补充</option></select></div></div>
+          <div id="supportTableWrap"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 报告 -->
+    <section class="page" id="page-report">
+      <h1 class="page-title">碳排报告</h1>
+      <div class="panel" style="padding:32px;text-align:center;min-height:480px;display:flex;align-items:center;justify-content:center">
+        <div><div style="font-size:44px;margin-bottom:16px;color:#8ba29a">▤</div><h2 style="margin:0 0 10px">一期暂不展开报告页面设计</h2>
+        <p style="color:#7d898f">报告输出能力保留为后续迭代项；当前核算结果与核查材料可作为报告数据基础。</p>
+        <button class="btn outline" data-go-page="preview">返回碳排放预览</button></div>
+      </div>
+    </section>
+
+    <!-- 因子库 -->
+    <section class="page" id="page-factor">
+      <h1 class="page-title">碳排放因子库　<span style="font-size:14px;color:#879197">ⓘ</span></h1>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin:-42px 0 12px"><button class="btn outline" data-open-modal="factor">▣ 新增因子</button><button class="btn outline" data-open-modal="import">▦ 批量导入</button></div>
+      <div class="panel factor-main">
+        <div class="factor-tip">因子库用于碳排放核算中的排放因子管理与引用。列表是独立业务页面；点击“查看”后，通过右侧抽屉展示因子详情。</div>
+        <div class="factor-filter">
+          <input id="factorSearch" placeholder="搜索因子名称/能源品种/排放源" />
+          <select id="factorEnergy"><option value="">能源/物料类型　全部</option><option>天然气</option><option>煤炭</option><option>柴油</option><option>电力</option><option>制冷剂</option><option>熟料</option></select>
+          <select id="factorSourceType"><option value="">排放源类型　全部</option><option>固定燃烧源</option><option>移动燃烧源</option><option>购入电力</option><option>过程排放源</option><option>逸散排放源</option></select>
+          <select id="factorStandard"><option value="">标准来源　全部</option><option>GB/T 32151-2023</option><option>生态环境部公告</option><option>IPCC 2006</option><option>企业实测</option></select>
+          <select id="factorRange"><option value="">数据范围　全部</option><option>全国</option><option>华东地区</option><option>某水泥厂</option></select>
+          <select id="factorState"><option value="">状态　全部</option><option>启用</option><option>停用</option></select>
+          <button class="btn primary sm" id="factorQuery">查询</button><button class="btn gray sm" id="factorReset">重置</button>
+        </div>
+        <div class="factor-tabs"><div class="tab active" data-factor-tab="all">全部因子（128）</div><div class="tab" data-factor-tab="default">默认因子（98）</div><div class="tab" data-factor-tab="measured">实测因子（18）</div><div class="tab" data-factor-tab="disabled">停用因子（12）</div></div>
+        <table class="factor-table"><thead><tr><th>因子名称</th><th>能源/物料类</th><th>排放源</th><th>标准来源</th><th>因子类型</th><th>单位</th><th>数值</th><th>数据范围</th><th>状态</th><th>操作</th></tr></thead><tbody id="factorBody"></tbody></table>
+        <div class="pagination"><span>共 128 条</span><div class="pages"><button class="page-btn">‹</button><button class="page-btn active">1</button><button class="page-btn">2</button><button class="page-btn">3</button><span>…</span><button class="page-btn">13</button><button class="page-btn">›</button></div></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<div class="modal" id="modal"><div class="modal-head"><span id="modalTitle"></span><button class="close-x" data-close-modal>×</button></div><div class="modal-body" id="modalBody"></div><div class="modal-foot" id="modalFoot"></div></div>
+<div class="drawer" id="drawer"><div class="drawer-head"><span id="drawerTitle"></span><button class="close-x" data-close-drawer>×</button></div><div class="drawer-body" id="drawerBody"></div><div class="drawer-foot" id="drawerFoot"></div></div>
+<div class="toast" id="toast"></div>
+<div class="popmenu" id="popmenu"><div data-pop-action="notApplicable">标记不适用</div><div data-pop-action="copy">复制记录</div><div data-pop-action="delete" style="color:#e94b54">删除记录</div></div>
+<input type="file" id="fileInput" multiple class="hidden" />
+
+<script>
+const inventoryGroups = [
+ {name:"化石燃料燃烧排放", open:true, rows:[
+  {id:"ng",type:"固定燃烧源",source:"天然气燃烧（锅炉房）",activity:"120,000 Nm³",origin:"能源数据",emission:"258.40",auto:true},
+  {id:"diesel",type:"移动燃烧源",source:"柴油燃烧（厂内车辆）",activity:"15.6 t",origin:"能源数据",emission:"48.30",auto:true}
+ ]},
+ {name:"生产过程排放", open:true, rows:[
+  {id:"process",type:"生产过程排放",source:"生产过程排放（工艺系统）",activity:"待录入",origin:"",emission:"—",auto:false,missing:true}
+ ]},
+ {name:"废弃物处理处置排放", open:true, rows:[
+  {id:"wastewater",type:"废弃物处理处置排放",source:"污水处理系统",activity:"8,500 t",origin:"运营数据",emission:"36.50",auto:true}
+ ]},
+ {name:"逸散排放", open:true, rows:[
+  {id:"r134a",type:"逸散排放",source:"制冷剂逸散（制冷系统）",activity:"120 kg",origin:"在线录入",emission:"171.60",auto:false}
+ ]},
+ {name:"购入电力与热力产生的排放", open:true, rows:[
+  {id:"power",type:"购入电力与热力产生的排放",source:"外购电力（企业整体）",activity:"18,600 MWh",origin:"能源数据",emission:"10,607.58",auto:true},
+  {id:"heat",type:"购入电力与热力产生的排放",source:"外购热力（企业整体）",activity:"12,500 GJ",origin:"能源数据",emission:"1,375.00",auto:true}
+ ]},
+ {name:"输出电力与热力产生的排放", open:false, rows:[
+  {id:"outpower",type:"输出电力与热力产生的排放",source:"外供电力（企业整体）",activity:"3,200 MWh",origin:"能源数据",emission:"1,800.00",auto:true}
+ ]},
+ {name:"其他间接排放", open:false, rows:[]},
+ {name:"特殊披露", open:false, rows:[
+  {id:"biomass",type:"特殊排放",source:"生物质燃料燃烧",activity:"待确认",origin:"",emission:"—",auto:false,missing:true}
+ ]}
+];
+
+const factorRows = [
+ {id:1,name:"天然气（锅炉）",energy:"天然气",source:"固定燃烧源",standard:"GB/T 32151-2023",type:"默认因子",unit:"tCO₂/10⁴m³",value:"20.44",range:"全国",state:"启用"},
+ {id:2,name:"标准煤（燃烧）",energy:"煤炭",source:"固定燃烧源",standard:"GB/T 32151-2023",type:"默认因子",unit:"tCO₂/t",value:"2.42",range:"全国",state:"启用"},
+ {id:3,name:"柴油（燃烧）",energy:"柴油",source:"移动燃烧源",standard:"GB/T 32151-2023",type:"默认因子",unit:"tCO₂/t",value:"3.17",range:"全国",state:"启用"},
+ {id:4,name:"外购电力（华东）",energy:"电力",source:"购入电力",standard:"生态环境部公告",type:"默认因子",unit:"tCO₂/MWh",value:"0.7035",range:"华东地区",state:"启用"},
+ {id:5,name:"外购电力（全国）",energy:"电力",source:"购入电力",standard:"生态环境部公告",type:"默认因子",unit:"tCO₂/MWh",value:"0.5703",range:"全国",state:"启用"},
+ {id:6,name:"外购蒸汽（燃煤）",energy:"热力",source:"购入热力",standard:"GB/T 32151-2023",type:"默认因子",unit:"tCO₂/GJ",value:"0.1110",range:"全国",state:"启用"},
+ {id:7,name:"石灰石分解（过程排放）",energy:"石灰石",source:"过程排放源",standard:"GB/T 32151-2023",type:"默认因子",unit:"tCO₂/t",value:"0.439",range:"全国",state:"启用"},
+ {id:8,name:"R134a（制冷剂）",energy:"制冷剂",source:"逸散排放源",standard:"IPCC 2006",type:"默认因子",unit:"tCO₂e/kg",value:"1.430",range:"全球变暖潜势",state:"启用"},
+ {id:9,name:"天然气（锅炉）- 实测",energy:"天然气",source:"固定燃烧源",standard:"企业实测",type:"实测因子",unit:"tCO₂/10⁴m³",value:"19.86",range:"某水泥厂",state:"启用"},
+ {id:10,name:"外购电力（企业实测）",energy:"电力",source:"购入电力",standard:"企业实测",type:"实测因子",unit:"tCO₂/MWh",value:"0.5321",range:"某水泥厂",state:"启用"},
+ {id:11,name:"熟料生产过程参数",energy:"熟料",source:"过程排放源",standard:"水泥行业方法",type:"行业因子",unit:"tCO₂/t熟料",value:"0.5280",range:"水泥行业",state:"启用"}
+];
+
+const supportBasic = [
+ {group:"核算主体与边界",item:"报告主体信息",activity:"统一社会信用代码及主体名称",origin:"基础信息·企业档案",materials:2,state:"已上传"},
+ {group:"核算主体与边界",item:"组织边界",activity:"企业法人边界及设施清单",origin:"核算任务·边界设置",materials:3,state:"已上传"},
+ {group:"核算制度与方法",item:"核算方法说明",activity:"GB/T 32150—2025",origin:"核算任务·方法设置",materials:1,state:"已上传"},
+ {group:"质量保证",item:"数据管理制度",activity:"核算数据收集与复核制度",origin:"在线上传",materials:0,state:"待补充"}
+];
+const supportSource = [
+ {group:"化石燃料燃烧排放",type:"固定燃烧源",item:"天然气燃烧（锅炉房）",activity:"天然气用量：120,000 Nm³",origin:"数据管理·能源消费",materials:2,state:"已上传"},
+ {group:"化石燃料燃烧排放",type:"固定燃烧源",item:"燃料油燃烧（导热油炉）",activity:"燃料油用量：6.3 t",origin:"数据管理·能源消费",materials:1,state:"已上传"},
+ {group:"化石燃料燃烧排放",type:"移动燃烧源",item:"柴油燃烧（厂内车辆）",activity:"柴油用量：15.6 t",origin:"数据管理·能源消费",materials:1,state:"已上传"},
+ {group:"生产过程排放",type:"生产过程排放",item:"水泥熟料生产",activity:"熟料产量：25,000 t",origin:"核算清单·在线录入",materials:3,state:"已上传"},
+ {group:"废弃物处理处置排放",type:"废弃物处理处置",item:"污水处理系统",activity:"污水处理量：180,000 m³",origin:"数据管理·运营数据",materials:2,state:"已上传"},
+ {group:"逸散排放",type:"逸散排放",item:"制冷剂R134a补充",activity:"补充量：32 kg",origin:"核算清单·在线录入",materials:1,state:"待补充"},
+ {group:"购入电力与热力产生的排放",type:"购入电力",item:"外购电力（企业整体）",activity:"外购电量：18,600 MWh",origin:"数据管理·能源消费",materials:12,state:"已上传"},
+ {group:"输出电力与热力产生的排放",type:"输出电力",item:"外供电力（企业整体）",activity:"外供电量：1,200 MWh",origin:"数据管理·能源消费",materials:2,state:"已上传"}
+];
+
+let activeSupportTab="basic", selectedSupport=null, selectedSupportIndex=0, selectedSupportManage=false, selectedFactor=null, popContext=null;
+
+function switchPage(name){
+ document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+ document.getElementById("page-"+name).classList.add("active");
+ document.querySelectorAll(".nav-item[data-page]").forEach(n=>n.classList.toggle("active",n.dataset.page===name));
+ document.querySelector(".main").scrollTop=0;
+}
+document.querySelectorAll(".nav-item[data-page]").forEach(n=>n.addEventListener("click",()=>switchPage(n.dataset.page)));
+document.querySelectorAll("[data-go-page]").forEach(b=>b.addEventListener("click",()=>switchPage(b.dataset.goPage)));
+
+function renderInventory(){
+ const q=(document.getElementById("inventorySearch")?.value||"").trim();
+ const boundary=document.getElementById("boundaryFilter")?.value||"";
+ const wrap=document.getElementById("inventoryGroups");
+ wrap.innerHTML="";
+ inventoryGroups.filter(g=>!boundary||g.name===boundary).forEach((g,gi)=>{
+  const rows=g.rows.filter(r=>!q||r.source.includes(q)||r.type.includes(q));
+  if(q && !rows.length) return;
+  const card=document.createElement("div"); card.className="group-card";
+  card.innerHTML=`<div class="group-head" data-gi="${gi}"><span class="arrow">${g.open?"⌄":"›"}</span>${g.name}<span class="count">（${g.rows.length}）</span></div>
+  <div class="group-content ${g.open?"":"hidden"}"><table class="group-table"><colgroup><col style="width:19%"><col style="width:25%"><col style="width:21%"><col style="width:18%"><col style="width:17%"></colgroup>
+  <thead><tr><th>温室气体源类型</th><th>排放源</th><th>活动数据</th><th>排放量（tCO₂e）</th><th>操作</th></tr></thead>
+  <tbody>${rows.length?rows.map(r=>`<tr data-id="${r.id}"><td>${r.type}</td><td>${r.source}</td><td>${r.activity}<div class="muted">${r.origin}</div></td><td>${r.emission}</td><td class="actions">${r.missing?`<span class="action-link warn" data-action="edit" data-id="${r.id}">补充数据</span>`:`<span class="action-link" data-action="view" data-id="${r.id}">查看</span><span class="action-link" data-action="edit" data-id="${r.id}">编辑</span>`}<button class="more-btn" data-more="${r.id}">⋮</button></td></tr>`).join(""):`<tr><td colspan="5" style="text-align:center;color:#879197">暂无数据</td></tr>`}</tbody></table></div>`;
+  wrap.appendChild(card);
+ });
+ document.querySelectorAll(".group-head").forEach(h=>h.onclick=()=>{
+  const gi=+h.dataset.gi; inventoryGroups[gi].open=!inventoryGroups[gi].open; renderInventory();
+ });
+ document.querySelectorAll("[data-action]").forEach(a=>a.onclick=()=>openSourceDrawer(a.dataset.id,a.dataset.action));
+ document.querySelectorAll("[data-more]").forEach(b=>b.onclick=e=>openPop(e,b.dataset.more));
+}
+renderInventory();
+document.getElementById("inventorySearch").addEventListener("input",renderInventory);
+document.getElementById("boundaryFilter").addEventListener("change",renderInventory);
+
+function findSource(id){for(const g of inventoryGroups){const r=g.rows.find(x=>x.id===id);if(r)return {group:g,row:r}}}
+function openSourceDrawer(id,mode="view"){
+ const data=findSource(id); if(!data)return;
+ const {group,row}=data;
+ openDrawer(mode==="edit"?(row.missing?"补充排放源数据":"编辑排放源"):"排放源详情",
+ `<div class="detail-block"><h4>基本信息</h4><div class="kv"><span>核算边界</span><b>${group.name}</b><span>温室气体源类型</span><span>${row.type}</span><span>排放源</span><span>${row.source}</span></div></div>
+ <div class="detail-block"><h4>活动数据</h4>${mode==="view"?`<div class="kv"><span>活动数据</span><b>${row.activity}</b><span>数据来源</span><span>${row.origin||"核算清单·在线录入"}</span></div>`:`<div class="form-item"><label>活动数据值</label><input id="editActivity" value="${row.activity.replace(/[^\d.,]/g,"")}" /></div><div class="form-item" style="margin-top:12px"><label>单位</label><select id="editUnit"><option>t</option><option>Nm³</option><option>MWh</option><option>GJ</option><option>kg</option></select></div>`}</div>
+ <div class="detail-block"><h4>排放因子与结果</h4><div class="kv"><span>当前因子</span><span>${id==="power"?"0.5703 tCO₂/MWh":"系统推荐因子"}</span><span>排放量</span><b>${row.emission} tCO₂e</b></div></div>
+ <div class="detail-block"><h4>支撑材料</h4><span class="tag green">已关联材料</span>　<button class="btn link" data-jump-support>前往核查支撑</button></div>`,
+ mode==="edit"?`<button class="btn gray" data-close-drawer>取消</button><button class="btn primary" id="saveSourceEdit">保存</button>`:`<button class="btn gray" data-close-drawer>关闭</button><button class="btn primary" id="drawerEditBtn">编辑</button>`);
+ if(mode==="view"){
+  document.getElementById("drawerEditBtn").onclick=()=>openSourceDrawer(id,"edit");
+  document.querySelector("[data-jump-support]").onclick=()=>{closeDrawer();switchPage("support");};
+ }else{
+  document.getElementById("saveSourceEdit").onclick=()=>{
+   const val=document.getElementById("editActivity").value||"0"; const unit=document.getElementById("editUnit").value;
+   row.activity=val+" "+unit; row.origin="核算清单·在线录入"; row.missing=false; row.emission=row.emission==="—"?"待计算":row.emission;
+   renderInventory(); closeDrawer(); toast("排放源数据已保存");
+  };
+ }
+}
+
+function renderSupport(){
+ const allData=activeSupportTab==="basic"?supportBasic:supportSource;
+ const q=(document.getElementById("supportSearch")?.value||"").trim();
+ const state=document.getElementById("supportStateFilter")?.value||"";
+ const data=allData.filter(x=>(!q||x.item.includes(q)||x.group.includes(q)||x.activity.includes(q))&&(!state||x.state===state));
+ const wrap=document.getElementById("supportTableWrap");
+ const groups=[...new Set(data.map(x=>x.group))];
+ wrap.innerHTML=`<table class="support-table"><thead><tr>${activeSupportTab==="source"?`<th>核算边界</th><th>温室气体源类型</th>`:`<th>核查事项</th>`}<th>排放源/材料事项</th><th>活动数据项</th><th>活动数据来源</th><th>支撑材料</th><th>状态</th><th>操作</th></tr></thead><tbody>
+ ${groups.map(g=>`<tr class="support-group"><td colspan="${activeSupportTab==="source"?8:7}">⌄　${g}</td></tr>${data.filter(x=>x.group===g).map(x=>{const index=allData.indexOf(x);return `<tr>${activeSupportTab==="source"?`<td>${x.group}</td><td>${x.type}</td>`:`<td>${x.group}</td>`}<td>${x.item}</td><td>${x.activity}</td><td>${x.origin}</td><td><span style="color:#377ce0">${x.materials} 份</span></td><td><span class="tag ${x.state==="已上传"?"green":"orange"}">${x.state}</span></td><td><span class="action-link" data-support-view="${index}">查看</span><span class="action-link" data-support-material="${index}">材料管理</span></td></tr>`}).join("")}`).join("")}
+ ${data.length?"":`<tr><td colspan="${activeSupportTab==="source"?8:7}" style="text-align:center;color:#879197;padding:30px">暂无符合条件的数据</td></tr>`}
+ </tbody></table>`;
+ document.querySelectorAll("[data-support-view]").forEach(b=>b.onclick=()=>openSupportDrawer(+b.dataset.supportView,false));
+ document.querySelectorAll("[data-support-material]").forEach(b=>b.onclick=()=>openSupportDrawer(+b.dataset.supportMaterial,true));
+}
+document.querySelectorAll("[data-support-tab]").forEach(t=>t.onclick=()=>{
+ activeSupportTab=t.dataset.supportTab; selectedSupport=null;
+ document.querySelectorAll("[data-support-tab]").forEach(x=>x.classList.toggle("active",x===t));
+ document.getElementById("supportInfo").textContent=activeSupportTab==="source"?"说明：排放源支撑清单由碳核算清单自动生成，活动数据及来源为只读；查看与材料管理均通过右侧抽屉完成。":"说明：基础材料用于证明核算主体、组织边界和核算制度。查看与材料管理均通过右侧抽屉完成。";
+ renderSupport();
+});
+function openSupportDrawer(idx,manage=false){
+ const data=activeSupportTab==="basic"?supportBasic:supportSource;
+ selectedSupportIndex=idx; selectedSupportManage=manage; selectedSupport=data[idx]; const x=selectedSupport;
+ const files=x.materials?Array.from({length:Math.min(x.materials,3)},(_,i)=>`<div class="file-row"><div class="file-icon">PDF</div><div class="file-meta"><div class="file-name">${i===0?"结算单_202601-202612.pdf":i===1?"采购发票_2026.pdf":"检测报告_2026.pdf"}</div><div class="file-sub">2027-01-05　${(2.34-i*.31).toFixed(2)}MB　张三</div></div><span>⌄</span></div>`).join(""):`<div class="muted">暂无上传材料</div>`;
+ openDrawer(manage?"材料管理":"支撑材料详情",
+ `<div class="detail-block"><h4>${x.item}</h4><div class="kv"><span>核算边界</span><span>${x.group}</span><span>活动数据项</span><b>${x.activity}</b><span>活动数据来源</span><span>${x.origin}</span><span>材料状态</span><span class="tag ${x.state==="已上传"?"green":"orange"}">${x.state}</span></div></div>
+ <div class="detail-block"><h4>关联材料列表（${x.materials}）</h4><div class="material-list">${files}</div></div>
+ ${manage?`<div class="detail-block"><h4>材料维护</h4><button class="btn outline" id="uploadSupportFile">⇧ 上传文件</button><div class="form-hint" style="margin-top:8px">支持PDF、图片、Word和Excel文件。</div></div>`:""}
+ <div class="detail-block"><h4>备注说明（选填）</h4><textarea class="textarea" placeholder="请输入备注说明（如适用）"></textarea></div>`,
+ `<button class="btn gray" data-close-drawer>关闭</button>${manage?`<button class="btn primary" id="saveSupportRemark">保存</button>`:`<button class="btn outline" id="openSupportManage">材料管理</button>`}`);
+ if(manage){
+   document.getElementById("uploadSupportFile").onclick=()=>document.getElementById("fileInput").click();
+   document.getElementById("saveSupportRemark").onclick=()=>{closeDrawer();toast("支撑材料信息已保存")};
+ }else{
+   document.getElementById("openSupportManage").onclick=()=>openSupportDrawer(idx,true);
+ }
+}
+renderSupport();
+document.getElementById("supportSearch").addEventListener("input",renderSupport);
+document.getElementById("supportStateFilter").addEventListener("change",renderSupport);
+
+document.getElementById("fileInput").addEventListener("change",e=>{
+ if(!selectedSupport||!e.target.files.length)return;
+ selectedSupport.materials+=e.target.files.length; selectedSupport.state="已上传"; renderSupport(); openSupportDrawer(selectedSupportIndex,true); toast("材料上传成功");
+ e.target.value="";
+});
+
+function renderFactors(){
+ let rows=[...factorRows];
+ const q=document.getElementById("factorSearch").value.trim();
+ const energy=document.getElementById("factorEnergy").value, src=document.getElementById("factorSourceType").value, std=document.getElementById("factorStandard").value, range=document.getElementById("factorRange").value, st=document.getElementById("factorState").value;
+ const activeTab=document.querySelector("[data-factor-tab].active")?.dataset.factorTab||"all";
+ rows=rows.filter(r=>(!q||r.name.includes(q)||r.energy.includes(q)||r.source.includes(q))&&(!energy||r.energy===energy)&&(!src||r.source===src)&&(!std||r.standard===std)&&(!range||r.range===range)&&(!st||r.state===st));
+ if(activeTab==="default")rows=rows.filter(r=>r.type==="默认因子");
+ if(activeTab==="measured")rows=rows.filter(r=>r.type==="实测因子");
+ if(activeTab==="disabled")rows=rows.filter(r=>r.state==="停用");
+ document.getElementById("factorBody").innerHTML=rows.map(r=>`<tr class="${selectedFactor?.id===r.id?"selected":""}" data-factor-row="${r.id}"><td>${r.name}</td><td>${r.energy}</td><td>${r.source}</td><td>${r.standard}</td><td><span class="tag ${r.type==="实测因子"?"orange":"blue"}">${r.type}</span></td><td>${r.unit}</td><td>${r.value}</td><td>${r.range}</td><td><span class="tag ${r.state==="启用"?"green":"gray"}">${r.state}</span></td><td><span class="action-link" data-factor-view="${r.id}">查看</span><span class="action-link" data-factor-edit="${r.id}">编辑</span></td></tr>`).join("");
+ document.querySelectorAll("[data-factor-view]").forEach(b=>b.onclick=e=>{e.stopPropagation();openFactorDrawer(+b.dataset.factorView)});
+ document.querySelectorAll("[data-factor-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();openFactorModal(+b.dataset.factorEdit)});
+ document.querySelectorAll("[data-factor-row]").forEach(tr=>tr.onclick=()=>openFactorDrawer(+tr.dataset.factorRow));
+}
+function openFactorDrawer(id){
+ selectedFactor=factorRows.find(r=>r.id===id)||factorRows[0]; const r=selectedFactor; renderFactors();
+ openDrawer("因子详情",
+ `<div class="detail-block"><h4>基本信息 <span class="tag ${r.state==="启用"?"green":"gray"}" style="float:right">${r.state}</span></h4><div class="kv"><span>因子名称</span><b>${r.name}</b><span>能源/物料类别</span><span>${r.energy}</span><span>排放源类型</span><span>${r.source}</span><span>因子类型</span><span>${r.type}</span><span>单位</span><span>${r.unit}</span><span>数值</span><b>${r.value}</b><span>数据范围</span><span>${r.range}</span><span>标准来源</span><span>${r.standard}</span><span>有效期</span><span>2023-07-01 ~ 长期有效</span></div></div>
+ <div class="detail-block"><h4>因子说明</h4><p class="muted">适用于相关排放源温室气体排放量计算，按当前核算任务规则引用。</p></div>
+ <div class="detail-block"><h4>数据来源说明</h4><p class="muted">依据标准推荐值或企业检测报告，适用范围与标准来源以详情记录为准。</p></div>
+ <div class="detail-block"><h4>使用记录（近3个月）</h4><div class="factor-kpi"><div><strong>26</strong>被引用次数</div><div><strong>8</strong>关联核算任务</div><div><strong style="font-size:12px">2026-07-18</strong>最后引用时间</div></div></div>`,
+ `<button class="btn gray" data-close-drawer>关闭</button><button class="btn gray" id="toggleFactor">${r.state==="启用"?"停用":"启用"}</button><button class="btn outline" id="copyFactor">复制因子</button><button class="btn primary" id="editFactorDrawer">编辑</button>`);
+ document.getElementById("toggleFactor").onclick=()=>{r.state=r.state==="启用"?"停用":"启用";openFactorDrawer(r.id);toast("因子状态已更新")};
+ document.getElementById("editFactorDrawer").onclick=()=>{closeDrawer();openFactorModal(r.id)};
+ document.getElementById("copyFactor").onclick=()=>{const n={...r,id:Date.now(),name:r.name+"-副本"};factorRows.push(n);openFactorDrawer(n.id);toast("因子已复制")};
+}
+renderFactors();
+document.getElementById("factorQuery").onclick=renderFactors;
+document.getElementById("factorReset").onclick=()=>{document.querySelectorAll(".factor-filter input").forEach(i=>i.value="");document.querySelectorAll(".factor-filter select").forEach(s=>s.selectedIndex=0);renderFactors()};
+document.querySelectorAll("[data-factor-tab]").forEach(t=>t.onclick=()=>{document.querySelectorAll("[data-factor-tab]").forEach(x=>x.classList.toggle("active",x===t));renderFactors()});
+
+function openModal(title,body,foot){
+ document.getElementById("modalTitle").textContent=title; document.getElementById("modalBody").innerHTML=body; document.getElementById("modalFoot").innerHTML=foot||`<button class="btn gray" data-close-modal>取消</button><button class="btn primary" data-modal-save>保存</button>`;
+ document.getElementById("overlay").classList.add("show"); document.getElementById("modal").classList.add("show"); bindClose();
+}
+function closeModal(){document.getElementById("overlay").classList.remove("show");document.getElementById("modal").classList.remove("show")}
+function openDrawer(title,body,foot){
+ document.getElementById("drawerTitle").textContent=title; document.getElementById("drawerBody").innerHTML=body; document.getElementById("drawerFoot").innerHTML=foot||`<button class="btn gray" data-close-drawer>关闭</button>`;
+ document.getElementById("overlay").classList.add("show"); document.getElementById("drawer").classList.add("show"); bindClose();
+}
+function closeDrawer(){document.getElementById("overlay").classList.remove("show");document.getElementById("drawer").classList.remove("show")}
+function bindClose(){
+ document.querySelectorAll("[data-close-modal]").forEach(b=>b.onclick=closeModal);
+ document.querySelectorAll("[data-close-drawer]").forEach(b=>b.onclick=closeDrawer);
+}
+document.getElementById("overlay").onclick=()=>{closeModal();closeDrawer();hidePop()};
+
+document.querySelectorAll("[data-open-modal]").forEach(b=>b.onclick=()=>{
+ const type=b.dataset.openModal;
+ if(type==="task"||type==="taskSettings"){
+  openModal(type==="task"?"新建年度核算任务":"核算设置",`<div class="form-grid"><div class="form-item"><label>核算主体</label><input value="XX科技有限公司" readonly /></div><div class="form-item"><label>核算年度 *</label><select><option>2026年</option><option>2025年</option></select></div><div class="form-item"><label>行业方法 *</label><select id="taskIndustry"><option>通用工业企业</option><option>水泥行业</option></select></div><div class="form-item"><label>核算用途 *</label><select><option>企业年度盘查</option><option>第三方核查准备</option></select></div><div class="form-item full"><label>核算范围 *</label><select><option>当前主体全部组织和设施</option><option>选择部分组织和设施</option></select></div><div class="form-item full"><label>边界说明</label><textarea placeholder="请输入本次核算范围的特殊说明"></textarea></div><div class="form-item full"><label>本次核算依据</label><div style="background:#f6faf8;border:1px solid #e2ebe8;border-radius:7px;padding:12px;line-height:1.8">主要依据：GB/T 32150—2025<br>组织清单框架：ISO 14064-1:2018<br>行业方法：由所选行业方法自动加载</div></div></div>`,
+  `<button class="btn gray" data-close-modal>取消</button><button class="btn primary" id="saveTask">${type==="task"?"创建并生成核算清单":"保存设置"}</button>`);
+  document.getElementById("saveTask").onclick=()=>{const ind=document.getElementById("taskIndustry").value;document.getElementById("industryMeta").textContent=ind;if(ind==="水泥行业"&&!inventoryGroups.find(g=>g.name==="水泥行业扩展"))inventoryGroups.splice(2,0,{name:"水泥行业扩展",open:true,rows:[{id:"cementClinker",type:"生产过程排放",source:"水泥熟料生产过程排放",activity:"25,000 t熟料",origin:"核算清单·在线录入",emission:"2,284.60",auto:false}]});renderInventory();closeModal();toast("核算任务设置已保存")};
+ } else if(type==="source"){
+  openModal("新增排放源",`<div class="form-grid"><div class="form-item"><label>核算边界 *</label><select id="newBoundary">${inventoryGroups.map(g=>`<option>${g.name}</option>`).join("")}</select></div><div class="form-item"><label>温室气体源类型 *</label><select id="newType"><option>固定燃烧源</option><option>移动燃烧源</option><option>生产过程排放</option><option>逸散排放</option><option>购入电力</option></select></div><div class="form-item full"><label>排放源名称 *</label><input id="newSourceName" placeholder="请输入排放源名称" /></div><div class="form-item"><label>活动数据值</label><input id="newActivity" placeholder="请输入数值" /></div><div class="form-item"><label>单位</label><select id="newUnit"><option>t</option><option>Nm³</option><option>MWh</option><option>GJ</option><option>kg</option></select></div><div class="form-item"><label>数据来源</label><select id="newOrigin"><option>核算清单·在线录入</option><option>数据管理·能源消费</option><option>数据管理·运营数据</option></select></div><div class="form-item"><label>排放因子</label><select><option>系统推荐因子</option><option>企业实测因子</option></select></div></div>`,
+  `<button class="btn gray" data-close-modal>取消</button><button class="btn primary" id="saveNewSource">保存</button>`);
+  document.getElementById("saveNewSource").onclick=()=>{const g=inventoryGroups.find(x=>x.name===document.getElementById("newBoundary").value);g.rows.push({id:"u"+Date.now(),type:document.getElementById("newType").value,source:document.getElementById("newSourceName").value||"新增排放源",activity:(document.getElementById("newActivity").value||"待录入")+" "+document.getElementById("newUnit").value,origin:document.getElementById("newOrigin").value,emission:"待计算",auto:false});renderInventory();closeModal();toast("排放源已新增")};
+ } else if(type==="factor"){openFactorModal();}
+ else if(type==="import"){openModal("批量导入因子",`<div style="border:1px dashed #bfcfca;border-radius:10px;padding:36px;text-align:center"><div style="font-size:34px;color:#7ba994">⇧</div><p>拖拽因子文件到此处，或点击选择文件</p><button class="btn outline" id="chooseImportFile">选择文件</button><div class="form-hint" style="margin-top:10px">支持.xlsx/.csv，单次不超过10MB</div></div>`,`<button class="btn gray" data-close-modal>取消</button><button class="btn primary" data-close-modal>开始导入</button>`);document.getElementById("chooseImportFile").onclick=()=>document.getElementById("fileInput").click();}
+});
+function openFactorModal(id){
+ const r=id?factorRows.find(x=>x.id===id):null;
+ openModal(r?"编辑因子":"新增因子",`<div class="form-grid"><div class="form-item full"><label>因子名称 *</label><input id="fmName" value="${r?.name||""}" /></div><div class="form-item"><label>能源/物料类别 *</label><input id="fmEnergy" value="${r?.energy||""}" /></div><div class="form-item"><label>适用排放源 *</label><input id="fmSource" value="${r?.source||""}" /></div><div class="form-item"><label>标准来源 *</label><input id="fmStandard" value="${r?.standard||""}" /></div><div class="form-item"><label>因子类型 *</label><select id="fmType"><option ${r?.type==="默认因子"?"selected":""}>默认因子</option><option ${r?.type==="实测因子"?"selected":""}>实测因子</option><option ${r?.type==="行业因子"?"selected":""}>行业因子</option></select></div><div class="form-item"><label>单位 *</label><input id="fmUnit" value="${r?.unit||""}" /></div><div class="form-item"><label>数值 *</label><input id="fmValue" value="${r?.value||""}" /></div><div class="form-item"><label>数据范围 *</label><input id="fmRange" value="${r?.range||""}" /></div><div class="form-item full"><label>因子说明</label><textarea>适用于相关排放源核算。</textarea></div></div>`,
+ `<button class="btn gray" data-close-modal>取消</button><button class="btn primary" id="saveFactor">保存</button>`);
+ document.getElementById("saveFactor").onclick=()=>{const obj={id:r?.id||Date.now(),name:document.getElementById("fmName").value,energy:document.getElementById("fmEnergy").value,source:document.getElementById("fmSource").value,standard:document.getElementById("fmStandard").value,type:document.getElementById("fmType").value,unit:document.getElementById("fmUnit").value,value:document.getElementById("fmValue").value,range:document.getElementById("fmRange").value,state:r?.state||"启用"};if(r)Object.assign(r,obj);else factorRows.push(obj);selectedFactor=obj;renderFactors();closeModal();openFactorDrawer(obj.id);toast("因子已保存")};
+}
+
+function openPop(e,id){e.stopPropagation();popContext=id;const p=document.getElementById("popmenu");p.style.left=(e.clientX-110)+"px";p.style.top=(e.clientY+8)+"px";p.style.display="block"}
+function hidePop(){document.getElementById("popmenu").style.display="none"}
+document.addEventListener("click",hidePop);
+document.querySelectorAll("[data-pop-action]").forEach(x=>x.onclick=e=>{e.stopPropagation();const act=x.dataset.popAction;const data=findSource(popContext);if(!data)return;if(act==="delete"){if(data.row.auto){toast("系统识别的排放源不可直接删除，可标记不适用");}else{data.group.rows=data.group.rows.filter(r=>r.id!==popContext);renderInventory();toast("记录已删除")}}else if(act==="copy"){data.group.rows.push({...data.row,id:"copy"+Date.now(),source:data.row.source+"-副本",auto:false});renderInventory();toast("记录已复制")}else{data.row.activity="不适用";data.row.emission="—";renderInventory();toast("已标记不适用")}hidePop()});
+
+function toast(text){const t=document.getElementById("toast");t.textContent="✓　"+text;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1800)}
+bindClose();
+</script>
+</body>
+</html>
