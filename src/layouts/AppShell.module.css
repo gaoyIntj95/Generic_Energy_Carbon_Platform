@@ -1,4 +1,26 @@
-.app { width: 1440px; min-height: 100vh; background: var(--color-bg); }
-.main { width: calc(1440px - var(--sidebar-width)); min-width: 0; margin-left: var(--sidebar-width); }
-.content { padding: 12px 24px 28px; }
-.pageSurface { min-height: 520px; }
+.app {
+  width: 100%;
+  min-width: 1440px;
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+.main {
+  width: calc(100% - var(--sidebar-width));
+  min-width: 0;
+  min-height: 100vh;
+  margin-left: var(--sidebar-width);
+  background: var(--color-bg);
+}
+
+.content {
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 16px var(--page-padding) 32px;
+}
+
+.pageSurface {
+  width: 100%;
+  min-height: 520px;
+}

@@ -7,7 +7,7 @@
   --text: #273239;
   --muted: #78858d;
   display: grid;
-  gap: 12px;
+  gap: var(--section-gap);
   min-width: 1080px;
   color: var(--text);
   font-size: 13px;
@@ -16,8 +16,8 @@
 .card {
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 10px;
-  box-shadow: 0 6px 22px rgb(40 72 64 / 6%);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
 }
 
 .button {
@@ -187,14 +187,19 @@
 
 .analysisGrid {
   display: grid;
-  grid-template-columns: 1.05fr 1.25fr 1fr;
-  gap: 14px;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: var(--section-gap);
 }
 
 .analysisCard {
   min-height: 315px;
   padding: 16px;
   overflow: hidden;
+}
+
+.rankAnalysisCard {
+  grid-column: 1 / -1;
+  min-height: 0;
 }
 
 .analysisCard h3 {
@@ -373,7 +378,24 @@
 
 .snapshotHeader h3 { margin: 0; font-size: 15px; }
 .snapshotHeader p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
-.snapshotHeader > span { color: #3977e8; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.snapshotHeaderStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #168456;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.snapshotHeaderStatus::before {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #18a76f;
+  content: '';
+}
 
 .snapshotTable {
   width: 100%;
@@ -404,11 +426,19 @@
   font-size: 12px;
 }
 
-.snapshotTable tr:last-child td { border-bottom: 0; }
-.snapshotComplete,
-.snapshotPending { display: inline-flex; padding: 3px 9px; border-radius: 10px; font-size: 11px; }
-.snapshotComplete { color: #168456; background: #e8f8f0; }
-.snapshotPending { color: #d57b00; background: #fff3df; }
+.snapshotResultCategory {
+  color: #263a42 !important;
+  font-weight: 600;
+  background: #fcfefd;
+}
+
+.snapshotTotalRow td {
+  color: #263a42;
+  font-weight: 700;
+  background: #f5faf8;
+  border-top: 1px solid #dfe9e5;
+  border-bottom: 0;
+}
 
 .snapshotActions {
   display: flex;
@@ -746,6 +776,11 @@
   font-size: 12px;
 }
 
+.sourceChoice { display: flex; align-items: center; gap: 8px; min-height: 30px; color: #435159; font-size: 12px; }
+.sourceChoice button { margin-left: auto; padding: 0; color: #e94b54; background: none; border: 0; cursor: pointer; }
+.customSource { display: flex; gap: 8px; margin-top: 8px; }
+.customSource input { flex: 1; height: 32px; padding: 0 9px; border: 1px solid #dce6e2; border-radius: 5px; }
+
 .blueText { color: #377ce0; }
 
 .factorHeadActions {
@@ -861,6 +896,298 @@
 
 .reportEmpty h2 { margin: 0 0 10px; }
 .reportEmpty p { color: #7d898f; }
+
+.reportPage {
+  min-height: calc(100vh - 146px);
+}
+
+.reportWorkbench {
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 16px;
+  min-height: 720px;
+}
+
+.reportSidebar,
+.reportPreviewPane {
+  border: 1px solid #e2ebe8;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 6px 18px rgb(28 72 60 / 5%);
+}
+
+.reportSidebar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 18px 14px;
+}
+
+.reportSidebar > .field {
+  margin-bottom: 12px;
+}
+
+.reportSidebar > .button {
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+.reportSearch {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.reportSearch input {
+  width: 100%;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0 34px 0 12px;
+  border: 1px solid #dce5e3;
+  border-radius: 6px;
+  outline: none;
+}
+
+.reportSearch input:focus {
+  border-color: #13a675;
+  box-shadow: 0 0 0 2px rgb(19 166 117 / 10%);
+}
+
+.reportSearch span {
+  position: absolute;
+  top: 7px;
+  right: 11px;
+  color: #718078;
+  font-size: 18px;
+}
+
+.reportList {
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.reportList section {
+  padding: 10px 0 14px;
+  border-bottom: 1px solid #edf2f0;
+}
+
+.reportList h3 {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin: 0 4px 7px;
+  color: #253a35;
+  font-size: 14px;
+}
+
+.reportList h3 span {
+  color: #27a77c;
+}
+
+.reportList button {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #53655f;
+  text-align: left;
+  cursor: pointer;
+}
+
+.reportList button:hover {
+  background: #f3faf7;
+}
+
+.reportList button b {
+  display: block;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reportList button small {
+  display: block;
+  overflow: hidden;
+  margin-top: 4px;
+  color: #8a9893;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reportList .reportListActive {
+  background: #edf8f4;
+  color: #087f5b;
+}
+
+.reportListEmpty {
+  padding: 40px 8px;
+  color: #97a29e;
+  font-size: 13px;
+  text-align: center;
+}
+
+.reportPreviewPane {
+  position: relative;
+  min-width: 0;
+  padding: 14px;
+  overflow: hidden;
+  background: #fbfcfc;
+}
+
+.reportPreviewActions {
+  position: absolute;
+  z-index: 2;
+  top: 18px;
+  right: 18px;
+}
+
+.carbonReportPaper {
+  width: min(860px, calc(100% - 70px));
+  min-height: 1040px;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 56px 46px;
+  border: 1px solid #f0f1f1;
+  background: #fff;
+  box-shadow: 0 3px 16px rgb(20 50 42 / 8%);
+  color: #202b28;
+  font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.carbonReportPaper header {
+  margin-bottom: 22px;
+}
+
+.carbonReportPaper header h1 {
+  margin: 0 0 8px;
+  color: #101a17;
+  font-size: 24px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.carbonReportPaper header p {
+  margin: 3px 0;
+}
+
+.carbonReportPaper header p:first-of-type {
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.carbonReportPaper h2 {
+  margin: 22px 0 9px;
+  font-size: 17px;
+}
+
+.carbonReportPaper h3 {
+  margin: 16px 0 8px;
+  font-size: 14px;
+}
+
+.carbonReportPaper > p {
+  margin: 7px 0;
+  text-align: justify;
+}
+
+.carbonReportPaper table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.carbonReportPaper th,
+.carbonReportPaper td {
+  padding: 5px 8px;
+  border: 1px solid #89938f;
+  font-weight: 400;
+  text-align: center;
+  word-break: break-word;
+}
+
+.carbonReportPaper th {
+  font-weight: 700;
+}
+
+.carbonReportPaper th:first-child,
+.carbonReportPaper td:first-child {
+  width: 38%;
+}
+
+.carbonReportPaper .reportTotalRow td {
+  background: #f4f8f6;
+  font-weight: 700;
+}
+
+.reportDocumentFoot {
+  margin-top: 18px !important;
+  padding-top: 10px;
+  border-top: 1px solid #e0e5e3;
+  color: #6e7a76;
+  font-family: "Microsoft YaHei", sans-serif;
+  font-size: 12px;
+}
+
+.reportDocumentEmpty {
+  display: grid;
+  min-height: 620px;
+  place-items: center;
+  color: #8c9994;
+}
+
+.exportReportSection {
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border: 1px solid #dfe7e4;
+  border-radius: 6px;
+}
+
+.exportReportSection h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.exportReportSection p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 42px;
+  margin: 0;
+  color: #52625d;
+}
+
+.exportReportSection label {
+  display: block;
+  margin: 9px 0;
+  cursor: pointer;
+}
+
+.exportReportSection input {
+  accent-color: #0aa06c;
+}
+
+.exportReportSection small {
+  display: block;
+  margin-top: 8px;
+  color: #8b9692;
+}
+
+@media (max-width: 1180px) {
+  .reportWorkbench {
+    grid-template-columns: 210px minmax(0, 1fr);
+  }
+
+  .carbonReportPaper {
+    width: calc(100% - 20px);
+    padding: 48px 32px;
+  }
+}
 
 .overlay {
   position: fixed;
@@ -1213,5 +1540,5 @@
 @media (max-width: 1300px) {
   .page { min-width: 1040px; }
   .summaryCard strong { font-size: 23px; }
-  .analysisGrid { grid-template-columns: 1fr 1.15fr 1fr; }
+  .analysisGrid { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
 }

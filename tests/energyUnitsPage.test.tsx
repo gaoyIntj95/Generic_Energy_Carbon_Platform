@@ -67,14 +67,14 @@ describe('EnergyUnitsPage behavior', () => {
 
   it('applies keyword and unit type filters and reset restores the complete list', async () => {
     const keyword = container.querySelector('input[aria-label="关键字"]') as HTMLInputElement;
-    await setInput(keyword, '办公楼');
+    await setInput(keyword, '办公区域');
     await click(findButton('查询'));
 
-    expect(container.textContent).toContain('办公楼');
-    expect(container.textContent).not.toContain('1号熟料生产线');
+    expect(container.textContent).toContain('办公区域');
+    expect(container.textContent).not.toContain('生产车间A');
 
     await click(findButton('重置'));
-    expect(container.textContent).toContain('1号熟料生产线');
+    expect(container.textContent).toContain('生产车间A');
 
     const typeFilter = container.querySelector(
       'select[aria-label="单元类型"]',
@@ -82,52 +82,41 @@ describe('EnergyUnitsPage behavior', () => {
     await setSelect(typeFilter, '建筑/区域');
     await click(findButton('查询'));
 
-    expect(container.textContent).toContain('办公楼');
-    expect(container.textContent).not.toContain('水泥粉磨线');
+    expect(container.textContent).toContain('办公区域');
+    expect(container.textContent).not.toContain('生产车间B');
   });
 
   it('creates a level-one unit and rejects a duplicate name in the actual dialog', async () => {
     await click(findButton('新增一级用能单元'));
     let form = modalForm();
     await setSelect(form.querySelector('select[aria-label="单元类型"]')!, '生产单元');
-    await setInput(form.querySelector('input[aria-label="用能单元名称"]')!, '2号熟料生产线');
+    await setInput(form.querySelector('input[aria-label="用能单元名称"]')!, '生产车间C');
     await click(findButton('保存', form));
 
-    expect(container.textContent).toContain('2号熟料生产线');
+    expect(container.textContent).toContain('生产车间C');
 
     await click(findButton('新增一级用能单元'));
     form = modalForm();
     await setSelect(form.querySelector('select[aria-label="单元类型"]')!, '建筑/区域');
-    await setInput(form.querySelector('input[aria-label="用能单元名称"]')!, '办公楼');
+    await setInput(form.querySelector('input[aria-label="用能单元名称"]')!, '办公区域');
     await click(findButton('保存', form));
 
     expect(form.textContent).toContain('用能单元名称已存在');
   });
 
-  it('adds a third-level child under the selected parent with the correct id relationship', async () => {
-    const parentRow = findRow('包装发运');
-    await click(findButton('添加下级', parentRow));
-    const form = modalForm();
+  it('uses the two-level structure from the latest prototype', async () => {
+    expect(container.textContent).toContain('一期采用两级结构');
 
-    expect(form.textContent).toContain('所属单元');
-    expect(form.textContent).toContain('包装发运');
-    expect(form.textContent).toContain('三级用能单元');
+    const levelOneRow = findRow('动力中心');
+    expect(levelOneRow.textContent).toContain('添加下级');
 
-    await setSelect(form.querySelector('select[aria-label="单元类型"]')!, '工序/环节');
-    await setInput(form.querySelector('input[aria-label="用能单元名称"]')!, '包装输送');
-    await click(findButton('保存', form));
-
-    const created = [...container.querySelectorAll('tbody tr')].find((row) =>
-      row.textContent?.includes('包装输送'),
-    );
-    expect(created).toBeTruthy();
-    expect(getEnergyUnit('eu-mock-100')?.parentEnergyUnitId).toBe('eu-packaging');
-    expect(getEnergyUnit('eu-mock-100')?.unitLevel).toBe('level3');
+    const levelTwoRow = findRow('包装区域');
+    expect(levelTwoRow.textContent).not.toContain('添加下级');
   });
 
   it('edits the selected record without changing its id or parent relationship', async () => {
     const original = getEnergyUnit('eu-packaging')!;
-    await click(findButton('编辑', findRow('包装发运')));
+    await click(findButton('编辑', findRow('包装区域')));
     const form = modalForm();
     const nameInput = form.querySelector(
       'input[aria-label="用能单元名称"]',
@@ -136,7 +125,7 @@ describe('EnergyUnitsPage behavior', () => {
     await click(findButton('保存', form));
 
     expect(container.textContent).toContain('包装与发运');
-    expect(container.textContent).not.toContain('包装发运');
+    expect(container.textContent).not.toContain('包装区域');
     expect(getEnergyUnit('eu-packaging')).toMatchObject({
       energyUnitId: original.energyUnitId,
       parentEnergyUnitId: original.parentEnergyUnitId,
@@ -146,17 +135,17 @@ describe('EnergyUnitsPage behavior', () => {
   });
 
   it('shows deletion blockers and deletes an unreferenced record after confirmation', async () => {
-    await click(findButton('删除', findRow('公辅系统')));
+    await click(findButton('删除', findRow('动力中心')));
     expect(modalForm().textContent).toContain('无法删除用能单元');
     expect(modalForm().textContent).toContain('4 个下级用能单元');
     await click(findButton('我知道了', modalForm()));
 
-    await click(findButton('删除', findRow('包装发运')));
+    await click(findButton('删除', findRow('包装区域')));
     const form = modalForm();
     expect(form.textContent).toContain('确认删除');
     await click(findButton('确认删除', form));
 
-    expect(container.textContent).not.toContain('包装发运');
+    expect(container.textContent).not.toContain('包装区域');
     expect(getEnergyUnit('eu-packaging')).toBeUndefined();
   });
 });

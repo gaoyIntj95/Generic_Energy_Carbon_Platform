@@ -3,14 +3,19 @@
   --color-brand-dark: #007d55;
   --color-brand-soft: #e8f7f1;
   --color-brand-pale: #edf8f4;
-  --color-bg: #f6f9f8;
+  --color-bg: #f3f6f5;
   --color-panel: #fff;
   --color-border: #e2e9e7;
   --color-text-strong: #142033;
   --color-text-secondary: #5d6878;
   --color-muted: #87919e;
-  --sidebar-width: 214px;
+  --sidebar-width: 300px;
   --topbar-height: 60px;
+  --content-max-width: 1440px;
+  --page-padding: 24px;
+  --section-gap: 16px;
+  --card-radius: 8px;
+  --card-shadow: 0 2px 10px rgb(25 55 70 / 5%);
   font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
   color: var(--color-text-strong);
   background: var(--color-bg);
@@ -22,3 +27,4 @@
 html, body, #root { min-width: 1440px; min-height: 100%; margin: 0; }
 body { min-height: 100vh; background: var(--color-bg); font-size: 14px; }
 button, input, select, textarea { font: inherit; }
+table { font-variant-numeric: tabular-nums; }

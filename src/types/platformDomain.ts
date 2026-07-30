@@ -78,7 +78,7 @@ export interface OperationMetric {
   operationMetricId: string;
   energyUnitId: string | null;
   year: number;
-  metricCategory: '产量与业务量' | '经济指标';
+  metricCategory: '产量' | '经济指标';
   entryMode: 'monthly' | 'annual';
   metricName: string;
   metricUnit: string;
@@ -110,13 +110,32 @@ export interface CarbonSnapshot {
 export interface EmissionSource {
   emissionSourceId: string;
   carbonTaskId: string;
+  organizationBoundary: string;
+  emissionCategory: string;
   emissionGroup: string;
   sourceType: string;
   sourceName: string;
+  greenhouseGasSpecies: string[];
+  activityValue: number;
+  activityUnit: string;
   activityData: string;
+  /** @deprecated 仅为历史页面兼容保留；追溯请使用 sourceModule / sourceRecordId。 */
   activityDataSource: string;
   factorName: string;
   emissionFactorId: string;
+  recordGenerationType: 'system' | 'manual';
+  sourceModule: string;
+  sourceRecordId: string;
+  factorObjectId: string;
+  factorVersionId: string;
+  createdBy: string;
+  createdAt: string;
+  recommendedActivityDataSources: string[];
+  confirmedActivityDataSources: string[];
+  customActivityDataSources: string[];
+  evidenceFiles: { evidenceFileId: string; fileName: string; activityDataSource: string }[];
+  evidenceStatus: '待确认' | '待补充' | '已完成';
+  supportRemark?: string;
   relatedEnergyRecordId?: string;
   relatedOperationMetricId?: string;
   emissionAmount: number;

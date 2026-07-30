@@ -80,12 +80,12 @@ describe('energy unit centralized mock store', () => {
 
   it('rejects duplicate names for create and edit', () => {
     const createResult = createEnergyUnit({
-      energyUnitName: '办公楼',
+      energyUnitName: '办公区域',
       unitType: '建筑/区域',
       conversionScene: null,
     });
     const editResult = updateEnergyUnit('eu-packaging', {
-      energyUnitName: '办公楼',
+      energyUnitName: '办公区域',
       unitType: '工序/环节',
       conversionScene: null,
     });
@@ -100,6 +100,32 @@ describe('energy unit centralized mock store', () => {
 
     expect(references.childCount).toBe(4);
     expect(result).toMatchObject({ ok: false, error: 'referenced' });
+  });
+
+  it('uses the generic manufacturing hierarchy and conversion scene dictionary', () => {
+    const units = listEnergyUnits();
+    const rootNames = units
+      .filter((unit) => unit.unitLevel === 'level1')
+      .map((unit) => unit.energyUnitName);
+
+    expect(rootNames).toEqual([
+      '生产车间A',
+      '生产车间B',
+      '动力中心',
+      '办公区域',
+      '仓储物流区域',
+    ]);
+    expect(units.filter((unit) => unit.parentEnergyUnitId === 'eu-clinker-line-1')
+      .map((unit) => unit.energyUnitName)).toEqual(['加工工段', '装配工段', '检测工段']);
+    expect(units.filter((unit) => unit.parentEnergyUnitId === 'eu-cement-grinding-line')
+      .map((unit) => unit.energyUnitName)).toEqual(['前处理区域', '生产加工区域', '包装区域']);
+    expect(units.filter((unit) => unit.parentEnergyUnitId === 'eu-utilities')
+      .map((unit) => [unit.energyUnitName, unit.conversionScene])).toEqual([
+        ['空压系统', null],
+        ['能源回收系统', '余能回收'],
+        ['锅炉系统', '锅炉产汽/产热'],
+        ['配电系统', '电力转换/分配'],
+      ]);
   });
 
   it('blocks deletion and reports business reference counts', () => {
@@ -133,6 +159,6 @@ describe('energy unit centralized mock store', () => {
 
     resetEnergyUnitMockStore();
     expect(listEnergyUnits().some((unit) => unit.energyUnitName === '会话内单元')).toBe(false);
-    expect(listEnergyUnits()).toHaveLength(13);
+    expect(listEnergyUnits()).toHaveLength(16);
   });
 });

@@ -11,17 +11,16 @@ export function AppShell() {
   const active = navigation.flatMap((group) => group.items).find((item) => item.path === location.pathname);
   const activeGroup = navigation.find((group) => group.items.some((item) => item.path === location.pathname));
   const isEnergyDataPage = [
+    '/data-management/energy-data',
     '/data-management/energy-consumption',
     '/data-management/energy-costs',
     '/data-management/energy-relations',
   ].includes(location.pathname);
-  const pageTitle = location.pathname === '/carbon-accounting/factors'
-    ? '碳排放因子与参数库'
-    : isEnergyDataPage
-      ? '能源数据'
-      : active?.label ?? '页面';
+  const pageTitle = isEnergyDataPage
+    ? '能源数据'
+    : active?.pageTitle ?? active?.label ?? '页面';
   const pageDescription = isEnergyDataPage
-    ? '按数据角色和组织层级录入能源量数据，系统自动形成输入、分配、利用和外部输出，仅对锅炉、余热发电等配置转换关系。'
+    ? '按企业及用能单元层级维护能源量和能源成本；锅炉、余热发电、自发电、回收利用及外供统一在能源转换与输出中维护。'
     : active?.description;
 
   return (

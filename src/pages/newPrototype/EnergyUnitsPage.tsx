@@ -31,7 +31,12 @@ import styles from './EnergyUnitsPage.module.css';
 const unitTypeOptions: EnergyUnitType[] = ['生产单元', '工序/环节', '公辅系统', '建筑/区域', '其他'];
 const rootUnitTypeOptions: EnergyUnitType[] = ['生产单元', '公辅系统', '建筑/区域', '其他'];
 const childUnitTypeOptions: EnergyUnitType[] = ['工序/环节', '公辅系统', '建筑/区域', '其他'];
-const conversionSceneOptions: EnergyConversionScene[] = ['锅炉产汽/产热', '余热发电', '自发电', '其他转换'];
+const conversionSceneOptions: EnergyConversionScene[] = [
+  '锅炉产汽/产热',
+  '余能回收',
+  '电力转换/分配',
+  '其他转换',
+];
 const conversionUnitTypes = new Set<EnergyUnitType>(['公辅系统', '其他']);
 
 const levelLabels: Record<EnergyUnitLevel, string> = {
@@ -228,15 +233,13 @@ export function EnergyUnitsPage() {
       width: 250,
       render: ({ unit }) => (
         <div className={styles.actions}>
-          <button
-            className={styles.action}
-            type="button"
-            disabled={unit.unitLevel === 'level3'}
-            title={unit.unitLevel === 'level3' ? '已达到系统允许的最大三级层级' : undefined}
-            onClick={() => setDialog({ type: 'addChild', parentEnergyUnitId: unit.energyUnitId })}
-          >
-            添加下级
-          </button>
+          {unit.unitLevel === 'level1' && <button
+              className={styles.action}
+              type="button"
+              onClick={() => setDialog({ type: 'addChild', parentEnergyUnitId: unit.energyUnitId })}
+            >
+              添加下级
+            </button>}
           <button
             className={styles.action}
             type="button"
@@ -301,7 +304,7 @@ export function EnergyUnitsPage() {
 
       <Card className={styles.tableCard}>
         <div className={styles.notice}>
-          一期采用三级以内结构。仅锅炉、余热发电、光伏等系统需要设置“能源转换场景”，用于在新增转换关系时自动筛选，普通车间、工序和办公区域无需设置。
+          一期采用两级结构。仅涉及能源转换或自产能源的系统需要设置能源转换场景，普通生产单元无需配置。
         </div>
         <div className={styles.tableArea}>
           <DataTable
@@ -515,7 +518,7 @@ function EnergyUnitFormDialog({
               </select>
             </Field>
             <div className={styles.help}>
-              只有该单元承担锅炉产汽、余热发电、光伏发电等能源转换或产出功能时才设置。
+              只有该单元涉及能源转换或自产能源时才设置，普通生产单元无需配置。
             </div>
           </div>
         )}
@@ -543,10 +546,10 @@ function EnergyUnitFormDialog({
 
 function namePlaceholder(unitType: EnergyUnitType | '') {
   const placeholders: Partial<Record<EnergyUnitType, string>> = {
-    生产单元: '如：1号熟料生产线、生产车间一',
-    '工序/环节': '如：熟料烧成、包装发运',
-    公辅系统: '如：空压系统、供配电系统',
-    '建筑/区域': '如：办公楼、仓储区域',
+    生产单元: '如：生产车间A、生产车间B',
+    '工序/环节': '如：加工工段、装配工段',
+    公辅系统: '如：锅炉系统、空压系统',
+    '建筑/区域': '如：办公区域、仓储物流区域',
     其他: '请输入具体用能单元名称',
   };
   return unitType ? (placeholders[unitType] ?? '请输入用能单元名称') : '请先选择单元类型';

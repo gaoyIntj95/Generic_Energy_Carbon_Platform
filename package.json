@@ -2,7 +2,7 @@
   "name": "generic-energy-carbon-platform",
   "version": "0.1.0",
   "private": true,
-  "description": "通用能源与碳管理平台",
+  "description": "面向工业企业的能碳SaaS管理平台",
   "type": "module",
   "scripts": {
     "dev": "vite",

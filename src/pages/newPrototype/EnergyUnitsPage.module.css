@@ -1,6 +1,6 @@
 .page {
   display: grid;
-  gap: 14px;
+  gap: var(--section-gap);
   color: #172033;
 }
 
@@ -29,6 +29,11 @@
 
 .tableArea {
   padding: 0 16px;
+}
+
+.tableArea :global(th:nth-child(n + 2)),
+.tableArea :global(td:nth-child(n + 2)) {
+  text-align: center;
 }
 
 .unitCell {
@@ -143,6 +148,7 @@
 .actions {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   white-space: nowrap;
 }

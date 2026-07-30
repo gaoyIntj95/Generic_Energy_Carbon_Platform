@@ -10,11 +10,17 @@ import {
 } from '../../mocks/carbonAccountingV4Mock';
 import {
   deleteEmissionSource,
+  listCarbonSnapshots,
   listEmissionSources,
   publishCarbonSnapshot,
   replaceEmissionSourcesForTask,
   saveEmissionSource,
 } from '../../mocks/platformMockStore';
+import {
+  createCarbonReportMock,
+  listCarbonReportMocks,
+  type CarbonReportRecord,
+} from '../../mocks/carbonReportMock';
 import type { EmissionSource } from '../../types/platformDomain';
 import styles from './CarbonAccountingV4.module.css';
 
@@ -25,9 +31,10 @@ type SupportItem = {
   type?: string;
   item: string;
   activity: string;
-  origin: string;
+  activityDataSources: string;
   materials: number;
-  state: '已上传' | '待补充';
+  state: '待确认' | '待补充' | '已完成';
+  emission?: EmissionSource;
 };
 type DialogState =
   | { kind: 'settings' | 'task' | 'newSource' | 'enterpriseFactor' | 'importFactor' }
@@ -46,15 +53,48 @@ type DrawerState =
 const format = (value: number, digits = 2) =>
   value.toLocaleString('zh-CN', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
+const createTarBlob = (files: Array<{ name: string; content: string }>) => {
+  const encoder = new TextEncoder();
+  const blocks: Uint8Array[] = [];
+  const writeText = (target: Uint8Array, offset: number, length: number, value: string) => {
+    target.set(encoder.encode(value).slice(0, length), offset);
+  };
+  const writeOctal = (target: Uint8Array, offset: number, length: number, value: number) => {
+    writeText(target, offset, length, value.toString(8).padStart(length - 1, '0') + '\0');
+  };
+  files.forEach((file) => {
+    const content = encoder.encode(file.content);
+    const header = new Uint8Array(512);
+    writeText(header, 0, 100, file.name);
+    writeOctal(header, 100, 8, 0o644);
+    writeOctal(header, 108, 8, 0);
+    writeOctal(header, 116, 8, 0);
+    writeOctal(header, 124, 12, content.length);
+    writeOctal(header, 136, 12, Math.floor(Date.now() / 1000));
+    header.fill(32, 148, 156);
+    header[156] = '0'.charCodeAt(0);
+    writeText(header, 257, 6, 'ustar\0');
+    writeText(header, 263, 2, '00');
+    writeOctal(header, 148, 8, header.reduce((sum, byte) => sum + byte, 0));
+    blocks.push(header, content);
+    const remainder = content.length % 512;
+    if (remainder) blocks.push(new Uint8Array(512 - remainder));
+  });
+  blocks.push(new Uint8Array(1024));
+  return new Blob(blocks as BlobPart[], { type: 'application/x-tar' });
+};
+
 const numberFromActivity = (value: string) => Number(value.replace(/[^\d.]/g, '')) || 0;
 const unitFromActivity = (value: string) =>
   value.match(/(Nm³|MWh|GJ|kg|t·km|t)$/)?.[1] ?? 't';
 
-const resultCategory = (group: string) => {
-  if (group === '购入电力与热力产生的排放') return 'purchased';
-  if (group === '其他间接排放') return 'other';
-  return 'direct';
+const resultCategory = (emissionCategory: string) => {
+  if (emissionCategory === '购入电力与热力产生的排放' || emissionCategory === '购入的电力与热力产生的排放') return 'purchased';
+  if (['化石燃料燃烧排放', '生产过程排放', '废弃物处理处置排放', '逸散排放'].includes(emissionCategory)) return 'direct';
+  return 'other';
 };
+
+const emissionCategoryDictionary = ['化石燃料燃烧排放', '生产过程排放', '废弃物处理处置排放', '逸散排放', '购入的电力与热力产生的排放', '交通运输产生的排放', '所使用的产品和服务隐含的排放', '所生产的产品和服务的排放', '其他排放', '特殊排放'];
 
 type ValidationIssue = { emissionSourceId: string; message: string };
 
@@ -92,7 +132,7 @@ const factorSummary = (row: EmissionSource, factorId = row.emissionFactorId) => 
   const factor = getCarbonFactorV4(factorId);
   if (!factor) return row.factorName;
   if (factor.calculationType === 'processParameter') return `参数化计算（${factor.parameters?.length ?? 0}项）`;
-  return `${factor.value} ${factor.unit}`;
+  return `${factor.value.replace(/^折算因子\s*/, '')} ${factor.unit}`;
 };
 
 const recalculate = (activity: number, unit: string, factor: CarbonFactor) => {
@@ -205,19 +245,17 @@ function Preview({
   version,
   confirmedAt,
   openSettings,
-  exportInventory,
 }: {
   inventory: EmissionSource[];
   state: TaskState;
   version: number;
   confirmedAt?: string;
   openSettings: () => void;
-  exportInventory: () => void;
 }) {
   const navigate = useNavigate();
   const total = inventory.reduce((sum, row) => sum + row.emissionAmount, 0);
-  const direct = inventory.filter((row) => resultCategory(row.emissionGroup) === 'direct').reduce((sum, row) => sum + row.emissionAmount, 0);
-  const purchased = inventory.filter((row) => resultCategory(row.emissionGroup) === 'purchased').reduce((sum, row) => sum + row.emissionAmount, 0);
+  const direct = inventory.filter((row) => resultCategory(row.emissionCategory) === 'direct').reduce((sum, row) => sum + row.emissionAmount, 0);
+  const purchased = inventory.filter((row) => resultCategory(row.emissionCategory) === 'purchased').reduce((sum, row) => sum + row.emissionAmount, 0);
   const other = total - direct - purchased;
   const cards = [
     { icon: '♧', label: '温室气体排放总量', value: total, sub: <span>较上年　<em>↓ 2.30%</em></span> },
@@ -235,34 +273,55 @@ function Preview({
   const ranked = [...inventory].sort((a, b) => b.emissionAmount - a.emissionAmount).slice(0, 5);
   const directEnd = direct / total * 100;
   const purchasedEnd = directEnd + purchased / total * 100;
-  const snapshotRows = [...new Set(inventory.map((row) => row.emissionGroup))].map((group) => {
-    const rows = inventory.filter((row) => row.emissionGroup === group);
+  const summaryRows = [...new Set(inventory.map((row) => row.emissionCategory))].map((emissionCategory) => {
+    const rows = inventory.filter((row) => row.emissionCategory === emissionCategory);
     const emission = rows.reduce((sum, row) => sum + row.emissionAmount, 0);
-    const category = resultCategory(group);
-    const boundaryName = category === 'direct' ? '直接排放' : category === 'purchased' ? '间接排放' : '其他间接排放';
-    const sourceCategory = ({
-      '化石燃料燃烧排放': '化石燃料燃烧',
-      '生产过程排放': '生产过程排放',
-      '废弃物处理处置排放': '废弃物处理处置',
-      '逸散排放': '逸散排放',
-      '购入电力与热力产生的排放': '购入电力与热力',
-      '其他间接排放': '运输等其他排放',
-    } as Record<string, string>)[group] ?? group;
-    const complete = rows.every((row) => Boolean(row.activityData && row.emissionFactorId) && Number.isFinite(row.emissionAmount));
-    return { group, boundaryName, sourceCategory, count: rows.length, emission, complete };
+    const category = resultCategory(emissionCategory);
+    const resultCategoryName = category === 'direct' ? '直接排放' : category === 'purchased' ? '购入能源间接排放' : '其他间接排放';
+    const displayEmissionCategory = emissionCategory === '购入的电力与热力产生的排放'
+      ? '购入电力与热力产生的排放'
+      : emissionCategory;
+    return { emissionCategory, resultCategoryName, displayEmissionCategory, count: rows.length, emission };
   });
-  const isFormal = state === 'confirmed';
-  const snapshotTitle = isFormal || state === 'pending' ? '本次核算清单快照' : '当前草稿清单摘要';
-  const snapshotDescription = isFormal
-    ? `正式清单 V${version} · 确认人：管理员${confirmedAt ? ` · 确认时间：${confirmedAt}` : ''}`
-    : state === 'pending'
-      ? `正式清单 V${version} · 当前存在尚未确认的清单修改，本页仍展示正式版本结果。`
-      : '当前结果基于草稿核算清单实时汇总，尚未形成正式核算结果。';
-  const resultDescription = isFormal
-    ? `结果读取正式清单 V${version} 冻结快照${confirmedAt ? ` · 确认人：管理员 · 确认时间：${confirmedAt}` : ''}`
+  const hasFormalVersion = state !== 'draft';
+  const confirmedTime = confirmedAt?.slice(0, 16);
+  const summaryDescription = hasFormalVersion
+    ? `正式核算清单 V${version}｜确认人：管理员${confirmedTime ? `｜确认时间：${confirmedTime}` : ''}`
+    : '当前结果基于草稿核算清单实时汇总，尚未形成正式核算结果。';
+  const resultDescription = state === 'confirmed'
+    ? `数据来源：正式核算清单 V${version}${confirmedTime ? ` · 确认人：管理员 · 确认时间：${confirmedTime}` : ''}`
     : state === 'pending'
       ? `数据来源：正式核算清单 V${version}；当前存在尚未确认的清单修改`
       : '当前结果基于草稿核算清单实时汇总，尚未形成正式核算结果。';
+  const exportSummary = () => {
+    const taskRows = [
+      ['核算任务', '2026年度组织温室气体核算'],
+      ['核算组织', 'XX科技有限公司'],
+      ['组织边界', '企业法人边界'],
+      ['正式清单版本', hasFormalVersion ? `V${version}` : '尚未生成'],
+      ['确认人', hasFormalVersion ? '管理员' : '—'],
+      ['确认时间', hasFormalVersion ? confirmedTime ?? '—' : '—'],
+      [],
+      ['结果类别', '排放类别', '排放源数量', '排放量（tCO₂e）', '占比'],
+      ...summaryRows.map((row) => [
+        row.resultCategoryName,
+        row.displayEmissionCategory,
+        `${row.count}项`,
+        format(row.emission),
+        `${format(row.emission / total * 100)}%`,
+      ]),
+      ['合计', '—', `${inventory.length}项`, format(total), '100.00%'],
+    ];
+    const csv = '\ufeff' + taskRows
+      .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `XX科技有限公司_2026年度核算结果汇总${hasFormalVersion ? `_V${version}` : ''}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className={styles.page}>
@@ -300,7 +359,7 @@ function Preview({
           <h3>排放趋势（近5年）</h3><small>单位：tCO₂e</small>
           <div className={styles.barChart}>{trend.map((value, index) => <div key={value}><span>{format(value)}</span><i className={index === 4 ? styles.barCurrent : ''} style={{ height: `${value / trendMax * 100}%` }} /><small>{2022 + index}年</small></div>)}</div>
         </section>
-        <section className={`${styles.card} ${styles.analysisCard}`}>
+        <section className={`${styles.card} ${styles.analysisCard} ${styles.rankAnalysisCard}`}>
           <h3>主要排放源排行</h3><small>单位：tCO₂e</small>
           <table className={styles.rankTable}><thead><tr><th>排名</th><th>排放源</th><th>排放量</th><th>占比</th></tr></thead><tbody>
             {ranked.map((row, index) => <tr key={row.emissionSourceId}><td>{['🥇', '🥈', '🥉', '4', '5'][index]}</td><td>{row.sourceName.replace(/（.*?）/, '')}</td><td>{format(row.emissionAmount)}</td><td>{format(row.emissionAmount / total * 100)}%</td></tr>)}
@@ -311,16 +370,35 @@ function Preview({
 
       <section className={`${styles.card} ${styles.snapshotCard}`}>
         <header className={styles.snapshotHeader}>
-          <div><h3>{snapshotTitle}</h3><p>{snapshotDescription}</p></div>
-          <span>{inventory.length} 项排放源</span>
+          <div><h3>本次核算排放汇总</h3><p>{summaryDescription}</p></div>
+          <span className={styles.snapshotHeaderStatus}>
+            {hasFormalVersion ? `正式核算清单数据完整，共${inventory.length}项排放源` : `当前草稿清单共${inventory.length}项排放源`}
+          </span>
         </header>
         <table className={styles.snapshotTable}>
-          <colgroup><col style={{ width: '14%' }} /><col style={{ width: '28%' }} /><col style={{ width: '14%' }} /><col style={{ width: '16%' }} /><col style={{ width: '12%' }} /><col style={{ width: '16%' }} /></colgroup>
-          <thead><tr><th>核算边界</th><th>排放源类别</th><th>排放源数量</th><th>排放量</th><th>占比</th><th>数据状态</th></tr></thead>
-          <tbody>{snapshotRows.map((row) => <tr key={row.group}><td>{row.boundaryName}</td><td>{row.sourceCategory}</td><td>{row.count} 项</td><td>{format(row.emission)} tCO₂e</td><td>{format(row.emission / total * 100)}%</td><td><span className={row.complete ? styles.snapshotComplete : styles.snapshotPending}>{row.complete ? '完整' : '待完善'}</span></td></tr>)}</tbody>
+          <colgroup><col style={{ width: '20%' }} /><col style={{ width: '32%' }} /><col style={{ width: '14%' }} /><col style={{ width: '20%' }} /><col style={{ width: '14%' }} /></colgroup>
+          <thead><tr><th>结果类别</th><th>排放类别</th><th>排放源数量</th><th>排放量</th><th>占比</th></tr></thead>
+          <tbody>
+            {summaryRows.map((row, index) => {
+              const firstIndex = summaryRows.findIndex((item) => item.resultCategoryName === row.resultCategoryName);
+              const rowSpan = summaryRows.filter((item) => item.resultCategoryName === row.resultCategoryName).length;
+              return (
+                <tr key={row.emissionCategory}>
+                  {firstIndex === index && <td className={styles.snapshotResultCategory} rowSpan={rowSpan}>{row.resultCategoryName}</td>}
+                  <td>{row.displayEmissionCategory}</td>
+                  <td>{row.count} 项</td>
+                  <td>{format(row.emission)} tCO₂e</td>
+                  <td>{format(row.emission / total * 100)}%</td>
+                </tr>
+              );
+            })}
+            <tr className={styles.snapshotTotalRow}>
+              <td>合计</td><td>—</td><td>{inventory.length} 项</td><td>{format(total)} tCO₂e</td><td>100.00%</td>
+            </tr>
+          </tbody>
         </table>
         <footer className={styles.snapshotActions}>
-          {isFormal ? <><Button outline compact onClick={() => navigate('/carbon-accounting/inventory')}>查看正式核算清单</Button><Button primary compact onClick={exportInventory}>导出核算清单</Button></> : <Button outline compact onClick={() => navigate('/carbon-accounting/inventory')}>返回核算清单继续完善</Button>}
+          {hasFormalVersion ? <><Button outline compact onClick={() => navigate('/carbon-accounting/inventory')}>查看正式核算清单</Button><Button primary compact onClick={exportSummary}>导出核算结果</Button></> : <Button outline compact onClick={() => navigate('/carbon-accounting/inventory')}>返回核算清单继续完善</Button>}
         </footer>
       </section>
     </div>
@@ -364,10 +442,10 @@ function Inventory({
   exportInventory: () => void;
   invalidSourceIds: Set<string>;
 }) {
-  const groups = [...new Set(inventory.map((row) => row.emissionGroup))];
+  const groups = [...new Set(inventory.map((row) => row.emissionCategory))];
   const filtered = inventory.filter((row) => {
     const matchKeyword = !keyword || [row.sourceName, row.sourceType, row.factorName, factorSummary(row)].some((text) => text.includes(keyword));
-    return matchKeyword && (!boundary || row.emissionGroup === boundary);
+    return matchKeyword && (!boundary || row.emissionCategory === boundary);
   });
   return (
     <div className={styles.page}>
@@ -387,31 +465,32 @@ function Inventory({
       {taskState === 'pending' && <div className={styles.syncBanner}><span>当前存在未确认的修改。碳排放预览、核查支撑清单及导出仍使用正式清单 V{version}。</span><button type="button" onClick={showChanges}>查看本次修改</button></div>}
       <section className={`${styles.card} ${styles.filterbar}`}>
         <div className={styles.search}><input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索排放源、因子或参数" /></div>
-        <label>核算边界<select value={boundary} onChange={(event) => setBoundary(event.target.value)}><option value="">全部</option>{groups.map((group) => <option key={group}>{group}</option>)}</select></label>
+        <label>排放类别<select value={boundary} onChange={(event) => setBoundary(event.target.value)}><option value="">全部</option>{groups.map((group) => <option key={group}>{group}</option>)}</select></label>
         <span />
         <Button primary disabled={taskState === 'confirmed'} onClick={() => openDialog({ kind: 'newSource' })}>⊕ 新增排放源</Button>
       </section>
       <section className={`${styles.card} ${styles.inventoryShell}`}>
         {groups.map((group) => {
           if (boundary && group !== boundary) return null;
-          const rows = filtered.filter((row) => row.emissionGroup === group);
+          const rows = filtered.filter((row) => row.emissionCategory === group);
           if (keyword && !rows.length) return null;
           return <div className={styles.groupCard} key={group}>
             <button type="button" className={styles.groupHead} onClick={() => toggleGroup(group)}>
-              <span>{collapsed.has(group) ? '›' : '⌄'}</span><b>{group}</b><em>（{inventory.filter((row) => row.emissionGroup === group).length}）</em>
+              <span>{collapsed.has(group) ? '›' : '⌄'}</span><b>{group}</b><em>（{inventory.filter((row) => row.emissionCategory === group).length}）</em>
               <strong>小计 {format(rows.reduce((sum, row) => sum + row.emissionAmount, 0))} tCO₂e</strong>
             </button>
             {!collapsed.has(group) && <div className={styles.groupTableWrap}><table className={styles.groupTable}>
-              <colgroup><col style={{ width: '14%' }} /><col style={{ width: '20%' }} /><col style={{ width: '18%' }} /><col style={{ width: '25%' }} /><col style={{ width: '11%' }} /><col style={{ width: '12%' }} /></colgroup>
-              <thead><tr><th>温室气体源类型</th><th>排放源</th><th>活动数据</th><th>排放因子/计算参数</th><th>排放量（tCO₂e）</th><th>操作</th></tr></thead>
+              <colgroup><col style={{ width: '13%' }} /><col style={{ width: '18%' }} /><col style={{ width: '12%' }} /><col style={{ width: '16%' }} /><col style={{ width: '21%' }} /><col style={{ width: '10%' }} /><col style={{ width: '10%' }} /></colgroup>
+              <thead><tr><th>温室气体源类型</th><th>排放源</th><th>温室气体种类</th><th>活动数据</th><th>排放因子/计算参数</th><th>排放量（tCO₂e）</th><th>操作</th></tr></thead>
               <tbody>{rows.length ? rows.map((row) => <tr key={row.emissionSourceId} className={invalidSourceIds.has(row.emissionSourceId) ? styles.invalidRow : ''}>
                 <td className={styles.sourceTypeCell} data-column="source-type">{row.sourceType}</td>
-                <td className={styles.sourceCell} data-column="source"><b>{row.sourceName}</b><small>{row.entryMode === 'manual' ? '人工新增' : '系统生成'}</small></td>
-                <td className={styles.activityCell} data-column="activity"><b>{row.activityData}</b><small>{row.activityDataSource}</small></td>
-                <td className={styles.factorCell} data-column="factor"><b>{factorSummary(row)}</b><small>{row.factorName}</small></td>
+                <td className={styles.sourceCell} data-column="source"><b>{row.sourceName}</b></td>
+                <td data-column="gas-species">{row.greenhouseGasSpecies.join('、')}</td>
+                <td className={styles.activityCell} data-column="activity"><b>{row.activityData}</b></td>
+                <td className={styles.factorCell} data-column="factor"><b>{factorSummary(row)}</b></td>
                 <td className={styles.emissionCell} data-column="emission"><b>{format(row.emissionAmount)}</b></td>
                 <td className={styles.rowActions} data-column="actions"><button type="button" onClick={() => openSource(row, 'view')}>查看</button>{taskState !== 'confirmed' && <><button type="button" onClick={() => openSource(row, 'edit')}>编辑</button><button type="button" className={styles.deleteLink} onClick={() => openDialog({ kind: 'deleteSource', row })}>删除</button></>}</td>
-              </tr>) : <tr><td colSpan={6} className={styles.emptyRow}>暂无排放源</td></tr>}</tbody>
+              </tr>) : <tr><td colSpan={7} className={styles.emptyRow}>暂无排放源</td></tr>}</tbody>
             </table></div>}
           </div>;
         })}
@@ -432,15 +511,17 @@ function SupportPage({
   const [keyword, setKeyword] = useState('');
   const [state, setState] = useState('');
   const sourceRows: SupportItem[] = inventory.map((row) => ({
-    group: row.emissionGroup,
+    group: row.emissionCategory,
     type: row.sourceType,
     item: row.sourceName,
     activity: row.activityData,
-    origin: row.activityDataSource,
-    materials: row.emissionSourceId === 'es-electricity' ? 12 : row.entryMode === 'manual' ? 1 : 2,
-    state: row.emissionSourceId === 'es-r134a' ? '待补充' : '已上传',
+    activityDataSources: row.confirmedActivityDataSources.length ? row.confirmedActivityDataSources.join('、') : '待确认',
+    materials: row.evidenceFiles.length,
+    state: row.evidenceStatus,
+    emission: row,
   }));
-  const data: SupportItem[] = tab === 'basic' ? supportBasicV4 : sourceRows;
+  const basicRows: SupportItem[] = supportBasicV4.map((item) => ({ ...item, activityDataSources: item.origin, state: item.state === '已上传' ? '已完成' : '待补充' }));
+  const data: SupportItem[] = tab === 'basic' ? basicRows : sourceRows;
   const filtered = data.filter((item) => (!keyword || [item.item, item.group, item.activity].some((text) => text.includes(keyword))) && (!state || item.state === state));
   const groups = [...new Set(filtered.map((item) => item.group))];
   return (
@@ -448,14 +529,14 @@ function SupportPage({
       <section className={`${styles.card} ${styles.supportHead}`}><div><div className={styles.taskLine}><b>当前核算任务：</b><strong>2026年度组织温室气体核算</strong><Tag tone="blue">通用工业企业</Tag></div><div className={styles.supportMeta}><span>核算组织：XX科技有限公司</span><span>核算周期：2026-01-01 ~ 2026-12-31</span><span>依据标准：GB/T 32150—2025</span></div></div><Button outline onClick={() => navigate('/carbon-accounting/inventory')}>← 返回核算清单</Button></section>
       <section className={`${styles.card} ${styles.supportPanel}`}>
         <div className={styles.tabs}><button className={tab === 'basic' ? styles.activeTab : ''} onClick={() => setTab('basic')}>核算基础材料</button><button className={tab === 'source' ? styles.activeTab : ''} onClick={() => setTab('source')}>排放源支撑材料</button></div>
-        <div className={styles.supportInfo}>{tab === 'source' ? '说明：排放源支撑清单由碳核算清单自动生成，活动数据、因子引用及来源保持只读；用户仅维护支撑材料和备注。' : '说明：基础材料用于证明核算主体、组织边界、核算方法和数据质量制度。主体信息来自核算任务创建时保存的组织档案快照。'}</div>
-        <div className={styles.supportToolbar}><div className={styles.search}><input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索核查事项、排放源或材料名称" /></div><label>状态<select value={state} onChange={(event) => setState(event.target.value)}><option value="">全部</option><option>已上传</option><option>待补充</option></select></label></div>
+        <div className={styles.supportInfo}>{tab === 'source' ? '说明：排放源、活动数据及因子信息由正式碳核算清单自动带入并保持只读；活动数据来源依据标准规则推荐，用户可根据企业实际台账、报表和凭证进行确认、调整或补充。' : '说明：基础材料用于证明核算主体、组织边界、核算方法和数据质量制度。主体信息来自核算任务创建时保存的组织档案快照。'}</div>
+        <div className={styles.supportToolbar}><div className={styles.search}><input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索核查事项、排放源或材料名称" /></div><label>状态<select value={state} onChange={(event) => setState(event.target.value)}><option value="">全部</option><option>待确认</option><option>待补充</option><option>已完成</option></select></label></div>
         <div className={styles.supportTableWrap}><table className={styles.supportTable} data-support-table>
-          <colgroup>{tab === 'source' ? <><col style={{ width: '15%' }} /><col style={{ width: '14%' }} /><col style={{ width: '20%' }} /><col style={{ width: '15%' }} /><col style={{ width: '14%' }} /><col style={{ width: '7%' }} /><col style={{ width: '6%' }} /><col style={{ width: '9%' }} /></> : <><col style={{ width: '15%' }} /><col style={{ width: '18%' }} /><col style={{ width: '26%' }} /><col style={{ width: '16%' }} /><col style={{ width: '9%' }} /><col style={{ width: '7%' }} /><col style={{ width: '9%' }} /></>}</colgroup>
-          <thead><tr>{tab === 'source' ? <><th>核算边界</th><th>温室气体源类型</th></> : <th>核查事项</th>}<th>排放源/材料事项</th><th>活动数据项</th><th>活动数据来源</th><th>支撑材料</th><th>状态</th><th>操作</th></tr></thead><tbody>
+          <colgroup>{tab === 'source' ? <><col style={{ width: '15%' }} /><col style={{ width: '14%' }} /><col style={{ width: '19%' }} /><col style={{ width: '14%' }} /><col style={{ width: '16%' }} /><col style={{ width: '7%' }} /><col style={{ width: '7%' }} /><col style={{ width: '8%' }} /></> : <><col style={{ width: '15%' }} /><col style={{ width: '18%' }} /><col style={{ width: '26%' }} /><col style={{ width: '16%' }} /><col style={{ width: '9%' }} /><col style={{ width: '7%' }} /><col style={{ width: '9%' }} /></>}</colgroup>
+          <thead><tr>{tab === 'source' ? <><th>排放类别</th><th>温室气体源类型</th></> : <th>核查事项</th>}<th>排放源/材料事项</th><th>活动数据项</th><th>活动数据来源</th><th>支撑材料</th><th>完整状态</th><th>操作</th></tr></thead><tbody>
           {groups.flatMap((group) => [
             <tr className={styles.supportGroup} key={`${group}-head`}><td colSpan={tab === 'source' ? 8 : 7}><div className={styles.supportGroupTitle} data-group-title={group}><span aria-hidden="true">⌄</span><b>{group}</b></div></td></tr>,
-            ...filtered.filter((item) => item.group === group).map((item) => <tr key={`${group}-${item.item}`}>{tab === 'source' ? <><td>{item.group}</td><td>{item.type}</td></> : <td>{item.group}</td>}<td>{item.item}</td><td>{item.activity}</td><td>{item.origin}</td><td><span className={styles.blueText}>{item.materials} 份</span></td><td><Tag tone={item.state === '已上传' ? 'green' : 'orange'}>{item.state}</Tag></td><td className={styles.rowActions}><button onClick={() => openDrawer({ kind: 'support', item, manage: false })}>查看</button><button onClick={() => openDrawer({ kind: 'support', item, manage: true })}>材料管理</button></td></tr>),
+            ...filtered.filter((item) => item.group === group).map((item) => <tr key={`${group}-${item.item}`}>{tab === 'source' ? <><td>{item.group}</td><td>{item.type}</td></> : <td>{item.group}</td>}<td>{item.item}</td><td>{item.activity}</td><td>{item.activityDataSources}</td><td><span className={styles.blueText}>{item.materials} 份</span></td><td><Tag tone={item.state === '已完成' ? 'green' : 'orange'}>{item.state}</Tag></td><td className={styles.rowActions}><button onClick={() => openDrawer({ kind: 'support', item, manage: false })}>查看</button><button onClick={() => openDrawer({ kind: 'support', item, manage: true })}>支撑管理</button></td></tr>),
           ])}
         </tbody></table></div>
       </section>
@@ -537,10 +618,10 @@ function SourceDrawer({
   const readOnly = state.mode === 'view';
   const system = row.entryMode === 'system';
   const result = recalculate(Number(activity), unit, factor);
-  const submit = () => save({ ...row, factorName: factor.name, emissionFactorId: factor.factorId, activityData: `${row.emissionSourceId === 'es-clinker' ? '原料消耗量：' : ''}${Number(activity).toLocaleString('zh-CN')} ${unit}`, emissionAmount: result }, row.emissionSourceId);
+  const submit = () => save({ ...row, factorName: factor.name, emissionFactorId: factor.factorId, factorObjectId: factor.factorId, factorVersionId: factor.version, activityValue: Number(activity), activityUnit: unit, activityData: `${row.emissionSourceId === 'es-clinker' ? '原料消耗量：' : ''}${Number(activity).toLocaleString('zh-CN')} ${unit}`, emissionAmount: result }, row.emissionSourceId);
   return (
     <Drawer title={readOnly ? '排放源详情' : '编辑排放源'} onClose={close} footer={<><Button onClick={close}>{readOnly ? '关闭' : '取消'}</Button>{readOnly && allowEdit ? <Button primary onClick={() => save(row, row.emissionSourceId)}>编辑</Button> : !readOnly ? <Button primary onClick={submit}>保存并重新计算</Button> : null}</>}>
-      <DetailBlock title="基本信息"><div className={styles.kv}><span>核算边界</span><b>{row.emissionGroup}</b><span>温室气体源类型</span><span>{row.sourceType}</span><span>排放源</span><span>{row.sourceName}</span><span>记录来源</span><span>{row.entryMode === 'manual' ? '人工新增' : '系统自动生成'}</span></div></DetailBlock>
+      <DetailBlock title="基本信息"><div className={styles.kv}><span>组织边界</span><b>{row.organizationBoundary}</b><span>排放类别</span><span>{row.emissionCategory}</span><span>温室气体源类型</span><span>{row.sourceType}</span><span>排放源</span><span>{row.sourceName}</span><span>温室气体种类</span><span>{row.greenhouseGasSpecies.join('、')}</span></div></DetailBlock>
       <DetailBlock title="核算摘要"><div className={styles.calcSummary}><div><span>活动数据</span><b>{row.activityData}</b></div><div><span>计算因子/参数</span><b>{factorSummary(row, factor.factorId)}</b></div><div><span>排放量</span><b>{format(readOnly ? row.emissionAmount : result)} tCO₂e</b></div></div></DetailBlock>
       <DetailBlock title="活动数据">{readOnly || system ? <><div className={styles.kv}><span>活动数据</span><b>{row.activityData}</b><span>数据来源</span><span>{row.activityDataSource}</span></div>{!readOnly && system && <div className={styles.infoBox}>该数据由数据管理模块自动关联，在核算清单中保持只读。需要调整时，请返回源数据页面修改。</div>}</> : <div className={styles.formGrid}><Field label="活动数据值"><input type="number" min="0" value={activity} onChange={(event) => setActivity(event.target.value)} /></Field><Field label="单位"><input value={unit} readOnly /></Field></div>}</DetailBlock>
       <DetailBlock title={factor.parameters?.length ? '计算因子拆解' : '计算因子说明'}>
@@ -548,6 +629,7 @@ function SourceDrawer({
         {!readOnly && <Button outline compact onClick={() => chooseFactor(row)}>从因子与参数库重新选择</Button>}
       </DetailBlock>
       <DetailBlock title="计算公式"><div className={styles.formulaBox}>{factor.formula}<br /><b>当前结果：{format(readOnly ? row.emissionAmount : result)} tCO₂e</b></div><p className={styles.note}>正式清单确认时将保存公式版本、全部原始参数和折算结果快照。</p></DetailBlock>
+      <DetailBlock title="数据追溯信息"><div className={styles.kv}><span>记录生成方式</span><span>{row.recordGenerationType === 'system' ? '系统识别' : '人工新增'}</span><span>上游数据模块</span><span>{row.sourceModule}</span><span>上游记录编号</span><span>{row.sourceRecordId}</span><span>因子或参数对象</span><span>{row.factorObjectId}</span><span>因子版本</span><span>{row.factorVersionId}</span><span>创建人</span><span>{row.createdBy}</span><span>创建时间</span><span>{row.createdAt}</span></div></DetailBlock>
       <DetailBlock title="来源与材料"><div className={styles.sourceCard}><span>活动数据来源</span><b>{row.activityDataSource}</b><span>因子/参数来源</span><span>{factor.source} · {factor.version}</span><span>支撑材料</span><span><Tag>已关联材料</Tag>　<button className={styles.textButton} onClick={goSupport}>前往核查支撑</button></span></div></DetailBlock>
     </Drawer>
   );
@@ -559,6 +641,215 @@ function DetailBlock({ title, children }: { title: string; children: ReactNode }
 
 function Field({ label, children, full }: { label: string; children: ReactNode; full?: boolean }) {
   return <label className={`${styles.field} ${full ? styles.fieldFull : ''}`}><span>{label}</span>{children}</label>;
+}
+
+function CarbonReportPage({
+  inventory,
+  formalVersion,
+  confirmedAt,
+  notify,
+}: {
+  inventory: EmissionSource[];
+  formalVersion: number;
+  confirmedAt: string;
+  notify: (message: string) => void;
+}) {
+  const [reports, setReports] = useState<CarbonReportRecord[]>(() => listCarbonReportMocks());
+  const [year, setYear] = useState(2026);
+  const [keyword, setKeyword] = useState('');
+  const [selectedId, setSelectedId] = useState(() => listCarbonReportMocks()[0]?.carbonReportId ?? '');
+  const [exportOpen, setExportOpen] = useState(false);
+  const [includeReport, setIncludeReport] = useState(true);
+  const [includeEvidence, setIncludeEvidence] = useState(false);
+  const snapshots = listCarbonSnapshots();
+  const visibleReports = reports.filter((report) =>
+    report.year === year && report.reportName.includes(keyword.trim()));
+  const selectedReport = reports.find((report) => report.carbonReportId === selectedId)
+    ?? visibleReports[0]
+    ?? reports[0];
+  const reportDateParts = selectedReport?.generatedAt.slice(0, 10).split('-') ?? [];
+  const reportDate = reportDateParts.length === 3
+    ? `${reportDateParts[0]} 年 ${reportDateParts[1]} 月 ${reportDateParts[2]} 日`
+    : selectedReport?.generatedAt.slice(0, 10) ?? '—';
+  const selectedSnapshot = snapshots.find((snapshot) =>
+    snapshot.carbonSnapshotId === selectedReport?.carbonSnapshotId)
+    ?? snapshots.find((snapshot) =>
+      snapshot.year === selectedReport?.year && snapshot.version === selectedReport?.version);
+  const reportInventory = selectedReport?.year === 2026 && selectedReport.version === formalVersion
+    ? inventory
+    : selectedSnapshot?.sourceItems ?? [];
+  const totalEmission = selectedReport?.year === 2026 && selectedReport.version === formalVersion
+    ? inventory.reduce((total, row) => total + row.emissionAmount, 0)
+    : selectedSnapshot?.totalEmission ?? 0;
+  const categoryRows = [...new Set(reportInventory.map((row) => row.emissionCategory))].map((category) => {
+    const rows = reportInventory.filter((row) => row.emissionCategory === category);
+    return {
+      category,
+      count: rows.length,
+      amount: rows.reduce((total, row) => total + row.emissionAmount, 0),
+    };
+  });
+  const evidenceFiles = reportInventory.flatMap((row) => row.evidenceFiles ?? []);
+  const selectYear = (nextYear: number) => {
+    setYear(nextYear);
+    const next = reports.find((report) => report.year === nextYear);
+    if (next) setSelectedId(next.carbonReportId);
+  };
+  const generateReport = () => {
+    const snapshot = snapshots
+      .filter((item) => item.year === year)
+      .sort((left, right) => right.version - left.version)[0];
+    if (!snapshot) {
+      notify(`${year}年度尚未形成正式核算清单，无法生成报告`);
+      return;
+    }
+    const generatedAt = new Date().toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).replace(/\//g, '-');
+    const report = createCarbonReportMock({
+      carbonSnapshotId: snapshot.carbonSnapshotId,
+      year,
+      version: snapshot.version,
+      generatedAt,
+    });
+    setReports((items) => [report, ...items]);
+    setSelectedId(report.carbonReportId);
+    notify(`已基于正式核算清单 V${snapshot.version} 生成排放报告`);
+  };
+  const exportPackage = () => {
+    if (!selectedReport || (!includeReport && !includeEvidence)) return;
+    const reportHtml = [
+      '<!doctype html><meta charset="utf-8">',
+      `<title>${selectedReport.reportName}</title>`,
+      '<style>body{font:14px/1.7 Arial,"Microsoft YaHei";padding:32px;color:#24333c}h1{font-size:22px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #cad4d8;padding:8px;text-align:left}</style>',
+      `<h1>${selectedReport.reportName}</h1>`,
+      `<p>核算年度：${selectedReport.year}年　核算主体：${selectedReport.organizationName}　正式清单版本：V${selectedReport.version}</p>`,
+      includeReport
+        ? `<h2>排放报告</h2><p>排放总量：${format(totalEmission)} tCO₂e</p><table><thead><tr><th>排放类别</th><th>排放源数量</th><th>排放量（tCO₂e）</th></tr></thead><tbody>${categoryRows.map((row) => `<tr><td>${row.category}</td><td>${row.count}</td><td>${format(row.amount)}</td></tr>`).join('')}</tbody></table>`
+        : '',
+    ].join('');
+    const packageFiles: Array<{ name: string; content: string }> = [];
+    if (includeReport) packageFiles.push({ name: `${selectedReport.reportName}.html`, content: reportHtml });
+    if (includeEvidence) packageFiles.push({
+      name: '核查凭证材料目录.txt',
+      content: evidenceFiles.length
+        ? evidenceFiles.map((file, index) => `${index + 1}. ${file.fileName}｜关联来源：${file.activityDataSource}`).join('\n')
+        : '当前正式清单尚未关联可导出的核查凭证材料。',
+    });
+    const url = URL.createObjectURL(createTarBlob(packageFiles));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${selectedReport.reportName}_核查资料包.tar`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setExportOpen(false);
+    notify('核查资料包已生成');
+  };
+
+  return <div className={`${styles.page} ${styles.reportPage}`}>
+    <section className={styles.reportWorkbench}>
+      <aside className={styles.reportSidebar}>
+        <Field label="选择年份">
+          <select value={year} onChange={(event) => selectYear(Number(event.target.value))}>
+            {[...new Set(reports.map((report) => report.year))].sort((a, b) => b - a).map((item) =>
+              <option key={item} value={item}>{item}</option>)}
+          </select>
+        </Field>
+        <Button primary onClick={generateReport}>生成报告</Button>
+        <div className={styles.reportSearch}>
+          <input
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            placeholder="请输入报告名称"
+            aria-label="搜索报告"
+          />
+          <span>⌕</span>
+        </div>
+        <div className={styles.reportList}>
+          {(['7天内', '30天内'] as const).map((group) => {
+            const groupReports = visibleReports.filter((report) => report.recentGroup === group);
+            if (!groupReports.length) return null;
+            return <section key={group}>
+              <h3><span>⌁</span>{group}</h3>
+              {groupReports.map((report) =>
+                <button
+                  type="button"
+                  key={report.carbonReportId}
+                  className={report.carbonReportId === selectedReport?.carbonReportId ? styles.reportListActive : ''}
+                  onClick={() => setSelectedId(report.carbonReportId)}
+                  title={report.reportName}
+                >
+                  <b>{report.reportName}</b>
+                  <small>正式清单 V{report.version} · {report.generatedAt.slice(5, 16)}</small>
+                </button>)}
+            </section>;
+          })}
+          {!visibleReports.length && <div className={styles.reportListEmpty}>未找到匹配的报告</div>}
+        </div>
+      </aside>
+      <main className={styles.reportPreviewPane}>
+        <div className={styles.reportPreviewActions}>
+          <Button primary compact onClick={() => setExportOpen(true)}>导出核查资料包</Button>
+        </div>
+        {selectedReport ? <article className={styles.carbonReportPaper}>
+          <header>
+            <h1>企业温室气体排放报告</h1>
+            <p>（{selectedReport.templateName}）</p>
+            <p>依据《{selectedReport.standardName}》及《工业其他行业企业温室气体排放核算方法与报告指南（试行）》编制</p>
+            <p>报告主体：{selectedReport.organizationName}</p>
+            <p>报告年度：{selectedReport.year} 年</p>
+            <p>编制日期：{reportDate}</p>
+          </header>
+          <h2>一、企业基本情况</h2>
+          <h3>1.1 报告主体基本信息</h3>
+          <table><thead><tr><th>项目</th><th>内容</th></tr></thead><tbody>
+            <tr><td>报告主体名称</td><td>{selectedReport.organizationName}</td></tr>
+            <tr><td>统一社会信用代码</td><td>9132XXXXXXXXXXXXXX</td></tr>
+            <tr><td>报告年度</td><td>{selectedReport.year}</td></tr>
+            <tr><td>单位性质</td><td>工业企业</td></tr>
+            <tr><td>所属行业</td><td>通用工业企业</td></tr>
+            <tr><td>核算标准</td><td>{selectedReport.standardName}</td></tr>
+            <tr><td>正式清单版本</td><td>V{selectedReport.version}</td></tr>
+          </tbody></table>
+          <h3>1.2 核算边界说明</h3>
+          <p>本报告主体以企业法人边界作为组织边界，核算并报告其运营控制范围内生产场所、辅助生产系统及办公区域产生的温室气体排放。</p>
+          <p>排放源、活动数据和排放因子均读取已确认的正式核算清单，报告生成后不随编辑副本实时变化。</p>
+          <h2>二、温室气体排放汇总</h2>
+          <table><thead><tr><th>排放类别</th><th>排放源数量</th><th>排放量（tCO₂e）</th><th>占比</th></tr></thead><tbody>
+            {categoryRows.map((row) => <tr key={row.category}><td>{row.category}</td><td>{row.count}项</td><td>{format(row.amount)}</td><td>{totalEmission ? format(row.amount / totalEmission * 100) : '0.00'}%</td></tr>)}
+            <tr className={styles.reportTotalRow}><td>合计</td><td>{reportInventory.length}项</td><td>{format(totalEmission)}</td><td>100.00%</td></tr>
+          </tbody></table>
+          <p className={styles.reportDocumentFoot}>数据来源：正式核算清单 V{selectedReport.version}　确认时间：{selectedReport.year === 2026 ? confirmedAt : selectedReport.generatedAt}</p>
+        </article> : <div className={styles.reportDocumentEmpty}>请选择或生成报告</div>}
+      </main>
+    </section>
+    {exportOpen && selectedReport && <Dialog
+      title="导出核查资料包"
+      onClose={() => setExportOpen(false)}
+      footer={<><Button onClick={() => setExportOpen(false)}>取消</Button><Button primary disabled={!includeReport && !includeEvidence} onClick={exportPackage}>导出资料包</Button></>}
+    >
+      <div className={styles.exportReportSection}>
+        <h3>导出信息</h3>
+        <p><span>核算年度：{selectedReport.year}年</span><span>核算主体：{selectedReport.organizationName}</span></p>
+      </div>
+      <div className={styles.exportReportSection}>
+        <h3>导出内容</h3>
+        <label><input type="checkbox" checked={includeReport} onChange={(event) => setIncludeReport(event.target.checked)} /> 排放报告</label>
+        <label><input type="checkbox" checked={includeEvidence} onChange={(event) => setIncludeEvidence(event.target.checked)} /> 核查凭证材料</label>
+      </div>
+      <div className={styles.exportReportSection}>
+        <h3>导出提示</h3>
+        <p>系统将导出当前报告及已上传的凭证材料目录。未上传的凭证材料不会生成空文件。</p>
+        <small>当前正式清单已关联 {evidenceFiles.length} 份凭证材料。</small>
+      </div>
+    </Dialog>}
+  </div>;
 }
 
 export function CarbonAccountingV4({ pathname }: { pathname: string }) {
@@ -582,9 +873,11 @@ export function CarbonAccountingV4({ pathname }: { pathname: string }) {
   const [drawer, setDrawer] = useState<DrawerState>(null);
   const [toast, setToast] = useState('');
   const [invalidSourceIds, setInvalidSourceIds] = useState<Set<string>>(new Set());
+  const [supportOverrides, setSupportOverrides] = useState<Record<string, EmissionSource>>({});
   const [factors, setFactors] = useState<CarbonFactor[]>(() => carbonFactorsV4.map((factor) => ({ ...factor, parameters: factor.parameters?.map((parameter) => ({ ...parameter })) })));
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 2200); };
   const officialInventory = taskState === 'pending' && baseline ? baseline : inventory;
+  const supportInventory = officialInventory.map((row) => supportOverrides[row.emissionSourceId] ?? row);
   const refresh = () => setInventory(listEmissionSources());
   const toggleGroup = (group: string) => setCollapsed((current) => {
     const next = new Set(current);
@@ -656,11 +949,16 @@ export function CarbonAccountingV4({ pathname }: { pathname: string }) {
   };
 
   let content: ReactNode;
-  if (page === 'preview') content = <Preview inventory={officialInventory} state={taskState} version={version} confirmedAt={history[0]?.time} openSettings={() => setDialog({ kind: 'settings' })} exportInventory={exportInventory} />;
+  if (page === 'preview') content = <Preview inventory={officialInventory} state={taskState} version={version} confirmedAt={history[0]?.time} openSettings={() => setDialog({ kind: 'settings' })} />;
   else if (page === 'inventory') content = <Inventory inventory={inventory} taskState={taskState} version={version} keyword={keyword} boundary={boundary} collapsed={collapsed} setKeyword={setKeyword} setBoundary={setBoundary} toggleGroup={toggleGroup} openSource={openSource} openDialog={setDialog} startUpdate={() => { setBaseline(inventory.map((row) => ({ ...row }))); setInvalidSourceIds(new Set()); setTaskState('pending'); notify(`已基于正式清单 V${version} 创建编辑副本`); }} confirmSnapshot={requestSnapshotConfirmation} confirmUpdate={requestUpdateConfirmation} showChanges={() => setDrawer({ kind: 'changes', baseline: baseline ?? inventory, draft: inventory, version })} exportInventory={exportInventory} invalidSourceIds={invalidSourceIds} />;
-  else if (page === 'support') content = <SupportPage inventory={officialInventory} openDrawer={setDrawer} />;
+  else if (page === 'support') content = <SupportPage inventory={supportInventory} openDrawer={setDrawer} />;
   else if (page === 'factors') content = <FactorPage factors={factors} setFactors={setFactors} openDrawer={setDrawer} openDialog={setDialog} />;
-  else content = <div className={styles.page}><section className={`${styles.card} ${styles.reportEmpty}`}><div><i>▤</i><h2>一期暂不展开报告编制页面</h2><p>当前核算任务、核算清单和核查材料已形成报告数据基础；报告模板及编制流程作为后续迭代项。</p><Button outline onClick={() => navigate('/carbon-accounting/preview')}>返回碳排放预览</Button></div></section></div>;
+  else content = <CarbonReportPage
+    inventory={officialInventory}
+    formalVersion={version}
+    confirmedAt={history[0]?.time ?? '2026-06-30 18:00:00'}
+    notify={notify}
+  />;
 
   return <>{content}{toast && <div className={styles.toast}>{toast}</div>}
     {dialog?.kind === 'settings' && <SettingsDialog close={() => setDialog(null)} save={() => { setDialog(null); notify('核算设置已保存'); }} />}
@@ -674,7 +972,7 @@ export function CarbonAccountingV4({ pathname }: { pathname: string }) {
     {dialog?.kind === 'enterpriseFactor' && <EnterpriseFactorDialog close={() => setDialog(null)} save={(factor) => { setFactors([...factors, factor]); setDialog(null); notify('企业因子/参数已保存'); }} />}
     {dialog?.kind === 'importFactor' && <Dialog title="导入企业因子/参数" onClose={() => setDialog(null)} footer={<><Button onClick={() => setDialog(null)}>取消</Button><Button primary onClick={() => { setDialog(null); notify('企业因子导入校验已启动（演示）'); }}>开始导入</Button></>}><div className={styles.infoBox}>仅导入当前企业的实测因子、核算参数或参数组。公共因子由平台管理员通过受控流程统一导入、校验和发布。</div><div className={styles.importBox}><b>导入文件 *</b><Button outline>选择Excel文件</Button><small>导入后将执行字段、单位、重复项、适用年度和依据材料校验。</small></div></Dialog>}
     {drawer?.kind === 'source' && <SourceDrawer state={drawer} allowEdit={taskState !== 'confirmed'} close={() => setDrawer(null)} save={(input, id) => { if (drawer.mode === 'view' && taskState !== 'confirmed') setDrawer({ ...drawer, mode: 'edit' }); else if (drawer.mode !== 'view') saveSource(input, id); }} chooseFactor={(row) => { setDrawer(null); setDialog({ kind: 'factorSelect', row }); }} goSupport={() => { setDrawer(null); navigate('/carbon-accounting/support'); }} />}
-    {drawer?.kind === 'support' && <SupportDrawer state={drawer} close={() => setDrawer(null)} manage={() => setDrawer({ ...drawer, manage: true })} save={() => { setDrawer(null); notify('支撑材料信息已保存'); }} />}
+    {drawer?.kind === 'support' && <SupportDrawer state={drawer} close={() => setDrawer(null)} manage={() => setDrawer({ ...drawer, manage: true })} save={(source) => { if (source) setSupportOverrides((items) => ({ ...items, [source.emissionSourceId]: source })); setDrawer(null); notify('支撑信息已保存'); }} />}
     {drawer?.kind === 'factor' && <FactorDrawer factor={drawer.factor} close={() => setDrawer(null)} />}
     {drawer?.kind === 'history' && <HistoryDrawer history={history} close={() => setDrawer(null)} />}
     {drawer?.kind === 'changes' && <ChangeDrawer baseline={drawer.baseline} draft={drawer.draft} version={drawer.version} close={() => setDrawer(null)} />}
@@ -699,9 +997,9 @@ function NewSourceDialog({ groups, close, save }: { groups: string[]; close: () 
   const factor = getCarbonFactorV4('pf-r134a')!;
   const submit = () => {
     if (!sourceName.trim() || !unit.trim()) return;
-    save({ carbonTaskId: 'ct-2026', emissionGroup: group, sourceType: sourceType || '人工新增排放源', sourceName: sourceName.trim(), activityData: `${Number(activity).toLocaleString('zh-CN')} ${unit}`, activityDataSource: '核算清单·在线录入', factorName: factor.name, emissionFactorId: factor.factorId, emissionAmount: recalculate(Number(activity), unit, factor), entryMode: 'manual' });
+    save({ carbonTaskId: 'ct-2026', organizationBoundary: '企业法人边界', emissionCategory: group, emissionGroup: group, sourceType: sourceType || '人工新增排放源', sourceName: sourceName.trim(), greenhouseGasSpecies: ['CO₂e'], activityValue: Number(activity), activityUnit: unit, activityData: `${Number(activity).toLocaleString('zh-CN')} ${unit}`, activityDataSource: '核算清单·在线录入', factorName: factor.name, emissionFactorId: factor.factorId, recordGenerationType: 'manual', sourceModule: '核算清单—在线录入', sourceRecordId: `CARBON-2026-${Date.now()}`, factorObjectId: factor.factorId, factorVersionId: factor.version, createdBy: '管理员', createdAt: new Date().toLocaleString('zh-CN', { hour12: false }), recommendedActivityDataSources: ['企业报告（可选）'], confirmedActivityDataSources: [], customActivityDataSources: [], evidenceFiles: [], evidenceStatus: '待确认', emissionAmount: recalculate(Number(activity), unit, factor), entryMode: 'manual' });
   };
-  return <Dialog title="新增排放源" onClose={close} footer={<><Button onClick={close}>取消</Button><Button primary onClick={submit}>保存排放源</Button></>}><form className={styles.formGrid} onSubmit={(event: FormEvent) => { event.preventDefault(); submit(); }}><div className={`${styles.infoBox} ${styles.fieldFull}`}>人工新增排放源可编辑和删除；由能源消费、运营数据等模块自动识别的排放源应通过源数据生成，不在此重复新增。</div><Field label="核算边界 *"><select value={group} onChange={(event) => setGroup(event.target.value)}>{groups.map((value) => <option key={value}>{value}</option>)}</select></Field><Field label="温室气体源类型 *"><input value={sourceType} onChange={(event) => setSourceType(event.target.value)} placeholder="例如：逸散排放" /></Field><Field label="排放源名称 *" full><input required value={sourceName} onChange={(event) => setSourceName(event.target.value)} placeholder="请输入排放源名称" /></Field><Field label="活动数据值 *"><input required type="number" value={activity} onChange={(event) => setActivity(event.target.value)} /></Field><Field label="单位 *"><input required value={unit} onChange={(event) => setUnit(event.target.value)} placeholder="例如：kg、t、MWh" /></Field><Field label="排放因子/参数" full><Button outline>从因子库选择</Button><small>默认演示：R134a全球变暖潜势</small></Field><button type="submit" className={styles.hiddenSubmit}>保存</button></form></Dialog>;
+  return <Dialog title="新增排放源" onClose={close} footer={<><Button onClick={close}>取消</Button><Button primary onClick={submit}>保存排放源</Button></>}><form className={styles.formGrid} onSubmit={(event: FormEvent) => { event.preventDefault(); submit(); }}><div className={`${styles.infoBox} ${styles.fieldFull}`}>人工新增排放源可编辑和删除；由能源消费、运营数据等模块自动识别的排放源应通过源数据生成，不在此重复新增。</div><Field label="排放类别 *"><select value={group} onChange={(event) => setGroup(event.target.value)}>{emissionCategoryDictionary.map((value) => <option key={value}>{value}</option>)}</select></Field><Field label="温室气体源类型 *"><input value={sourceType} onChange={(event) => setSourceType(event.target.value)} placeholder="例如：制冷剂逸散源" /></Field><Field label="排放源名称 *" full><input required value={sourceName} onChange={(event) => setSourceName(event.target.value)} placeholder="请输入排放源名称" /></Field><Field label="活动数据值 *"><input required type="number" value={activity} onChange={(event) => setActivity(event.target.value)} /></Field><Field label="单位 *"><input required value={unit} onChange={(event) => setUnit(event.target.value)} placeholder="例如：kg、t、MWh" /></Field><Field label="排放因子/参数" full><Button outline>从因子库选择</Button><small>默认演示：R134a全球变暖潜势</small></Field><button type="submit" className={styles.hiddenSubmit}>保存</button></form></Dialog>;
 }
 
 function ConfirmSnapshot({ title, previousVersion, version, baseline, inventory, close, confirm }: { title: string; previousVersion: number; version: number; baseline: EmissionSource[]; inventory: EmissionSource[]; close: () => void; confirm: () => void }) {
@@ -757,10 +1055,18 @@ function EnterpriseFactorDialog({ close, save }: { close: () => void; save: (fac
   return <Dialog title="新增企业因子/参数" onClose={close} footer={<><Button onClick={close}>取消</Button><Button primary onClick={() => { if (!name.trim() || !source.trim()) return; save({ factorId: `ef-${Date.now()}`, scope: 'enterprise', name, objectType: '综合排放因子', activity: '固定燃烧', gas: 'CO₂', value, unit, source: '企业自定义', version: '2026年度', geo: '当前企业', industry: '通用工业', validity: '当前有效', raw: `${value} ${unit}`, quality: '企业配置', effective: '2026年度', reference: source, selectable: true, calculationType: 'direct', approval: '待审核' }); }}>保存企业数据</Button></>}><div className={styles.infoBox}>企业数据仅适用于当前组织。建议优先录入可验证的单项实测参数；系统可将企业参数与公共缺省参数组合为计算参数组。</div><div className={styles.formGrid}><Field label="对象名称 *"><input value={name} onChange={(event) => setName(event.target.value)} /></Field><Field label="对象类型 *"><select><option>综合排放因子</option><option>基础核算参数</option><option>参数组/公式模板</option></select></Field><Field label="排放活动 *"><select><option>固定燃烧</option><option>购入电力</option><option>工业过程</option></select></Field><Field label="温室气体"><select><option>CO₂</option><option>CO₂e</option><option>CH₄</option></select></Field><Field label="数值/参数摘要 *"><input value={value} onChange={(event) => setValue(event.target.value)} /></Field><Field label="单位 *"><input value={unit} onChange={(event) => setUnit(event.target.value)} /></Field><Field label="适用年度 *"><input value="2026年度" readOnly /></Field><Field label="取值方式 *"><select><option>多批次加权平均</option><option>单次检测值</option><option>供应商提供值</option></select></Field><Field label="来源及依据材料 *" full><input value={source} onChange={(event) => setSource(event.target.value)} placeholder="例如：检测报告编号、台账或供应商证明" /></Field></div></Dialog>;
 }
 
-function SupportDrawer({ state, close, manage, save }: { state: Extract<DrawerState, { kind: 'support' }>; close: () => void; manage: () => void; save: () => void }) {
+function SupportDrawer({ state, close, manage, save }: { state: Extract<DrawerState, { kind: 'support' }>; close: () => void; manage: () => void; save: (source?: EmissionSource) => void }) {
   const item = state.item;
-  const files = ['结算单_202601-202612.pdf', '采购发票_2026.pdf', '检测报告_2026.pdf'].slice(0, Math.min(item.materials, 3));
-  return <Drawer title={state.manage ? '材料管理' : '支撑材料详情'} onClose={close} footer={<><Button onClick={close}>关闭</Button>{state.manage ? <Button primary onClick={save}>保存</Button> : <Button outline onClick={manage}>材料管理</Button>}</>}><DetailBlock title={item.item}><div className={styles.kv}><span>核算边界/事项</span><span>{item.group}</span><span>活动数据项</span><b>{item.activity}</b><span>活动数据来源</span><span>{item.origin}</span><span>材料状态</span><Tag tone={item.state === '已上传' ? 'green' : 'orange'}>{item.state}</Tag></div></DetailBlock><DetailBlock title={`关联材料列表（${item.materials}）`}>{files.length ? files.map((file, index) => <div className={styles.fileRow} key={file}><i>PDF</i><span><b>{file}</b><small>2027-01-05　{(2.34 - index * .31).toFixed(2)}MB　张三</small></span><em>⌄</em></div>) : <p className={styles.note}>暂无上传材料</p>}</DetailBlock>{state.manage && <DetailBlock title="材料维护"><Button outline>⇧ 上传文件</Button><p className={styles.note}>支持PDF、图片、Word和Excel文件。</p></DetailBlock>}<DetailBlock title="备注说明（选填）"><textarea className={styles.textarea} placeholder="请输入备注说明" /></DetailBlock></Drawer>;
+  const source = item.emission;
+  const [confirmed, setConfirmed] = useState(source?.confirmedActivityDataSources ?? []);
+  const [customSource, setCustomSource] = useState('');
+  const [customSources, setCustomSources] = useState(source?.customActivityDataSources ?? []);
+  const [files, setFiles] = useState(source?.evidenceFiles ?? []);
+  const [remark, setRemark] = useState(source?.supportRemark ?? '');
+  if (!source) return <Drawer title="支撑材料详情" onClose={close} footer={<Button onClick={close}>关闭</Button>}><DetailBlock title={item.item}><div className={styles.kv}><span>核查事项</span><span>{item.group}</span><span>活动数据项</span><b>{item.activity}</b><span>活动数据来源</span><span>{item.activityDataSources}</span></div></DetailBlock></Drawer>;
+  const sources = [...source.recommendedActivityDataSources, ...customSources];
+  const submit = () => save({ ...source, confirmedActivityDataSources: confirmed, customActivityDataSources: customSources, evidenceFiles: files, evidenceStatus: confirmed.length ? files.length ? '已完成' : '待补充' : '待确认', supportRemark: remark });
+  return <Drawer title={state.manage ? '支撑管理' : '支撑材料详情'} onClose={close} footer={<><Button onClick={close}>关闭</Button>{state.manage ? <Button primary onClick={submit}>保存支撑信息</Button> : <Button outline onClick={manage}>支撑管理</Button>}</>}><DetailBlock title="核算数据（只读）"><div className={styles.kv}><span>排放类别</span><b>{source.emissionCategory}</b><span>温室气体源类型</span><span>{source.sourceType}</span><span>排放源</span><span>{source.sourceName}</span><span>温室气体种类</span><span>{source.greenhouseGasSpecies.join('、')}</span><span>活动数据</span><b>{source.activityData}</b><span>正式清单版本</span><span>V1</span></div></DetailBlock><DetailBlock title="活动数据来源"><p className={styles.note}>系统已根据排放源类型推荐活动数据来源，请结合企业实际台账和凭证确认。</p>{sources.map((value) => <label className={styles.sourceChoice} key={value}><input type="checkbox" checked={confirmed.includes(value)} onChange={() => setConfirmed((items) => items.includes(value) ? items.filter((item) => item !== value) : [...items, value])} />{value}{customSources.includes(value) && <button type="button" onClick={() => { setCustomSources((items) => items.filter((item) => item !== value)); setConfirmed((items) => items.filter((item) => item !== value)); }}>删除</button>}</label>)}{state.manage && <div className={styles.customSource}><input value={customSource} onChange={(event) => setCustomSource(event.target.value)} placeholder="添加自定义活动数据来源" /><Button compact onClick={() => { if (customSource.trim() && !sources.includes(customSource.trim())) { setCustomSources((items) => [...items, customSource.trim()]); setCustomSource(''); } }}>添加</Button></div>}</DetailBlock><DetailBlock title="支撑材料和备注">{files.map((file) => <div className={styles.fileRow} key={file.evidenceFileId}><i>FILE</i><span><b>{file.fileName}</b><small>关联来源：{file.activityDataSource}</small></span><button type="button" className={styles.textButton} onClick={() => setFiles((items) => items.filter((item) => item.evidenceFileId !== file.evidenceFileId))}>删除</button></div>)}{state.manage && <><Button outline onClick={() => setFiles((items) => [...items, { evidenceFileId: `ev-${Date.now()}`, fileName: '新增支撑凭证.pdf', activityDataSource: confirmed[0] ?? '未指定来源' }])}>⇧ 上传文件</Button><p className={styles.note}>上传后可在当前 Mock 中删除或保留，并关联到已确认活动数据来源。</p></>}<textarea className={styles.textarea} value={remark} onChange={(event) => setRemark(event.target.value)} placeholder="填写数据口径、年度汇总方法、缺失月份处理或来源差异说明" /></DetailBlock></Drawer>;
 }
 
 function FactorDrawer({ factor, close }: { factor: CarbonFactor; close: () => void }) {

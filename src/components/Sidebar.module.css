@@ -1,21 +1,370 @@
-.sidebar { position: fixed; inset: 0 auto 0 0; z-index: 10; display: flex; width: var(--sidebar-width); flex-direction: column; background: var(--color-panel); border-right: 1px solid #dfe7e5; box-shadow: 2px 0 9px rgb(25 54 70 / 3%); }
-.brand { display: flex; height: var(--topbar-height); flex: 0 0 var(--topbar-height); align-items: center; gap: 10px; padding: 0 16px; color: var(--color-text-strong); font-size: 18px; font-weight: 700; border-bottom: 1px solid var(--color-border); }
-.logo { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 9px; color: white; background: linear-gradient(135deg, #10b981, #008b61); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 32%); }
-.nav { overflow: auto; padding: 9px 4px 16px; scrollbar-width: thin; scrollbar-color: #b8c3c0 transparent; }
-.group { margin-bottom: 3px; }
-.groupButton { display: flex; width: 100%; min-height: 40px; align-items: center; gap: 8px; padding: 0 12px; color: #273441; background: transparent; border: 0; border-radius: 5px; font: inherit; font-weight: 500; text-align: left; cursor: pointer; }
-.groupButton:hover,.groupActive { background: #f3f5f5; }
-.chevron { width: 13px; color: #8b959d; font-size: 15px; }
-.items { padding: 1px 0 5px; }
-.item { position: relative; display: flex; min-height: 41px; align-items: center; padding: 0 10px 0 49px; color: #3d4852; border-radius: 4px; font-size: 13px; line-height: 1.3; text-decoration: none; }
-.nestedItem { padding-left: 67px; }
-.item:hover { color: var(--color-brand-dark); background: var(--color-brand-pale); }
-.active { color: #172033; background: #ededed; font-weight: 500; }
-.active::before { position: absolute; left: 4px; top: 9px; width: 3px; height: 23px; content: ''; border-radius: 3px; background: var(--color-brand); }
-.sectionButton { display: flex; width: 100%; min-height: 38px; align-items: center; gap: 8px; padding: 0 10px 0 31px; color: #3c4852; background: transparent; border: 0; border-radius: 4px; font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
-.sectionButton span { width: 12px; color: #8b959d; font-size: 15px; }
-.sectionButton:hover,.sectionActive { color: #172033; background: #f6f7f7; }
-.collapseButton { margin-top: auto; height: 52px; padding: 0 17px; color: #5c6977; background: transparent; border: 0; border-top: 1px solid var(--color-border); text-align: left; cursor: pointer; }
-.compact .brand { justify-content: center; padding: 0; }
-.compact .brand > span:last-child,.compact .nav { display: none; }
-.compact .collapseButton { padding: 0; font-size: 22px; text-align: center; }
+.sidebar {
+  position: fixed;
+  z-index: 10;
+  inset: 0 auto 0 0;
+  display: flex;
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  flex: 0 0 var(--sidebar-width);
+  flex-direction: column;
+  color: #24313f;
+  background: linear-gradient(180deg, #fff 0%, #fbfdfc 100%);
+  border-right: 1px solid #d8e2df;
+  box-shadow: 5px 0 18px rgb(25 54 70 / 6%);
+}
+
+.brand {
+  display: flex;
+  height: var(--topbar-height);
+  flex: 0 0 var(--topbar-height);
+  align-items: center;
+  gap: 11px;
+  margin: 0 12px;
+  padding: 0 6px;
+  color: #008f60;
+  border-bottom: 1px solid #e4ebe8;
+  font-size: 17px;
+  font-weight: 750;
+  letter-spacing: .2px;
+}
+
+.logo {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  transform: rotate(-18deg);
+}
+
+.logo span {
+  position: absolute;
+  display: block;
+  width: 25px;
+  height: 14px;
+  background: linear-gradient(135deg, #49b85f, #009b68);
+  border-radius: 100% 0 100% 0;
+}
+
+.logo span:first-child {
+  top: 3px;
+  left: 2px;
+}
+
+.logo span:last-child {
+  right: 1px;
+  bottom: 3px;
+  transform: rotate(180deg);
+}
+
+.logo::after {
+  position: absolute;
+  top: 15px;
+  left: 7px;
+  width: 20px;
+  height: 3px;
+  content: '';
+  transform: rotate(18deg);
+  background: #fff;
+  border-radius: 3px;
+}
+
+.nav {
+  overflow: auto;
+  flex: 1;
+  padding: 12px 9px 18px;
+  scrollbar-color: #b8c3c0 transparent;
+  scrollbar-width: thin;
+}
+
+.group {
+  padding: 4px 0 8px;
+  border-bottom: 1px solid #e8eeec;
+}
+
+.group:last-child {
+  border-bottom: 0;
+}
+
+.groupButton {
+  display: flex;
+  width: 100%;
+  min-height: 46px;
+  align-items: center;
+  gap: 11px;
+  padding: 0 11px;
+  color: #24313f;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+}
+
+.groupButton:hover {
+  background: #f3faf7;
+}
+
+.groupActive {
+  color: #008f60;
+}
+
+.groupIcon,
+.sectionIcon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  color: #526476;
+}
+
+.groupIcon svg,
+.sectionIcon svg,
+.itemIcon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.groupActive .groupIcon {
+  color: #00a36d;
+}
+
+.groupLabel,
+.sectionLabel,
+.itemLabel {
+  min-width: 0;
+  flex: 1;
+}
+
+.groupLabel,
+.sectionLabel,
+.itemLabel {
+  white-space: nowrap;
+}
+
+.chevron,
+.sectionChevron {
+  width: 18px;
+  color: #81909b;
+  font-size: 17px;
+  text-align: center;
+}
+
+.items {
+  position: relative;
+  padding: 1px 0 3px;
+}
+
+.item {
+  position: relative;
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  gap: 11px;
+  margin: 2px 0;
+  padding: 0 10px 0 38px;
+  color: #394958;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.3;
+  text-decoration: none;
+}
+
+.item:hover {
+  color: #007e56;
+  background: #f2faf7;
+}
+
+.itemIcon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  color: #526476;
+  background: #fff;
+  border: 1px solid #e1e8e6;
+  border-radius: 7px;
+  box-shadow: 0 2px 7px rgb(35 60 70 / 8%);
+}
+
+.branchDot {
+  position: absolute;
+  left: 24px;
+  width: 6px;
+  height: 6px;
+  background: #aad8c8;
+  border: 1px solid #fff;
+  border-radius: 50%;
+}
+
+.active {
+  color: #008b5e;
+  background: linear-gradient(90deg, #effaf6, #f8fcfa);
+  border-color: #b9e7d5;
+  font-weight: 650;
+}
+
+.active::before {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: -1px;
+  width: 3px;
+  content: '';
+  background: #00a66f;
+  border-radius: 0 3px 3px 0;
+}
+
+.active .itemIcon {
+  color: #00a36d;
+  border-color: #c9e9dd;
+}
+
+.section {
+  margin: 3px 0;
+  border: 1px solid transparent;
+  border-radius: 10px;
+}
+
+.sectionOpen {
+  background: linear-gradient(135deg, #f4fbf8 0%, #fff 68%);
+  border-color: #dcebe5;
+  box-shadow: 0 3px 10px rgb(32 62 72 / 4%);
+}
+
+.sectionButton {
+  display: flex;
+  width: 100%;
+  min-height: 46px;
+  align-items: center;
+  gap: 11px;
+  padding: 0 11px;
+  color: #354553;
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.sectionButton:hover,
+.sectionActive {
+  color: #008b5e;
+}
+
+.sectionOpen .sectionIcon {
+  color: #00a36d;
+  background: #fff;
+  border: 1px solid #d5eae2;
+  border-radius: 7px;
+  box-shadow: 0 2px 7px rgb(35 60 70 / 7%);
+}
+
+.sectionItems {
+  position: relative;
+  padding: 0 5px 6px;
+}
+
+.sectionItems::before {
+  position: absolute;
+  top: 0;
+  bottom: 20px;
+  left: 29px;
+  width: 1px;
+  content: '';
+  background: #d9ebe4;
+}
+
+.nestedItem {
+  padding-left: 42px;
+}
+
+.nestedItem .branchDot {
+  left: 26px;
+  z-index: 1;
+}
+
+.plannedItem {
+  color: #98a3aa;
+  background: #fafbfb;
+  border-color: #edf1f0;
+  cursor: not-allowed;
+}
+
+.plannedItem:hover {
+  color: #98a3aa;
+  background: #fafbfb;
+}
+
+.plannedItem .itemIcon {
+  color: #a4afb5;
+  background: #f7f9f8;
+  border-color: #e5eae8;
+  box-shadow: none;
+}
+
+.plannedItem .branchDot {
+  background: #d2dbd8;
+}
+
+.plannedBadge {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  color: #8d989f;
+  background: #f3f5f5;
+  border: 1px solid #dfe5e3;
+  border-radius: 4px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.collapseButton {
+  height: 48px;
+  flex: 0 0 48px;
+  padding: 0 17px;
+  color: #63717d;
+  background: #fbfdfc;
+  border: 0;
+  border-top: 1px solid #e3eae8;
+  cursor: pointer;
+  text-align: left;
+}
+
+.collapseButton:hover {
+  color: #008f60;
+  background: #f2faf7;
+}
+
+.compact .brand {
+  justify-content: center;
+  margin: 0 8px;
+  padding: 0;
+}
+
+.compact {
+  min-width: 72px;
+  flex-basis: 72px;
+}
+
+.compact .brand > span:last-child,
+.compact .nav {
+  display: none;
+}
+
+.compact .collapseButton {
+  padding: 0;
+  font-size: 22px;
+  text-align: center;
+}

@@ -2,7 +2,11 @@ export type EnergyUnitLevel = 'enterprise' | 'level1' | 'level2' | 'level3';
 
 export type EnergyUnitType = '生产单元' | '工序/环节' | '公辅系统' | '建筑/区域' | '其他';
 
-export type EnergyConversionScene = '锅炉产汽/产热' | '余热发电' | '自发电' | '其他转换';
+export type EnergyConversionScene =
+  | '锅炉产汽/产热'
+  | '余能回收'
+  | '电力转换/分配'
+  | '其他转换';
 
 export interface EnergyUnit {
   energyUnitId: string;

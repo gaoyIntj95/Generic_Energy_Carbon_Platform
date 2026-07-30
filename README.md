@@ -1,6 +1,6 @@
-# Generic Energy Carbon Platform
+# 工业企业能碳管理平台
 
-通用能源与碳管理平台项目骨架。
+面向工业企业的能碳 SaaS 前端原型，采用 React、TypeScript 与 Vite 构建。项目包含数据管理、能源监测与分析、碳排放核算与合规、能碳资产运营与策略四个模块，并使用集中式 Mock 数据支撑演示交互。
 
 ## 目录
 
@@ -9,6 +9,11 @@
 - `src/`：应用、布局、组件、图表、业务模块及基础设施
 - `tests/`：交互测试与视觉测试
 
-## 开始开发
+## 本地运行
 
-当前仓库已完成基础目录初始化，后续可根据技术栈补充依赖、构建脚本和页面实现。
+```bash
+npm install
+npm run dev
+```
+
+质量检查命令：`npm run typecheck`、`npm run lint`、`npm run test`、`npm run build`。
