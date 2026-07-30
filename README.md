@@ -17,3 +17,7 @@ npm run dev
 ```
 
 质量检查命令：`npm run typecheck`、`npm run lint`、`npm run test`、`npm run build`。
+
+## GitHub Pages
+
+推送到 `main` 分支后，`.github/workflows/deploy-pages.yml` 会自动执行质量检查、构建并发布 `dist`。线上版本使用 Hash 路由，确保 GitHub Pages 刷新业务页面时不会返回 404。

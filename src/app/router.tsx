@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, createHashRouter, Navigate } from 'react-router-dom';
 import { AppShell } from '../layouts/AppShell';
 import { PlatformPage } from '../pages/PlatformPage';
 
@@ -92,7 +92,12 @@ export const navigation: NavGroup[] = [
 
 export const allNavItems = navigation.flatMap((group) => group.items);
 
-export const router = createBrowserRouter([
+// GitHub Pages cannot rewrite arbitrary application paths back to index.html.
+// Keep clean browser routes during local development and use hash routes for
+// the production static build so refreshes and deep links remain available.
+const createAppRouter = import.meta.env.PROD ? createHashRouter : createBrowserRouter;
+
+export const router = createAppRouter([
   {
     path: '/',
     element: <AppShell />,
