@@ -599,21 +599,17 @@ function ConversionOutputDialog({ item, onClose, onEditExisting, onSaved }: { it
   const sourceType = types.find((type) => type.energyTypeId === source?.energyTypeId);
   const linkedCandidate = linkedCandidates.length === 1 ? linkedCandidates[0] : undefined;
   const soleOutputOption = outputOptions.length === 1 ? outputOptions[0] : undefined;
-  const outputEnergyType = types.find((type) => type.energyTypeName === outputEnergyName && type.analysisCategory === outputCategory);
   useEffect(() => {
     if (recordType === '直接外供') return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Keep the dependent unit selection valid after its source changes.
     if (conversionUnits.length === 1 && unitId !== conversionUnits[0].energyUnitId) setUnitId(conversionUnits[0].energyUnitId);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Keep the dependent unit selection valid after its source changes.
     if (conversionUnits.length > 1 && unitId && !conversionUnits.some((unit) => unit.energyUnitId === unitId)) setUnitId('');
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Keep the dependent unit selection valid after its source changes.
     if (conversionUnits.length === 0 && unitId) setUnitId('');
   }, [recordType, unitId, conversionUnits]);
   useEffect(() => {
     if (recordType !== '锅炉产汽/产热' && recordType !== '其他转换') return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Keep the linked energy record in sync with the selected conversion context.
     if (linkedCandidate && inputRecordId !== linkedCandidate.energyRecordId) setInputRecordId(linkedCandidate.energyRecordId);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Keep the linked energy record in sync with the selected conversion context.
     if (linkedCandidates.length !== 1 && inputRecordId && !linkedCandidates.some((record) => record.energyRecordId === inputRecordId)) setInputRecordId('');
   }, [recordType, year, unitId, inputRecordId, linkedCandidate, linkedCandidates]);
   useEffect(() => {
@@ -621,7 +617,6 @@ function ConversionOutputDialog({ item, onClose, onEditExisting, onSaved }: { it
     const energyType = types.find((type) => type.energyTypeName === soleOutputOption && type.analysisCategory === outputCategory);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Apply the only valid output energy option when its category changes.
     setOutputEnergyName(soleOutputOption);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Apply the unit paired with the only valid output energy option.
     setOutputUnit(energyType?.measurementUnit ?? '');
   }, [soleOutputOption, outputEnergyName, outputCategory, types]);
   const selectType = (next: ConversionOutputType) => {

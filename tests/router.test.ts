@@ -23,9 +23,9 @@ describe('navigation manifest', () => {
     expect(navigation.find((group) => group.key === 'data-management')?.items.map((item) => item.label)).toEqual([
       '用能单元',
       '能源品种',
+      '重点设备',
       '能源数据',
       '运营数据',
-      '重点设备',
     ]);
     const carbonDisplay = navigation.find((group) => group.key === 'carbon-accounting')?.display;
     const carbonCalculation = carbonDisplay?.find((entry) => 'items' in entry);

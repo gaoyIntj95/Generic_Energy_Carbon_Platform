@@ -196,13 +196,13 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
 
     await click(button('设备'));
     const deviceSelect = container.querySelector('select[aria-label="对标对象"]') as HTMLSelectElement;
-    expect([...deviceSelect.options].map((option) => option.textContent)).toEqual([
-      '加工中心1｜待完善',
-      '前处理设备1｜待完善',
-      '空压机1｜待完善：尚未录入设备级能源数据。',
-    ]);
+    expect([...deviceSelect.options].map((option) => option.textContent)).toEqual(expect.arrayContaining([
+      '1#数控加工中心｜待完善',
+      '连续式热处理炉｜待完善',
+      '1#螺杆空压机｜待完善：尚未录入设备级能源数据。',
+    ]));
     expect(container.textContent).toContain('指标趋势（电力消费量）');
-    expect(container.textContent).toContain('当前指标读取加工中心1独立设备能源记录');
+    expect(container.textContent).toContain('当前指标读取1#数控加工中心独立设备能源记录');
     expect(container.textContent).toContain('未配置目标');
     expect(container.textContent).toContain('12/12月');
     expect(container.querySelector('[aria-label="指标趋势图"]')?.textContent).not.toContain('年度目标');

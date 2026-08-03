@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   deleteV11EnergyRecord,
   deleteV11KeyDevice,
+  inspectV11KeyDeviceDeletion,
   listV11ConversionOutputs,
   listV11EnergyCosts,
   listV11EnergyRecords,
@@ -17,9 +18,11 @@ import {
   saveV11EnergyRecord,
   saveV11KeyDevice,
   saveV11OperationMetric,
+  v11EnergyRecordAnnualAmount,
 } from '../src/mocks/dataManagementV11Store';
 import { saveBenchmarkTarget } from '../src/mocks/benchmarkTargetStore';
 import { buildBenchmarkDataset } from '../src/mocks/energyBenchmarkSelector';
+import { listEnergyUnits } from '../src/mocks/energyUnitMockStore';
 import { listProducts } from '../src/mocks/productMasterStore';
 import { DataManagementV11 } from '../src/pages/newPrototype/DataManagementV11';
 
@@ -38,7 +41,8 @@ async function click(element: HTMLElement) {
 
 async function change(element: HTMLInputElement | HTMLSelectElement, value: string) {
   await act(async () => {
-    element.value = value;
+    const prototype = element instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLSelectElement.prototype;
+    Object.getOwnPropertyDescriptor(prototype, 'value')?.set?.call(element, value);
     element.dispatchEvent(new Event('input', { bubbles: true }));
     element.dispatchEvent(new Event('change', { bubbles: true }));
   });
@@ -68,10 +72,30 @@ describe('DataManagementV11 fidelity and data behavior', () => {
   it('renders the V11 energy type columns without prototype-external state fields', async () => {
     await render('/data-management/energy-types');
     const headers = [...container.querySelectorAll('th')].map((item) => item.textContent);
-    expect(headers).toEqual(['分析类别', '能源品种', '计量单位', '折标系数', '折标单位', '操作']);
+    expect(headers).toEqual(['能源分析类别', '能源品种', '计量单位', '折标系数', '折标单位', '操作']);
     expect(container.textContent).toContain('压缩空气');
     expect(container.textContent).not.toContain('参数来源');
     expect(container.textContent).not.toContain('启用');
+  });
+
+  it('applies energy type filters only after querying and resets them on demand', async () => {
+    await render('/data-management/energy-types');
+    const keyword = container.querySelector('[aria-label="关键字"]') as HTMLInputElement;
+    const category = container.querySelector('[aria-label="能源分析类别"]') as HTMLSelectElement;
+
+    expect(container.querySelectorAll('tbody > tr')).toHaveLength(listV11EnergyTypes().length);
+    await change(keyword, '天然气');
+    await change(category, '化石燃料');
+    expect(container.querySelectorAll('tbody > tr')).toHaveLength(listV11EnergyTypes().length);
+
+    await click(button('查询'));
+    expect(container.querySelectorAll('tbody > tr')).toHaveLength(1);
+    expect(container.textContent).toContain('天然气');
+
+    await click(button('重置'));
+    expect(keyword.value).toBe('');
+    expect(category.value).toBe('');
+    expect(container.querySelectorAll('tbody > tr')).toHaveLength(listV11EnergyTypes().length);
   });
 
   it('keeps the energy quantity ledger limited to consumption and exposes monthly details inline', async () => {
@@ -87,7 +111,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
       '归属范围',
       '归属层级',
       '能流阶段',
-      '分析类别',
+      '能源分析类别',
       '能源品种',
       '单位',
       '数据进度',
@@ -99,7 +123,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
       .map((cell) => cell.textContent ?? '');
     expect(scopeNames[0]).toContain('全厂');
     expect(scopeNames.findIndex((name) => name.includes('生产车间A'))).toBeLessThan(
-      scopeNames.findIndex((name) => name.includes('加工中心1')),
+      scopeNames.findIndex((name) => name.includes('1#数控加工中心')),
     );
     expect(scopeNames.findIndex((name) => name.includes('加工中心1'))).toBeLessThan(
       scopeNames.findIndex((name) => name.includes('生产车间B')),
@@ -110,17 +134,48 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(container.textContent).toContain('12,710,000');
   });
 
+  it('locks new energy records to the active level tab and cascades second-level choices from the configured parent', async () => {
+    await render('/data-management/energy-data');
+    expect(container.textContent).toContain('请切换至具体层级页签后录入');
+    expect(() => button('新增能源数据')).toThrow();
+
+    await click(button('二级用能单元'));
+    await click(button('新增能源数据'));
+
+    const scopeType = container.querySelector('[aria-label="归属对象类型"]') as HTMLInputElement;
+    expect(scopeType.value).toBe('二级用能单元');
+    expect(scopeType.readOnly).toBe(true);
+
+    const parentSelect = container.querySelector('[aria-label="所属一级用能单元"]') as HTMLSelectElement;
+    const childSelect = container.querySelector('[aria-label="二级用能单元"]') as HTMLSelectElement;
+    expect(childSelect.disabled).toBe(true);
+
+    const parent = listEnergyUnits().find((unit) => unit.unitLevel === 'level1');
+    expect(parent).toBeDefined();
+    if (!parent) return;
+    await change(parentSelect, parent.energyUnitId);
+
+    const expectedChildren = listEnergyUnits()
+      .filter((unit) => unit.unitLevel === 'level2' && unit.parentEnergyUnitId === parent.energyUnitId)
+      .map((unit) => unit.energyUnitName);
+    expect(childSelect.disabled).toBe(false);
+    expect([...childSelect.options].slice(1).map((option) => option.textContent)).toEqual(expectedChildren);
+  });
+
   it('opens the shared energy ledger in device mode and carries the selected device context', async () => {
     await render('/data-management/energy-data?scope=device&deviceId=v11-device-62&new=1');
 
     expect(container.textContent).toContain('重点设备能源数据');
     const dialog = [...container.querySelectorAll('form')].find((form) => form.textContent?.includes('新增能源数据'));
     expect(dialog).toBeDefined();
+    const scopeType = dialog?.querySelector('[aria-label="归属对象类型"]') as HTMLInputElement;
+    expect(scopeType.value).toBe('重点设备');
+    expect(scopeType.readOnly).toBe(true);
     const selects = [...(dialog?.querySelectorAll('select') ?? [])] as HTMLSelectElement[];
-    expect(selects.some((select) => select.value === '重点设备')).toBe(true);
     expect(selects.some((select) => select.value === 'v11-device-62')).toBe(true);
-    expect(dialog?.textContent).toContain('空压机1');
-    expect([...(dialog?.querySelectorAll('input[readonly]') ?? [])].map((input) => (input as HTMLInputElement).value)).toContain('空压系统');
+    expect(dialog?.textContent).toContain('1#螺杆空压机');
+    expect(dialog?.textContent).toContain('所属用能单元 空压系统');
+    expect(dialog?.textContent).toContain('设备类型 空压设备');
     expect(dialog?.textContent).not.toContain('数据角色');
   });
 
@@ -191,6 +246,12 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(blocked).toMatchObject({ ok: false });
     expect(blocked.error).toContain('能源数据');
     expect(blocked.error).toContain('指标目标');
+    const inspection = inspectV11KeyDeviceDeletion(device.deviceId);
+    expect(inspection).toMatchObject({ ok: false });
+    if (!inspection.ok) {
+      expect(inspection.references.energyRecordCount).toBeGreaterThan(0);
+      expect(inspection.references.benchmarkTargetCount).toBeGreaterThan(0);
+    }
 
     const record = listV11EnergyRecords().find((item) =>
       item.scopeType === 'device' && item.scopeId === device.deviceId);
@@ -216,7 +277,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
       '产出/回收能源',
       '内部使用',
       '外供量',
-      '平衡结果',
+      '去向状态',
       '操作',
     ]);
     expect(container.textContent).toContain('18,300,000');
@@ -261,6 +322,40 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(listV11EnergyCosts()).toHaveLength(originalCostCount + 1);
     expect(listV11EnergyTypes()).toHaveLength(originalTypeCount);
     expect(listV11EnergyRecords().at(-1)?.energyRecordId).toMatch(/^v11-er-/);
+  });
+
+  it('supports partial monthly readings with an annual supplemental total without fabricating missing months', () => {
+    const typeId = listV11EnergyTypes()[0].energyTypeId;
+    const saved = saveV11EnergyRecord({
+      year: 2025,
+      energyRole: '能源消费',
+      scopeLevel: '企业',
+      energyUnitId: null,
+      energyTypeId: typeId,
+      entryMode: 'monthly',
+      monthlyAmounts: [10, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      monthlyReportedMonths: [true, true, false, false, false, false, false, false, false, false, false, false],
+      annualAmount: 100,
+    });
+
+    expect(saved).toMatchObject({ ok: true });
+    const savedRecord = listV11EnergyRecords().at(-1);
+    expect(savedRecord?.monthlyReportedMonths).toEqual([true, true, false, false, false, false, false, false, false, false, false, false]);
+    expect(savedRecord && v11EnergyRecordAnnualAmount(savedRecord)).toBe(100);
+
+    const invalid = saveV11EnergyRecord({
+      year: 2024,
+      energyRole: '能源消费',
+      scopeLevel: '企业',
+      energyUnitId: null,
+      energyTypeId: typeId,
+      entryMode: 'monthly',
+      monthlyAmounts: [60, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      monthlyReportedMonths: [true, true, false, false, false, false, false, false, false, false, false, false],
+      annualAmount: 100,
+    });
+    expect(invalid).toMatchObject({ ok: false });
+    if (!invalid.ok) expect(invalid.error).toContain('年度总量不能小于已填报月份合计');
   });
 
   it('validates conversion balance and stores conversion records with stable IDs', () => {
@@ -310,11 +405,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(productOutputs.every((record) => record.metricCategory === '产量')).toBe(true);
     expect(productOutputs.every((record) => products.some((product) => product.productId === record.productId))).toBe(true);
     expect(productOutputs.filter((record) => record.productId === 'product-b')).toHaveLength(2);
-    expect(productOutputs).toContainEqual(expect.objectContaining({
-      productId: 'product-a',
-      scopeLevel: '企业',
-      energyUnitId: null,
-    }));
+    expect(productOutputs.some((record) => record.energyUnitId === null)).toBe(false);
 
     await render('/data-management/operations');
     expect([...container.querySelectorAll('th')].map((item) => item.textContent)).toEqual([
@@ -330,11 +421,12 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(container.textContent).toContain('产品B');
     expect(container.textContent).toContain('产品C');
     expect(container.textContent).toContain('全厂');
-    expect(container.textContent).toContain('产量可按全厂或具体用能单元维护');
+    expect(container.textContent).toContain('产量可在企业、一级或二级用能单元层级维护');
     expect(container.textContent).not.toContain('产量与业务量');
     expect(container.textContent).not.toContain('熟料产量');
     expect(container.textContent).not.toContain('水泥产量');
 
+    await click(button('企业（'));
     await click(button('新增运营数据'));
     let dialog = container.querySelector('form');
     expect(dialog?.textContent).toContain('新增运营数据');
@@ -343,10 +435,11 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     dialog = container.querySelector('form');
     selects = [...(dialog?.querySelectorAll('select') ?? [])] as HTMLSelectElement[];
     const productSelect = selects.find((select) => [...select.options].some((option) => option.value === 'product-b'));
-    const scopeSelect = selects.find((select) => [...select.options].some((option) => option.value === '__enterprise__'));
+    const scopeSelect = dialog?.querySelector('[aria-label="运营数据归属层级"]') as HTMLInputElement;
     expect(productSelect).toBeDefined();
     expect(scopeSelect).toBeDefined();
-    expect([...scopeSelect!.options].map((option) => option.textContent)).toContain('全厂');
+    expect(scopeSelect.value).toBe('企业');
+    expect([...(dialog?.querySelectorAll('input[readonly]') ?? [])].map((input) => (input as HTMLInputElement).value)).toContain('全厂');
     const saved = saveV11OperationMetric({
       year: 2026,
       scopeLevel: '企业',
@@ -361,12 +454,49 @@ describe('DataManagementV11 fidelity and data behavior', () => {
       monthlyValues: Array(12).fill(100),
       annualValue: 0,
     });
-    expect(saved).toMatchObject({ ok: true });
-    expect(listV11OperationMetrics()).toContainEqual(expect.objectContaining({
-      productId: 'product-b',
-      scopeLevel: '企业',
-      energyUnitId: null,
-      metricCategory: '产量',
-    }));
+    expect(saved).toMatchObject({ ok: false });
+    if (!saved.ok) expect(saved.error).toContain('不能同时维护');
+  });
+
+  it('uses the queried year for new operation records and keeps tab counts in sync with filters', async () => {
+    await render('/data-management/operations');
+    const year = container.querySelector('select') as HTMLSelectElement;
+    await change(year, '2025');
+    await click(button('查询'));
+    expect(container.textContent).toContain('全部层级（0）');
+
+    await click(button('企业（'));
+    await click(button('新增运营数据'));
+    expect(container.querySelector('form')?.textContent).toContain('2025年度');
+  });
+
+  it('uses the configured energy-unit tree when assigning operation data and key devices', async () => {
+    const parent = listEnergyUnits().find((unit) => unit.unitLevel === 'level1');
+    expect(parent).toBeDefined();
+    if (!parent) return;
+    const expectedChildren = listEnergyUnits()
+      .filter((unit) => unit.unitLevel === 'level2' && unit.parentEnergyUnitId === parent.energyUnitId)
+      .map((unit) => unit.energyUnitName);
+
+    await render('/data-management/operations');
+    await click(button('二级用能单元（'));
+    await click(button('新增运营数据'));
+    const operationScopeLevel = container.querySelector('[aria-label="运营数据归属层级"]') as HTMLInputElement;
+    expect(operationScopeLevel.value).toBe('二级用能单元');
+    const operationParent = container.querySelector('[aria-label="运营数据所属一级用能单元"]') as HTMLSelectElement;
+    const operationChild = container.querySelector('[aria-label="运营数据归属范围"]') as HTMLSelectElement;
+    expect(operationChild.disabled).toBe(true);
+    await change(operationParent, parent.energyUnitId);
+    expect([...operationChild.options].slice(1).map((option) => option.textContent)).toEqual(expectedChildren);
+
+    await render('/data-management/devices');
+    await click(button('新增重点设备'));
+    const deviceScopeLevel = container.querySelector('[aria-label="重点设备归属层级"]') as HTMLSelectElement;
+    await change(deviceScopeLevel, '二级用能单元');
+    const deviceParent = container.querySelector('[aria-label="重点设备所属一级用能单元"]') as HTMLSelectElement;
+    const deviceChild = container.querySelector('[aria-label="重点设备所属用能单元"]') as HTMLSelectElement;
+    expect(deviceChild.disabled).toBe(true);
+    await change(deviceParent, parent.energyUnitId);
+    expect([...deviceChild.options].slice(1).map((option) => option.textContent)).toEqual(expectedChildren);
   });
 });

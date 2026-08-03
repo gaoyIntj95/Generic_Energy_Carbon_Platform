@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getEnergyUnit, resetEnergyUnitMockStore } from '../src/mocks/energyUnitMockStore';
+import { getEnergyUnit, listEnergyUnits, resetEnergyUnitMockStore } from '../src/mocks/energyUnitMockStore';
 import { EnergyUnitsPage } from '../src/pages/newPrototype/EnergyUnitsPage';
 
 let container: HTMLDivElement;
@@ -101,7 +101,7 @@ describe('EnergyUnitsPage behavior', () => {
     await setInput(form.querySelector('input[aria-label="用能单元名称"]')!, '办公区域');
     await click(findButton('保存', form));
 
-    expect(form.textContent).toContain('用能单元名称已存在');
+    expect(form.textContent).toContain('同一所属单元下已存在该名称');
   });
 
   it('uses the two-level structure from the latest prototype', async () => {
@@ -112,6 +112,33 @@ describe('EnergyUnitsPage behavior', () => {
 
     const levelTwoRow = findRow('包装区域');
     expect(levelTwoRow.textContent).not.toContain('添加下级');
+  });
+
+  it('derives a child unit type from its parent and exposes only compatible alternatives on demand', async () => {
+    await click(findButton('添加下级', findRow('生产车间A')));
+    const form = modalForm();
+
+    expect(form.textContent).toContain('系统默认工序/环节');
+    expect(form.querySelector('select[aria-label="单元类型"]')).toBeNull();
+
+    await click(findButton('修改类型', form));
+    const typeSelect = form.querySelector('select[aria-label="单元类型"]') as HTMLSelectElement;
+    expect([...typeSelect.options].map((option) => option.value)).toEqual(['工序/环节', '公辅系统', '其他']);
+  });
+
+  it('reorders sibling units without changing their parent relationship', async () => {
+    await click(findButton('调整下级顺序', findRow('生产车间A')));
+    const form = modalForm();
+    expect(form.textContent).toContain('调整“生产车间A”下级顺序');
+    const firstItem = [...form.querySelectorAll('div')].find((item) => item.textContent?.includes('加工工段') && item.textContent?.includes('下移'));
+    if (!firstItem) throw new Error('未找到加工工段排序项');
+    await click(findButton('下移', firstItem));
+    await click(findButton('保存顺序', form));
+
+    expect(listEnergyUnits()
+      .filter((unit) => unit.parentEnergyUnitId === 'eu-clinker-line-1')
+      .map((unit) => unit.energyUnitName)).toEqual(['装配工段', '加工工段', '检测工段']);
+    expect(getEnergyUnit('eu-raw-material')?.parentEnergyUnitId).toBe('eu-clinker-line-1');
   });
 
   it('edits the selected record without changing its id or parent relationship', async () => {
@@ -137,7 +164,8 @@ describe('EnergyUnitsPage behavior', () => {
   it('shows deletion blockers and deletes an unreferenced record after confirmation', async () => {
     await click(findButton('删除', findRow('动力中心')));
     expect(modalForm().textContent).toContain('无法删除用能单元');
-    expect(modalForm().textContent).toContain('4 个下级用能单元');
+    expect(modalForm().textContent).toContain('包含下级用能单元，请先处理下级用能单元后再删除');
+    expect(modalForm().textContent).not.toContain('能源记录引用');
     await click(findButton('我知道了', modalForm()));
 
     await click(findButton('删除', findRow('包装区域')));

@@ -6,6 +6,7 @@ import {
   getEnergyUnit,
   inspectEnergyUnitDeletion,
   listEnergyUnits,
+  reorderEnergyUnits,
   resetEnergyUnitMockStore,
   updateEnergyUnit,
 } from '../src/mocks/energyUnitMockStore';
@@ -17,7 +18,6 @@ describe('energy unit centralized mock store', () => {
     const result = createEnergyUnit({
       energyUnitName: '新建生产车间',
       unitType: '生产单元',
-      conversionScene: null,
       remark: '测试',
     });
 
@@ -31,30 +31,22 @@ describe('energy unit centralized mock store', () => {
     expect(getEnergyUnit(result.unit!.energyUnitId)).toEqual(result.unit);
   });
 
-  it('adds a child using parent id and computes its level', () => {
-    const result = addChildEnergyUnit('eu-packaging', {
+  it('adds a second-level unit using its level-one parent id', () => {
+    const result = addChildEnergyUnit('eu-clinker-line-1', {
       energyUnitName: '包装输送设备区',
       unitType: '工序/环节',
-      conversionScene: null,
     });
 
     expect(result.unit).toMatchObject({
-      parentEnergyUnitId: 'eu-packaging',
-      unitLevel: 'level3',
+      parentEnergyUnitId: 'eu-clinker-line-1',
+      unitLevel: 'level2',
     });
   });
 
-  it('prevents adding below the maximum third level', () => {
-    const levelThree = addChildEnergyUnit('eu-packaging', {
-      energyUnitName: '包装三级单元',
+  it('prevents adding below a second-level unit', () => {
+    const result = addChildEnergyUnit('eu-packaging', {
+      energyUnitName: '不允许的三级单元',
       unitType: '工序/环节',
-      conversionScene: null,
-    }).unit!;
-
-    const result = addChildEnergyUnit(levelThree.energyUnitId, {
-      energyUnitName: '不允许的四级单元',
-      unitType: '工序/环节',
-      conversionScene: null,
     });
 
     expect(result).toMatchObject({ ok: false, error: 'maxLevel' });
@@ -65,7 +57,6 @@ describe('energy unit centralized mock store', () => {
     const result = updateEnergyUnit('eu-packaging', {
       energyUnitName: '包装与发运',
       unitType: '工序/环节',
-      conversionScene: null,
       remark: '名称已更新',
     });
 
@@ -78,16 +69,14 @@ describe('energy unit centralized mock store', () => {
     });
   });
 
-  it('rejects duplicate names for create and edit', () => {
+  it('rejects duplicate names within the same parent scope', () => {
     const createResult = createEnergyUnit({
       energyUnitName: '办公区域',
       unitType: '建筑/区域',
-      conversionScene: null,
     });
     const editResult = updateEnergyUnit('eu-packaging', {
-      energyUnitName: '办公区域',
+      energyUnitName: '前处理区域',
       unitType: '工序/环节',
-      conversionScene: null,
     });
 
     expect(createResult).toMatchObject({ ok: false, error: 'duplicateName' });
@@ -102,7 +91,7 @@ describe('energy unit centralized mock store', () => {
     expect(result).toMatchObject({ ok: false, error: 'referenced' });
   });
 
-  it('uses the generic manufacturing hierarchy and conversion scene dictionary', () => {
+  it('uses the generic manufacturing hierarchy without storing conversion rules on units', () => {
     const units = listEnergyUnits();
     const rootNames = units
       .filter((unit) => unit.unitLevel === 'level1')
@@ -120,23 +109,41 @@ describe('energy unit centralized mock store', () => {
     expect(units.filter((unit) => unit.parentEnergyUnitId === 'eu-cement-grinding-line')
       .map((unit) => unit.energyUnitName)).toEqual(['前处理区域', '生产加工区域', '包装区域']);
     expect(units.filter((unit) => unit.parentEnergyUnitId === 'eu-utilities')
-      .map((unit) => [unit.energyUnitName, unit.conversionScene])).toEqual([
-        ['空压系统', null],
-        ['能源回收系统', '余能回收'],
-        ['锅炉系统', '锅炉产汽/产热'],
-        ['配电系统', '电力转换/分配'],
+      .map((unit) => unit.energyUnitName)).toEqual([
+        '空压系统',
+        '能源回收系统',
+        '锅炉系统',
+        '配电系统',
       ]);
   });
 
-  it('blocks deletion and reports business reference counts', () => {
-    const references = inspectEnergyUnitDeletion('eu-raw-material');
-    const result = deleteEnergyUnit('eu-raw-material');
+  it('updates only the display order of same-parent units', () => {
+    const result = reorderEnergyUnits('eu-clinker-line-1', [
+      'eu-quality-inspection',
+      'eu-raw-material',
+      'eu-clinker-burning',
+    ]);
+
+    expect(result).toMatchObject({ ok: true });
+    expect(listEnergyUnits()
+      .filter((unit) => unit.parentEnergyUnitId === 'eu-clinker-line-1')
+      .map((unit) => unit.energyUnitName)).toEqual(['检测工段', '加工工段', '装配工段']);
+    expect(getEnergyUnit('eu-quality-inspection')).toMatchObject({
+      parentEnergyUnitId: 'eu-clinker-line-1',
+      unitLevel: 'level2',
+    });
+  });
+
+  it('blocks deletion using actual business records', () => {
+    const references = inspectEnergyUnitDeletion('eu-waste-heat-power');
+    const result = deleteEnergyUnit('eu-waste-heat-power');
 
     expect(references).toMatchObject({
       childCount: 0,
-      deviceCount: 1,
+      energyRecordCount: 3,
+      conversionRelationCount: 1,
     });
-    expect(result.references?.deviceCount).toBe(1);
+    expect(result.references?.energyRecordCount).toBe(3);
     expect(result.ok).toBe(false);
   });
 
@@ -153,7 +160,6 @@ describe('energy unit centralized mock store', () => {
     createEnergyUnit({
       energyUnitName: '会话内单元',
       unitType: '其他',
-      conversionScene: null,
     });
     expect(listEnergyUnits().some((unit) => unit.energyUnitName === '会话内单元')).toBe(true);
 
