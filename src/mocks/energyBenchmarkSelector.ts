@@ -3,6 +3,7 @@ import {
   listV11EnergyTypes,
   listV11KeyDevices,
   listV11OperationMetrics,
+  v11EnergyRecordAnnualAmount,
   v11RecordScopeType,
   type V11EnergyRecord,
   type V11EnergyType,
@@ -58,10 +59,7 @@ type AllocatedEnergyRecord = {
   share: number;
 };
 
-const annualRecordAmount = (record: V11EnergyRecord) =>
-  record.entryMode === 'monthly'
-    ? record.monthlyAmounts.reduce((sum, value) => sum + value, 0)
-    : record.annualAmount;
+const annualRecordAmount = (record: V11EnergyRecord) => v11EnergyRecordAnnualAmount(record);
 
 const annualOperationAmount = (record: V11OperationMetric) =>
   record.entryMode === 'monthly'
@@ -84,8 +82,7 @@ function monthlyStandardCoal(record: V11EnergyRecord, types: V11EnergyType[]) {
   if (record.entryMode === 'monthly') {
     return record.monthlyAmounts.map((amount) => standardCoalTce(amount, type));
   }
-  return Array.from({ length: 12 }, (_, index) =>
-    index === 11 ? standardCoalTce(record.annualAmount, type) : 0);
+  return Array.from({ length: 12 }, () => 0);
 }
 
 function sumMonthlyEnergy(records: AllocatedEnergyRecord[], types: V11EnergyType[]) {
@@ -372,9 +369,8 @@ function deviceMetric(
   const metricCode = deviceMetricCode(type.energyTypeId);
   const target = targetValue('device', device.deviceId, metricCode, year);
   const actual = annualRecordAmount(record);
-  const monthCount = record.entryMode === 'monthly'
-    ? record.monthlyAmounts.filter((value) => value > 0).length
-    : 12;
+  const monthCount = (record.monthlyReportedMonths ?? record.monthlyAmounts.map((value) => value > 0)).filter(Boolean).length;
+  const hasAnnualSupplement = record.annualAmount > 0;
   return {
     benchmarkMetricId: `benchmark-device-${device.deviceId}-${type.energyTypeId}`,
     metricCode,
@@ -390,7 +386,7 @@ function deviceMetric(
     direction: target?.direction ?? 'low',
     trend: record.entryMode === 'monthly'
       ? [...record.monthlyAmounts]
-      : Array.from({ length: 12 }, (_, index) => index === 11 ? record.annualAmount : 0),
+      : Array.from({ length: 12 }, () => 0),
     available: true,
     unavailableReason: target ? '' : '当前指标尚未配置目标值，暂不判定达标状态。',
     availabilityLabel: target ? '可对标' : '待完善',
@@ -403,9 +399,9 @@ function deviceMetric(
     outputScopeDescription: '设备消费量指标不需要运营数据分母',
     allocationDescription: '设备能源记录通过稳定设备ID独立归属，不计入企业或用能单元汇总',
     formulaDescription: `${type.energyTypeName}消费量＝设备月度能源量合计`,
-    periodDescription: `${year}年度（${record.entryMode === 'monthly' ? '月度数据汇总' : '年度填报'}）`,
+    periodDescription: `${year}年度（${monthCount ? hasAnnualSupplement && monthCount < 12 ? '月度数据+年度补录' : '月度数据汇总' : '年度汇总录入'}）`,
     monthlyTargets: target?.monthlyTargets ? [...target.monthlyTargets] : undefined,
-    dataCompleteness: record.entryMode === 'annual' ? '年度已填报' : `${monthCount}/12月`,
+    dataCompleteness: !monthCount ? '年度汇总录入' : monthCount < 12 ? hasAnnualSupplement ? `${monthCount}/12月｜年度已补录` : `${monthCount}/12月｜年度待完善` : '12/12月',
   };
 }
 

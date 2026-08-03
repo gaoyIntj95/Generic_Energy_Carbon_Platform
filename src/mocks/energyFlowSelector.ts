@@ -2,6 +2,7 @@ import {
   listV11ConversionOutputs,
   listV11EnergyRecords,
   listV11EnergyTypes,
+  v11EnergyRecordAnnualAmount,
   v11RecordScopeType,
   type V11ConversionOutput,
   type V11EnergyRecord,
@@ -201,12 +202,9 @@ function directSecondLevelUnit(energyUnitId: string | null, units: EnergyUnit[])
 }
 
 function recordPhysicalAmount(record: V11EnergyRecord, period: FlowPeriod) {
-  if (record.entryMode === 'annual') {
-    return period.grain === 'year' ? record.annualAmount : record.annualAmount / 12;
-  }
-  return period.grain === 'year'
-    ? sum(record.monthlyAmounts)
-    : record.monthlyAmounts[period.month - 1] ?? 0;
+  if (period.grain === 'year') return v11EnergyRecordAnnualAmount(record);
+  if (record.entryMode === 'annual') return 0;
+  return record.monthlyAmounts[period.month - 1] ?? 0;
 }
 
 function standardAmount(physical: number, type: V11EnergyType | null) {
@@ -228,7 +226,7 @@ function conversionScale(conversion: V11ConversionOutput, records: V11EnergyReco
   if (period.grain === 'year') return 1;
   const input = records.find((record) => record.energyRecordId === conversion.inputEnergyRecordId);
   if (!input) return 1 / 12;
-  const annual = input.entryMode === 'monthly' ? sum(input.monthlyAmounts) : input.annualAmount;
+  const annual = v11EnergyRecordAnnualAmount(input);
   return annual > 0 ? recordPhysicalAmount(input, period) / annual : 0;
 }
 

@@ -16,9 +16,9 @@ export type NavGroup = {
 const dataManagementItems: NavItem[] = [
   { label: '用能单元', pageTitle: '用能单元管理', path: '/data-management/units', description: '配置企业用能单元及上下级关系，用于能源数据归属、查询与分析。' },
   { label: '能源品种', path: '/data-management/energy-types', description: '管理企业实际使用的能源品种、计量单位及默认折标参数。' },
+  { label: '重点设备', path: '/data-management/devices', description: '维护重点设备基础档案及其用能归属，为后续设备级分析提供基础。' },
   { label: '能源数据', path: '/data-management/energy-data', description: '按企业及用能单元层级维护能源量和能源成本；锅炉、余热发电、自发电、回收利用及外供统一在能源转换与输出中维护。' },
   { label: '运营数据', path: '/data-management/operations', description: '录入产品产量和经济指标，支撑能耗强度、能效对标与预算分析。' },
-  { label: '重点设备', path: '/data-management/devices', description: '维护重点设备基础档案及其用能归属，为后续设备级分析提供基础。' },
 ];
 
 const energyAnalysisItems: NavItem[] = [

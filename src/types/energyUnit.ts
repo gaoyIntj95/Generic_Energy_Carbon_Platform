@@ -1,12 +1,6 @@
-export type EnergyUnitLevel = 'enterprise' | 'level1' | 'level2' | 'level3';
+export type EnergyUnitLevel = 'enterprise' | 'level1' | 'level2';
 
 export type EnergyUnitType = '生产单元' | '工序/环节' | '公辅系统' | '建筑/区域' | '其他';
-
-export type EnergyConversionScene =
-  | '锅炉产汽/产热'
-  | '余能回收'
-  | '电力转换/分配'
-  | '其他转换';
 
 export interface EnergyUnit {
   energyUnitId: string;
@@ -15,26 +9,14 @@ export interface EnergyUnit {
   parentEnergyUnitId: string | null;
   unitLevel: EnergyUnitLevel;
   unitType: EnergyUnitType;
-  conversionScene: EnergyConversionScene | null;
+  /** 同一父级下的展示顺序；不参与能源量、能流或工艺关系计算。 */
+  displayOrder: number;
   remark?: string;
-}
-
-export type EnergyUnitReferenceType =
-  | 'energyRecord'
-  | 'operationRecord'
-  | 'device'
-  | 'conversionRelation';
-
-export interface EnergyUnitReference {
-  referenceId: string;
-  energyUnitId: string;
-  referenceType: EnergyUnitReferenceType;
 }
 
 export interface EnergyUnitWriteInput {
   energyUnitName: string;
   unitType: EnergyUnitType;
-  conversionScene: EnergyConversionScene | null;
   remark?: string;
 }
 
@@ -49,6 +31,6 @@ export interface EnergyUnitReferenceSummary {
 export interface EnergyUnitMutationResult {
   ok: boolean;
   unit?: EnergyUnit;
-  error?: 'notFound' | 'duplicateName' | 'maxLevel' | 'referenced';
+  error?: 'notFound' | 'duplicateName' | 'maxLevel' | 'referenced' | 'invalidOrder';
   references?: EnergyUnitReferenceSummary;
 }

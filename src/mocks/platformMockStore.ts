@@ -19,7 +19,7 @@ import type {
   OptimizationStrategy,
   StrategyState,
 } from '../types/platformDomain';
-import { DEMO_ORGANIZATION_ID } from './energyUnitMockStore';
+import { DEMO_ORGANIZATION_ID } from './demoOrganization';
 
 const months = 12;
 const spread = (annual: number) => {

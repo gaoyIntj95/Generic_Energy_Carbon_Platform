@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   createEnergyQueryAnnualDetails,
   createEnergyQueryMonthlyDetails,
@@ -664,10 +664,14 @@ function IntensityPage() {
 
 function BenchmarkPage() {
   const navigate = useNavigate();
+  const { search } = useLocation();
+  const initialDeviceId = new URLSearchParams(search).get('objectType') === 'device'
+    ? new URLSearchParams(search).get('objectId') ?? ''
+    : '';
   const [year, setYear] = useState('2026');
-  const [type, setType] = useState<BenchmarkType>('all');
-  const [objectId, setObjectId] = useState('');
-  const [selectedId, setSelectedId] = useState('benchmark-enterprise-added-value');
+  const [type, setType] = useState<BenchmarkType>(initialDeviceId ? 'device' : 'all');
+  const [objectId, setObjectId] = useState(initialDeviceId);
+  const [selectedId, setSelectedId] = useState(initialDeviceId ? '' : 'benchmark-enterprise-added-value');
   const [grain, setGrain] = useState<'month' | 'quarter' | 'year'>('month');
   const [dataVersion, setDataVersion] = useState(0);
   const [dialog, setDialog] = useState<DialogState>(null);
@@ -686,6 +690,7 @@ function BenchmarkPage() {
     ?? filteredRows[0]
     ?? metrics[0]
     ?? null;
+
   const activeObjectId = objectId || objects[0]?.objectId || '';
   const metricRows = type === 'all' ? [] : filteredRows.filter((row) => row.objectId === activeObjectId);
   const noData = filteredRows.length === 0;

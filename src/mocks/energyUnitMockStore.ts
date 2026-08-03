@@ -2,13 +2,18 @@ import type {
   EnergyUnit,
   EnergyUnitLevel,
   EnergyUnitMutationResult,
-  EnergyUnitReference,
   EnergyUnitReferenceSummary,
   EnergyUnitWriteInput,
 } from '../types/energyUnit';
+import {
+  listEnergyActivityRecords,
+  listEnergyConversionRelations,
+  listKeyDevices,
+  listOperationMetrics,
+} from './platformMockStore';
+import { DEMO_ORGANIZATION_ID } from './demoOrganization';
 
-export const DEMO_ORGANIZATION_ID = 'org-demo-001';
-export const DEMO_ORGANIZATION_NAME = '某制造企业';
+export { DEMO_ORGANIZATION_ID, DEMO_ORGANIZATION_NAME } from './demoOrganization';
 
 const seedEnergyUnits: EnergyUnit[] = [
   {
@@ -18,7 +23,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     parentEnergyUnitId: null,
     unitLevel: 'level1',
     unitType: '生产单元',
-    conversionScene: null,
+    displayOrder: 10,
     remark: '',
   },
   {
@@ -28,7 +33,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     parentEnergyUnitId: 'eu-clinker-line-1',
     unitLevel: 'level2',
     unitType: '工序/环节',
-    conversionScene: null,
+    displayOrder: 10,
     remark: '',
   },
   {
@@ -38,7 +43,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     parentEnergyUnitId: 'eu-clinker-line-1',
     unitLevel: 'level2',
     unitType: '工序/环节',
-    conversionScene: null,
+    displayOrder: 20,
     remark: '',
   },
   {
@@ -48,7 +53,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     parentEnergyUnitId: 'eu-clinker-line-1',
     unitLevel: 'level2',
     unitType: '工序/环节',
-    conversionScene: null,
+    displayOrder: 30,
     remark: '',
   },
   {
@@ -58,7 +63,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     parentEnergyUnitId: null,
     unitLevel: 'level1',
     unitType: '生产单元',
-    conversionScene: null,
+    displayOrder: 20,
     remark: '',
   },
   {
@@ -68,7 +73,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     parentEnergyUnitId: 'eu-cement-grinding-line',
     unitLevel: 'level2',
     unitType: '工序/环节',
-    conversionScene: null,
+    displayOrder: 10,
     remark: '',
   },
   {
@@ -78,7 +83,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     parentEnergyUnitId: 'eu-cement-grinding-line',
     unitLevel: 'level2',
     unitType: '工序/环节',
-    conversionScene: null,
+    displayOrder: 20,
     remark: '',
   },
   {
@@ -88,7 +93,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     parentEnergyUnitId: 'eu-cement-grinding-line',
     unitLevel: 'level2',
     unitType: '工序/环节',
-    conversionScene: null,
+    displayOrder: 30,
     remark: '',
   },
   {
@@ -98,7 +103,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     parentEnergyUnitId: null,
     unitLevel: 'level1',
     unitType: '公辅系统',
-    conversionScene: null,
+    displayOrder: 30,
     remark: '',
   },
   {
@@ -108,7 +113,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
     unitType: '公辅系统',
-    conversionScene: null,
+    displayOrder: 10,
     remark: '',
   },
   {
@@ -118,7 +123,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
     unitType: '公辅系统',
-    conversionScene: '余能回收',
+    displayOrder: 20,
     remark: '',
   },
   {
@@ -128,7 +133,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
     unitType: '公辅系统',
-    conversionScene: '锅炉产汽/产热',
+    displayOrder: 30,
     remark: '',
   },
   {
@@ -138,7 +143,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
     unitType: '公辅系统',
-    conversionScene: '电力转换/分配',
+    displayOrder: 40,
     remark: '',
   },
   {
@@ -148,7 +153,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     parentEnergyUnitId: null,
     unitLevel: 'level1',
     unitType: '建筑/区域',
-    conversionScene: null,
+    displayOrder: 40,
     remark: '',
   },
   {
@@ -158,7 +163,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     parentEnergyUnitId: 'eu-office',
     unitLevel: 'level2',
     unitType: '公辅系统',
-    conversionScene: null,
+    displayOrder: 10,
     remark: '',
   },
   {
@@ -168,52 +173,39 @@ const seedEnergyUnits: EnergyUnit[] = [
     parentEnergyUnitId: null,
     unitLevel: 'level1',
     unitType: '建筑/区域',
-    conversionScene: null,
+    displayOrder: 50,
     remark: '',
   },
 ];
 
-const seedReferences: EnergyUnitReference[] = [
-  { referenceId: 'energy-record-31', energyUnitId: 'eu-clinker-line-1', referenceType: 'energyRecord' },
-  { referenceId: 'energy-record-32', energyUnitId: 'eu-clinker-line-1', referenceType: 'energyRecord' },
-  { referenceId: 'operation-record-51', energyUnitId: 'eu-clinker-line-1', referenceType: 'operationRecord' },
-  { referenceId: 'device-60', energyUnitId: 'eu-raw-material', referenceType: 'device' },
-  { referenceId: 'energy-record-34', energyUnitId: 'eu-waste-heat-power', referenceType: 'energyRecord' },
-  { referenceId: 'energy-record-33', energyUnitId: 'eu-waste-heat-power', referenceType: 'energyRecord' },
-  { referenceId: 'conversion-relation-80', energyUnitId: 'eu-waste-heat-power', referenceType: 'conversionRelation' },
-  { referenceId: 'energy-record-36', energyUnitId: 'eu-gas-boiler', referenceType: 'energyRecord' },
-  { referenceId: 'conversion-relation-81', energyUnitId: 'eu-gas-boiler', referenceType: 'conversionRelation' },
-  { referenceId: 'energy-record-38', energyUnitId: 'eu-distributed-pv', referenceType: 'energyRecord' },
-  { referenceId: 'conversion-relation-82', energyUnitId: 'eu-distributed-pv', referenceType: 'conversionRelation' },
-];
-
 let energyUnits = cloneUnits(seedEnergyUnits);
-let energyUnitReferences = cloneReferences(seedReferences);
 let nextMockId = 100;
 
 function cloneUnits(units: EnergyUnit[]) {
   return units.map((unit) => ({ ...unit }));
 }
 
-function cloneReferences(references: EnergyUnitReference[]) {
-  return references.map((reference) => ({ ...reference }));
-}
-
 function normalizeName(name: string) {
   return name.trim();
 }
 
-function isDuplicateName(name: string, excludeEnergyUnitId?: string) {
+function isDuplicateName(
+  name: string,
+  parentEnergyUnitId: string | null,
+  excludeEnergyUnitId?: string,
+) {
   const normalized = normalizeName(name);
   return energyUnits.some(
-    (unit) => unit.energyUnitId !== excludeEnergyUnitId && unit.energyUnitName === normalized,
+    (unit) =>
+      unit.energyUnitId !== excludeEnergyUnitId &&
+      unit.parentEnergyUnitId === parentEnergyUnitId &&
+      unit.energyUnitName === normalized,
   );
 }
 
 function nextLevel(level: EnergyUnitLevel): EnergyUnitLevel | null {
   if (level === 'enterprise') return 'level1';
   if (level === 'level1') return 'level2';
-  if (level === 'level2') return 'level3';
   return null;
 }
 
@@ -223,8 +215,19 @@ function makeId() {
   return id;
 }
 
+function nextDisplayOrder(parentEnergyUnitId: string | null) {
+  const siblingOrders = energyUnits
+    .filter((unit) => unit.parentEnergyUnitId === parentEnergyUnitId)
+    .map((unit) => unit.displayOrder);
+  return (siblingOrders.length ? Math.max(...siblingOrders) : 0) + 10;
+}
+
 export function listEnergyUnits() {
-  return cloneUnits(energyUnits);
+  return cloneUnits(energyUnits).sort((left, right) => {
+    const parent = String(left.parentEnergyUnitId ?? '').localeCompare(String(right.parentEnergyUnitId ?? ''), 'zh-CN');
+    if (parent) return parent;
+    return left.displayOrder - right.displayOrder;
+  });
 }
 
 export function getEnergyUnit(energyUnitId: string) {
@@ -233,7 +236,7 @@ export function getEnergyUnit(energyUnitId: string) {
 }
 
 export function createEnergyUnit(input: EnergyUnitWriteInput): EnergyUnitMutationResult {
-  if (isDuplicateName(input.energyUnitName)) return { ok: false, error: 'duplicateName' };
+  if (isDuplicateName(input.energyUnitName, null)) return { ok: false, error: 'duplicateName' };
 
   const unit: EnergyUnit = {
     energyUnitId: makeId(),
@@ -242,7 +245,7 @@ export function createEnergyUnit(input: EnergyUnitWriteInput): EnergyUnitMutatio
     parentEnergyUnitId: null,
     unitLevel: 'level1',
     unitType: input.unitType,
-    conversionScene: input.conversionScene,
+    displayOrder: nextDisplayOrder(null),
     remark: input.remark?.trim() ?? '',
   };
   energyUnits.push(unit);
@@ -258,7 +261,9 @@ export function addChildEnergyUnit(
 
   const unitLevel = nextLevel(parent.unitLevel);
   if (!unitLevel) return { ok: false, error: 'maxLevel' };
-  if (isDuplicateName(input.energyUnitName)) return { ok: false, error: 'duplicateName' };
+  if (isDuplicateName(input.energyUnitName, parentEnergyUnitId)) {
+    return { ok: false, error: 'duplicateName' };
+  }
 
   const unit: EnergyUnit = {
     energyUnitId: makeId(),
@@ -267,7 +272,7 @@ export function addChildEnergyUnit(
     parentEnergyUnitId,
     unitLevel,
     unitType: input.unitType,
-    conversionScene: input.conversionScene,
+    displayOrder: nextDisplayOrder(parentEnergyUnitId),
     remark: input.remark?.trim() ?? '',
   };
   energyUnits.push(unit);
@@ -280,30 +285,48 @@ export function updateEnergyUnit(
 ): EnergyUnitMutationResult {
   const unit = energyUnits.find((item) => item.energyUnitId === energyUnitId);
   if (!unit) return { ok: false, error: 'notFound' };
-  if (isDuplicateName(input.energyUnitName, energyUnitId)) {
+  if (isDuplicateName(input.energyUnitName, unit.parentEnergyUnitId, energyUnitId)) {
     return { ok: false, error: 'duplicateName' };
   }
 
   Object.assign(unit, {
     energyUnitName: normalizeName(input.energyUnitName),
     unitType: input.unitType,
-    conversionScene: input.conversionScene,
     remark: input.remark?.trim() ?? '',
   });
   return { ok: true, unit: { ...unit } };
 }
 
+export function reorderEnergyUnits(
+  parentEnergyUnitId: string | null,
+  orderedEnergyUnitIds: string[],
+): EnergyUnitMutationResult {
+  const siblings = energyUnits.filter((unit) => unit.parentEnergyUnitId === parentEnergyUnitId);
+  const siblingIds = new Set(siblings.map((unit) => unit.energyUnitId));
+  const valid = orderedEnergyUnitIds.length === siblings.length
+    && orderedEnergyUnitIds.every((id) => siblingIds.has(id))
+    && new Set(orderedEnergyUnitIds).size === orderedEnergyUnitIds.length;
+  if (!valid) return { ok: false, error: 'invalidOrder' };
+
+  orderedEnergyUnitIds.forEach((energyUnitId, index) => {
+    const unit = energyUnits.find((item) => item.energyUnitId === energyUnitId);
+    if (unit) unit.displayOrder = (index + 1) * 10;
+  });
+  return { ok: true };
+}
+
 export function inspectEnergyUnitDeletion(energyUnitId: string): EnergyUnitReferenceSummary {
-  const references = energyUnitReferences.filter(
-    (reference) => reference.energyUnitId === energyUnitId,
-  );
   return {
     childCount: energyUnits.filter((unit) => unit.parentEnergyUnitId === energyUnitId).length,
-    energyRecordCount: references.filter((item) => item.referenceType === 'energyRecord').length,
-    operationRecordCount: references.filter((item) => item.referenceType === 'operationRecord').length,
-    deviceCount: references.filter((item) => item.referenceType === 'device').length,
-    conversionRelationCount: references.filter(
-      (item) => item.referenceType === 'conversionRelation',
+    energyRecordCount: listEnergyActivityRecords().filter(
+      (record) => record.energyUnitId === energyUnitId,
+    ).length,
+    operationRecordCount: listOperationMetrics().filter(
+      (record) => record.energyUnitId === energyUnitId,
+    ).length,
+    deviceCount: listKeyDevices().filter((device) => device.energyUnitId === energyUnitId).length,
+    conversionRelationCount: listEnergyConversionRelations().filter(
+      (relation) => relation.conversionEnergyUnitId === energyUnitId,
     ).length,
   };
 }
@@ -318,14 +341,10 @@ export function deleteEnergyUnit(energyUnitId: string): EnergyUnitMutationResult
   }
 
   energyUnits = energyUnits.filter((item) => item.energyUnitId !== energyUnitId);
-  energyUnitReferences = energyUnitReferences.filter(
-    (reference) => reference.energyUnitId !== energyUnitId,
-  );
   return { ok: true, unit: { ...unit } };
 }
 
 export function resetEnergyUnitMockStore() {
   energyUnits = cloneUnits(seedEnergyUnits);
-  energyUnitReferences = cloneReferences(seedReferences);
   nextMockId = 100;
 }

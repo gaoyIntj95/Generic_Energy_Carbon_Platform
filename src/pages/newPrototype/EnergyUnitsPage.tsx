@@ -6,10 +6,10 @@ import {
   getEnergyUnit,
   inspectEnergyUnitDeletion,
   listEnergyUnits,
+  reorderEnergyUnits,
   updateEnergyUnit,
 } from '../../mocks/energyUnitMockStore';
 import type {
-  EnergyConversionScene,
   EnergyUnit,
   EnergyUnitLevel,
   EnergyUnitReferenceSummary,
@@ -31,25 +31,26 @@ import styles from './EnergyUnitsPage.module.css';
 const unitTypeOptions: EnergyUnitType[] = ['生产单元', '工序/环节', '公辅系统', '建筑/区域', '其他'];
 const rootUnitTypeOptions: EnergyUnitType[] = ['生产单元', '公辅系统', '建筑/区域', '其他'];
 const childUnitTypeOptions: EnergyUnitType[] = ['工序/环节', '公辅系统', '建筑/区域', '其他'];
-const conversionSceneOptions: EnergyConversionScene[] = [
-  '锅炉产汽/产热',
-  '余能回收',
-  '电力转换/分配',
-  '其他转换',
-];
-const conversionUnitTypes = new Set<EnergyUnitType>(['公辅系统', '其他']);
+
+const childTypeRules: Record<EnergyUnitType, { defaultType: EnergyUnitType; options: EnergyUnitType[] }> = {
+  生产单元: { defaultType: '工序/环节', options: ['工序/环节', '公辅系统', '其他'] },
+  '工序/环节': { defaultType: '工序/环节', options: ['工序/环节', '公辅系统', '其他'] },
+  公辅系统: { defaultType: '公辅系统', options: ['公辅系统', '其他'] },
+  '建筑/区域': { defaultType: '建筑/区域', options: ['建筑/区域', '公辅系统', '其他'] },
+  其他: { defaultType: '其他', options: ['其他', '工序/环节', '公辅系统', '建筑/区域'] },
+};
 
 const levelLabels: Record<EnergyUnitLevel, string> = {
   enterprise: '企业',
   level1: '一级用能单元',
   level2: '二级用能单元',
-  level3: '三级用能单元',
 };
 
 type DialogState =
   | { type: 'addRoot' }
   | { type: 'addChild'; parentEnergyUnitId: string }
   | { type: 'edit'; energyUnitId: string }
+  | { type: 'reorder'; parentEnergyUnitId: string | null }
   | { type: 'deleteBlocked'; unit: EnergyUnit; references: EnergyUnitReferenceSummary }
   | { type: 'deleteConfirm'; unit: EnergyUnit }
   | null;
@@ -67,15 +68,14 @@ interface DisplayRow {
 
 const emptyFilter: FilterState = { keyword: '', unitType: '' };
 
-function nextLevel(level: EnergyUnitLevel) {
-  if (level === 'enterprise') return 'level1';
-  if (level === 'level1') return 'level2';
-  if (level === 'level2') return 'level3';
-  return null;
-}
-
 function formUnitTypes(level: EnergyUnitLevel) {
   return level === 'level1' ? rootUnitTypeOptions : childUnitTypeOptions;
+}
+
+function childTypeRule(parent?: EnergyUnit) {
+  return parent
+    ? childTypeRules[parent.unitType]
+    : { defaultType: '工序/环节' as const, options: childUnitTypeOptions };
 }
 
 function initialExpanded(units: EnergyUnit[]) {
@@ -170,7 +170,7 @@ export function EnergyUnitsPage() {
       render: ({ unit, depth, childCount }) => (
         <div
           className={`${styles.unitCell} ${depth ? styles.childName : ''} ${
-            depth === 1 ? styles.level2 : depth >= 2 ? styles.level3 : ''
+            depth === 1 ? styles.level2 : ''
           }`}
         >
           {childCount ? (
@@ -204,34 +204,19 @@ export function EnergyUnitsPage() {
       render: ({ unit }) => (
         <span
           className={`${styles.levelTag} ${
-            unit.unitLevel === 'level2'
-              ? styles.levelTagSecondary
-              : unit.unitLevel === 'level3'
-                ? styles.levelTagTertiary
-                : ''
+            unit.unitLevel === 'level2' ? styles.levelTagSecondary : ''
           }`}
         >
-          {unit.unitLevel === 'level1' ? '一级' : unit.unitLevel === 'level2' ? '二级' : '三级'}
+          {unit.unitLevel === 'level1' ? '一级' : '二级'}
         </span>
       ),
     },
     { key: 'unitType', title: '单元类型', width: 190, render: ({ unit }) => unit.unitType },
     {
-      key: 'conversionScene',
-      title: '能源转换场景',
-      width: 210,
-      render: ({ unit }) =>
-        unit.conversionScene ? (
-          <span className={styles.conversion}>{unit.conversionScene}</span>
-        ) : (
-          '—'
-        ),
-    },
-    {
       key: 'actions',
       title: '操作',
-      width: 250,
-      render: ({ unit }) => (
+      width: 330,
+      render: ({ unit, childCount }) => (
         <div className={styles.actions}>
           {unit.unitLevel === 'level1' && <button
               className={styles.action}
@@ -239,6 +224,13 @@ export function EnergyUnitsPage() {
               onClick={() => setDialog({ type: 'addChild', parentEnergyUnitId: unit.energyUnitId })}
             >
               添加下级
+            </button>}
+          {unit.unitLevel === 'level1' && childCount > 1 && <button
+              className={styles.action}
+              type="button"
+              onClick={() => setDialog({ type: 'reorder', parentEnergyUnitId: unit.energyUnitId })}
+            >
+              调整下级顺序
             </button>}
           <button
             className={styles.action}
@@ -264,9 +256,14 @@ export function EnergyUnitsPage() {
           setActiveFilter(emptyFilter);
         }}
         actions={
-          <Button primary onClick={() => setDialog({ type: 'addRoot' })}>
-            ＋ 新增一级用能单元
-          </Button>
+          <>
+            <Button onClick={() => setDialog({ type: 'reorder', parentEnergyUnitId: null })}>
+              调整一级顺序
+            </Button>
+            <Button primary onClick={() => setDialog({ type: 'addRoot' })}>
+              ＋ 新增一级用能单元
+            </Button>
+          </>
         }
       >
         <Field label="关键字">
@@ -304,7 +301,7 @@ export function EnergyUnitsPage() {
 
       <Card className={styles.tableCard}>
         <div className={styles.notice}>
-          一期采用两级结构。仅涉及能源转换或自产能源的系统需要设置能源转换场景，普通生产单元无需配置。
+          一期采用两级结构。能源转换、回收利用和外供在“能源数据 &gt; 能源转换与输出”中按实际系统维护；用能单元仅维护组织与归属关系。
         </div>
         <div className={styles.tableArea}>
           <DataTable
@@ -338,6 +335,18 @@ export function EnergyUnitsPage() {
         />
       )}
 
+      {dialog?.type === 'reorder' && (
+        <ReorderEnergyUnitsDialog
+          parentEnergyUnitId={dialog.parentEnergyUnitId}
+          onClose={() => setDialog(null)}
+          onSaved={() => {
+            refreshUnits();
+            setDialog(null);
+            notify('用能单元顺序已更新');
+          }}
+        />
+      )}
+
       {dialog?.type === 'deleteBlocked' && (
         <DeleteBlockedDialog
           unit={dialog.unit}
@@ -364,7 +373,7 @@ export function EnergyUnitsPage() {
           <div className={styles.confirmBox}>
             确认删除用能单元“<strong>{dialog.unit.energyUnitName}</strong>”吗？
             <br />
-            删除后该记录将从当前前端Mock数据中移除。
+            删除后无法恢复。请确认该用能单元不再需要用于后续数据维护和分析。
           </div>
         </Modal>
       )}
@@ -374,12 +383,67 @@ export function EnergyUnitsPage() {
   );
 }
 
+function ReorderEnergyUnitsDialog({
+  parentEnergyUnitId,
+  onClose,
+  onSaved,
+}: {
+  parentEnergyUnitId: string | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const parent = parentEnergyUnitId ? getEnergyUnit(parentEnergyUnitId) : undefined;
+  const [orderedUnits, setOrderedUnits] = useState(() =>
+    listEnergyUnits().filter((unit) => unit.parentEnergyUnitId === parentEnergyUnitId),
+  );
+  const move = (index: number, offset: -1 | 1) => {
+    setOrderedUnits((current) => {
+      const target = index + offset;
+      if (target < 0 || target >= current.length) return current;
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+  return (
+    <Modal
+      title={parent ? `调整“${parent.energyUnitName}”下级顺序` : '调整一级用能单元顺序'}
+      width={680}
+      submitText="保存顺序"
+      onClose={onClose}
+      onSubmit={() => {
+        const result = reorderEnergyUnits(parentEnergyUnitId, orderedUnits.map((unit) => unit.energyUnitId));
+        if (result.ok) onSaved();
+      }}
+    >
+      <div className={styles.reorderIntro}>
+        调整同级用能单元的展示顺序，不改变父子关系、能源数据归属或能流计算结果。
+      </div>
+      <div className={styles.reorderList}>
+        {orderedUnits.map((unit, index) => (
+          <div className={styles.reorderItem} key={unit.energyUnitId}>
+            <span className={styles.reorderIndex}>{index + 1}</span>
+            <div><strong>{unit.energyUnitName}</strong><small>{unit.unitType}</small></div>
+            <div className={styles.reorderActions}>
+              <button type="button" disabled={index === 0} onClick={() => move(index, -1)}>上移</button>
+              <button type="button" disabled={index === orderedUnits.length - 1} onClick={() => move(index, 1)}>下移</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
 function EnergyUnitFormDialog({
   dialog,
   onClose,
   onSaved,
 }: {
-  dialog: Exclude<DialogState, null | { type: 'deleteBlocked' } | { type: 'deleteConfirm' }>;
+  dialog: Exclude<
+    DialogState,
+    null | { type: 'deleteBlocked' } | { type: 'deleteConfirm' } | { type: 'reorder' }
+  >;
   onClose: () => void;
   onSaved: (message: string, expandedParentId?: string) => void;
 }) {
@@ -390,16 +454,18 @@ function EnergyUnitFormDialog({
       ? 'level1'
       : dialog.type === 'edit'
         ? target?.unitLevel ?? 'level1'
-        : nextLevel(parent?.unitLevel ?? 'level3') ?? 'level3';
-  const availableTypes = formUnitTypes(level);
+        : 'level2';
+  const isAddingChild = dialog.type === 'addChild';
+  const inheritedChildTypeRule = childTypeRule(parent);
+  const availableTypes = isAddingChild ? inheritedChildTypeRule.options : formUnitTypes(level);
 
   const [form, setForm] = useState<EnergyUnitWriteInput>({
-    unitType: target?.unitType ?? ('' as EnergyUnitType),
+    unitType: target?.unitType ?? (isAddingChild ? inheritedChildTypeRule.defaultType : ('' as EnergyUnitType)),
     energyUnitName: target?.energyUnitName ?? '',
-    conversionScene: target?.conversionScene ?? null,
     remark: target?.remark ?? '',
   });
   const [error, setError] = useState('');
+  const [isChangingChildType, setIsChangingChildType] = useState(false);
 
   const title =
     dialog.type === 'addRoot'
@@ -409,31 +475,25 @@ function EnergyUnitFormDialog({
         : target?.unitLevel === 'level1'
           ? '编辑一级用能单元'
           : '编辑下级用能单元';
-  const showConversion = conversionUnitTypes.has(form.unitType);
-
   const save = () => {
     setError('');
     if (!form.unitType || !form.energyUnitName.trim()) {
       setError('请选择单元类型并填写用能单元名称。');
       return;
     }
-    const normalizedForm = {
-      ...form,
-      conversionScene: showConversion ? form.conversionScene : null,
-    };
     const result =
       dialog.type === 'addRoot'
-        ? createEnergyUnit(normalizedForm)
+        ? createEnergyUnit(form)
         : dialog.type === 'addChild'
-          ? addChildEnergyUnit(dialog.parentEnergyUnitId, normalizedForm)
-          : updateEnergyUnit(dialog.energyUnitId, normalizedForm);
+          ? addChildEnergyUnit(dialog.parentEnergyUnitId, form)
+          : updateEnergyUnit(dialog.energyUnitId, form);
 
     if (!result.ok) {
       setError(
         result.error === 'duplicateName'
-          ? '用能单元名称已存在，请使用其他名称。'
+          ? '同一所属单元下已存在该名称，请使用其他名称。'
           : result.error === 'maxLevel'
-            ? '当前记录已达到系统允许的最大三级层级，不能继续添加下级。'
+            ? '一期仅支持两级用能单元，二级单元不能继续添加下级。'
             : '保存失败，请检查当前记录是否仍然存在。',
       );
       return;
@@ -460,30 +520,54 @@ function EnergyUnitFormDialog({
           </div>
         )}
         <Field label="单元类型" required>
-          <select
-            aria-label="单元类型"
-            required
-            value={form.unitType}
-            onChange={(event) => {
-              const unitType = event.target.value as EnergyUnitType;
-              setForm((current) => ({
-                ...current,
-                unitType,
-                conversionScene: conversionUnitTypes.has(unitType)
-                  ? current.conversionScene
-                  : null,
-              }));
-            }}
-          >
-            <option value="" disabled>
-              请选择单元类型
-            </option>
-            {availableTypes.map((unitType) => (
-              <option value={unitType} key={unitType}>
-                {unitType}
-              </option>
-            ))}
-          </select>
+          {isAddingChild && !isChangingChildType ? (
+            <div className={styles.defaultTypeField}>
+              <div>
+                <span>系统默认</span>
+                <strong>{form.unitType}</strong>
+              </div>
+              {availableTypes.length > 1 && (
+                <button type="button" onClick={() => setIsChangingChildType(true)}>
+                  修改类型
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className={styles.typeSelectField}>
+              <select
+                aria-label="单元类型"
+                required
+                value={form.unitType}
+                onChange={(event) => {
+                  const unitType = event.target.value as EnergyUnitType;
+                  setForm((current) => ({ ...current, unitType }));
+                }}
+              >
+                {!isAddingChild && (
+                  <option value="" disabled>
+                    请选择单元类型
+                  </option>
+                )}
+                {availableTypes.map((unitType) => (
+                  <option value={unitType} key={unitType}>
+                    {unitType}
+                  </option>
+                ))}
+              </select>
+              {isAddingChild && (
+                <button
+                  type="button"
+                  className={styles.resetType}
+                  onClick={() => {
+                    setForm((current) => ({ ...current, unitType: inheritedChildTypeRule.defaultType }));
+                    setIsChangingChildType(false);
+                  }}
+                >
+                  恢复默认
+                </button>
+              )}
+            </div>
+          )}
         </Field>
         <Field label="用能单元名称" required>
           <input
@@ -496,32 +580,6 @@ function EnergyUnitFormDialog({
             }
           />
         </Field>
-        {showConversion && (
-          <div className={styles.full}>
-            <Field label="能源转换场景">
-              <select
-                aria-label="能源转换场景"
-                value={form.conversionScene ?? ''}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    conversionScene: (event.target.value || null) as EnergyConversionScene | null,
-                  }))
-                }
-              >
-                <option value="">不涉及能源转换</option>
-                {conversionSceneOptions.map((scene) => (
-                  <option value={scene} key={scene}>
-                    {scene}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <div className={styles.help}>
-              只有该单元涉及能源转换或自产能源时才设置，普通生产单元无需配置。
-            </div>
-          </div>
-        )}
         <div className={styles.full}>
           <Field label="备注">
             <textarea
@@ -564,25 +622,15 @@ function DeleteBlockedDialog({
   references: EnergyUnitReferenceSummary;
   onClose: () => void;
 }) {
-  const reasons = [
-    references.childCount > 0 && `包含 ${references.childCount} 个下级用能单元`,
-    references.energyRecordCount > 0 && `被 ${references.energyRecordCount} 条能源记录引用`,
-    references.operationRecordCount > 0 && `被 ${references.operationRecordCount} 条运营数据引用`,
-    references.deviceCount > 0 && `被 ${references.deviceCount} 台重点设备引用`,
-    references.conversionRelationCount > 0 &&
-      `被 ${references.conversionRelationCount} 条能源转换关系引用`,
-  ].filter(Boolean);
+  const hasChildren = references.childCount > 0;
 
   return (
     <Modal title="无法删除用能单元" width={560} cancelText="我知道了" onClose={onClose}>
       <p className={styles.blockerIntro}>
-        用能单元“{unit.energyUnitName}”当前仍被以下数据使用，不能删除：
+        {hasChildren
+          ? `用能单元“${unit.energyUnitName}”包含下级用能单元，请先处理下级用能单元后再删除。`
+          : `用能单元“${unit.energyUnitName}”已被业务数据使用。为保证历史数据和分析结果完整，暂不支持删除。`}
       </p>
-      <ul className={styles.blockerList}>
-        {reasons.map((reason) => (
-          <li key={String(reason)}>{reason}</li>
-        ))}
-      </ul>
     </Modal>
   );
 }

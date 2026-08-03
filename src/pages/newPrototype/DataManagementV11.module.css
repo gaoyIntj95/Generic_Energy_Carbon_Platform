@@ -49,6 +49,16 @@
   border-radius: 6px;
 }
 
+.entryHint {
+  display: inline-flex;
+  height: 38px;
+  align-items: center;
+  padding: 0 2px;
+  color: #78869a;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
 .toolbar input,
 .toolbar select,
 .formGrid input,
@@ -229,6 +239,89 @@
   font-weight: 600;
 }
 
+.deviceLevelOneRow td {
+  height: 42px;
+  padding: 0 14px;
+  background: #fff;
+  border-top: 1px solid #edf0f4;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.deviceLevelOneNode {
+  display: flex;
+  height: 42px;
+  align-items: center;
+  gap: 8px;
+}
+
+.deviceToggle {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  color: #00875a;
+  background: #fff;
+  border: 1px solid #d9e5df;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.deviceLevelOneNode b {
+  color: #172033;
+  font-size: 14px;
+}
+
+.deviceCount {
+  display: inline-flex;
+  height: 22px;
+  align-items: center;
+  padding: 0 7px;
+  color: #00875a;
+  background: #eaf8f3;
+  border-radius: 11px;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.deviceDirectRow td,
+.deviceLevelTwoRow td {
+  height: 34px;
+  padding: 0 14px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.deviceTreeChild {
+  position: relative;
+  display: flex;
+  height: 34px;
+  align-items: center;
+  gap: 8px;
+  padding-left: 62px;
+  color: #344054;
+}
+
+.deviceTreeChild::before {
+  position: absolute;
+  top: 50%;
+  left: 29px;
+  width: 13px;
+  height: 16px;
+  border-bottom: 1px solid #c9d4cf;
+  border-left: 1px solid #c9d4cf;
+  content: '';
+  transform: translateY(-10px);
+}
+
+.deviceTreeChild small {
+  color: #8a94a3;
+  font-size: 12px;
+  font-weight: 400;
+}
+
 .scopeGroupStart td {
   border-top: 1px solid #dce8e4;
 }
@@ -348,6 +441,40 @@
   grid-column: 1 / -1;
 }
 
+.deviceForm {
+  display: grid;
+  gap: 24px;
+}
+
+.deviceFormSection {
+  display: grid;
+  gap: 13px;
+}
+
+.deviceFormSection h3 {
+  margin: 0;
+  color: #26364a;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.deviceFormSection h3 small {
+  color: #8a94a3;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.deviceOwnershipFields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 17px;
+}
+
+.deviceFormSection textarea {
+  height: 96px;
+}
+
 .contextStrip,
 .autoInfo {
   display: flex;
@@ -418,6 +545,28 @@
   border: 1px solid #ffccc7;
   border-radius: 6px;
   line-height: 1.6;
+}
+
+.blockedActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.blockedAction {
+  height: 36px;
+  padding: 0 14px;
+  color: #00875a;
+  background: #fff;
+  border: 1px solid #a8dfca;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.blockedAction:hover {
+  background: #f3faf7;
+  border-color: #00a870;
 }
 
 .stagePill {
@@ -755,6 +904,12 @@
   place-items: center;
 }
 
+.sceneDescription {
+  margin: 8px 0 0;
+  color: #6c7788;
+  font-size: 13px;
+}
+
 .conversionSceneGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -861,6 +1016,38 @@
   border: 0;
 }
 
+.duplicateRecordNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  color: #8c5b11;
+  background: #fff8e8;
+  border: 1px solid #ffe0a3;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.duplicateRecordNotice button {
+  flex: 0 0 auto;
+  padding: 6px 14px;
+  color: #9a6700;
+  font-weight: 600;
+  background: #fff;
+  border: 1px solid #e6b75b;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.duplicateRecordNotice button:hover {
+  color: #fff;
+  background: #d99200;
+  border-color: #d99200;
+}
+
 .linkedPreview,
 .sourceLocked {
   padding: 10px 12px;
@@ -890,8 +1077,24 @@
 }
 
 .helpText {
+  margin-top: 10px;
   color: #8a94a3;
   font-size: 12px;
+}
+
+.advancedToggle {
+  padding: 0;
+  margin-top: 12px;
+  color: #1677ff;
+  font-size: 13px;
+  background: transparent;
+  border: 0;
+}
+
+.advancedBody {
+  padding-top: 14px;
+  margin-top: 12px;
+  border-top: 1px dashed #dce3eb;
 }
 
 .balanceBox {

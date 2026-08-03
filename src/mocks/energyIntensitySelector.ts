@@ -2,6 +2,7 @@ import {
   listV11EnergyRecords,
   listV11EnergyTypes,
   listV11OperationMetrics,
+  v11EnergyRecordAnnualAmount,
   v11RecordScopeType,
   type V11EnergyRecord,
   type V11OperationMetric,
@@ -77,9 +78,7 @@ export function listIntensityObjects(objectType: IntensityObjectType): Intensity
 }
 
 function annualEnergyAmount(record: V11EnergyRecord) {
-  return record.entryMode === 'monthly'
-    ? record.monthlyAmounts.reduce((sum, value) => sum + value, 0)
-    : record.annualAmount;
+  return v11EnergyRecordAnnualAmount(record);
 }
 
 function annualOperationAmount(record: V11OperationMetric) {

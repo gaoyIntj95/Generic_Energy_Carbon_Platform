@@ -37,7 +37,7 @@ const iconNames: Record<string, string> = {
   能源平衡与优化: 'balance',
   用能分析与策略推荐: 'analysis',
   用能与碳排放预算管理: 'budget',
-  碳资产管理: 'database',
+  碳资产管理: 'assetManagement',
   用能单元: 'units',
   能源品种: 'energyType',
   能源数据: 'energyData',
@@ -66,6 +66,7 @@ function MenuIcon({ name }: { name: string }) {
       {type === 'analysis' && <><path d="M4 19l5-6 4 3 7-10" /><path d="M15 6h5v5" /></>}
       {type === 'budget' && <><path d="M6 3h12v18H6zM9 8h6M9 12h6M9 16h3" /><path d="M16 15l3 3" /></>}
       {type === 'database' && <><ellipse cx="12" cy="6" rx="7" ry="3" /><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" /></>}
+      {type === 'assetManagement' && <><path d="M4 7h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" /><path d="M4 7V5a2 2 0 0 1 2-2h10" /><path d="M15 11h5v6h-5a3 3 0 0 1 0-6z" /><circle cx="16" cy="14" r=".8" /></>}
       {type === 'units' && <><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></>}
       {type === 'energyType' && <><path d="M13 2L5 14h7l-1 8 8-12h-7z" /></>}
       {type === 'energyData' && <><path d="M4 19V9m5 10V5m5 14v-7m5 7V3" /><path d="M3 21h18" /></>}
