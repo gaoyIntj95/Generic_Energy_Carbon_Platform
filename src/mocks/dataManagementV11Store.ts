@@ -1,6 +1,7 @@
 import { listEnergyUnits } from './energyUnitMockStore';
 import { countBenchmarkTargets, resetBenchmarkTargetStore } from './benchmarkTargetStore';
 import { resetProductMasterStore } from './productMasterStore';
+import { resetDeviceIntensityParameters } from './deviceIntensityParameterStore';
 
 export type AnalysisCategory =
   | '电力'
@@ -159,6 +160,10 @@ const seedConversionOutputs: V11ConversionOutput[] = [
 
 const seedOperations: V11OperationMetric[] = [
   { operationMetricId: 'v11-operation-50', metricCode: 'industrial_added_value', productId: null, year: 2026, scopeLevel: '企业', energyUnitId: null, metricCategory: '经济指标', aggregationMethod: '年度单值', metricName: '工业增加值', metricUnit: '万元', entryMode: 'annual', annualValue: 56000, monthlyValues: [] },
+  { operationMetricId: 'v11-operation-55', metricCode: 'product_output', productId: null, year: 2026, scopeLevel: '企业', energyUnitId: null, metricCategory: '产量', aggregationMethod: '月度求和', metricName: '企业产品产量', metricUnit: 't', entryMode: 'monthly', annualValue: 0, monthlyValues: [22500,21800,23200,23800,24500,24900,25200,25100,24700,24400,25000,26000] },
+  { operationMetricId: 'v11-operation-product-a-enterprise', metricCode: 'product_output', productId: 'product-a', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-clinker-line-1', metricCategory: '产量', aggregationMethod: '年度单值', metricName: '产品产量', metricUnit: 't', entryMode: 'annual', annualValue: 956700, monthlyValues: [] },
+  { operationMetricId: 'v11-operation-56', metricCode: 'industrial_output_value', productId: null, year: 2026, scopeLevel: '企业', energyUnitId: null, metricCategory: '经济指标', aggregationMethod: '年度单值', metricName: '工业总产值', metricUnit: '万元', entryMode: 'annual', annualValue: 286000, monthlyValues: [] },
+  { operationMetricId: 'v11-operation-57', metricCode: 'operating_revenue', productId: null, year: 2026, scopeLevel: '企业', energyUnitId: null, metricCategory: '经济指标', aggregationMethod: '年度单值', metricName: '营业收入', metricUnit: '万元', entryMode: 'annual', annualValue: 312000, monthlyValues: [] },
   { operationMetricId: 'v11-operation-51', metricCode: 'product_output', productId: 'product-a', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-clinker-line-1', metricCategory: '产量', aggregationMethod: '月度求和', metricName: '产品产量', metricUnit: 't', entryMode: 'monthly', annualValue: 0, monthlyValues: [76000,73500,78000,79200,80500,81200,82000,81600,80400,79800,81000,83500] },
   { operationMetricId: 'v11-operation-52', metricCode: 'product_output', productId: 'product-b', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-cement-grinding-line', metricCategory: '产量', aggregationMethod: '月度求和', metricName: '产品产量', metricUnit: 't', entryMode: 'monthly', annualValue: 0, monthlyValues: [91000,89500,92500,94000,95800,97000,98200,97800,96500,95200,97000,100000] },
   { operationMetricId: 'v11-operation-53', metricCode: 'product_output', productId: 'product-b', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-clinker-line-1', metricCategory: '产量', aggregationMethod: '月度求和', metricName: '产品产量', metricUnit: 't', entryMode: 'monthly', annualValue: 0, monthlyValues: [30000,28500,31000,31500,32000,32500,33000,32800,32200,31800,32500,33800] },
@@ -433,5 +438,6 @@ export function resetDataManagementV11Store() {
   devices = seedDevices.map((item) => ({ ...item }));
   sequence = 100;
   resetProductMasterStore();
+  resetDeviceIntensityParameters();
   resetBenchmarkTargetStore();
 }

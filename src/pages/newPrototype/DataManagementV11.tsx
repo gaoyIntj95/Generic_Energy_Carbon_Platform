@@ -215,15 +215,20 @@ function EnergyQuantityPage() {
   const { search } = useLocation();
   const params = new URLSearchParams(search);
   const linkedDeviceId = params.get('deviceId') ?? '';
+  const linkedEnergyTypeId = params.get('energyTypeId') ?? '';
+  const linkedRecordId = params.get('recordId') ?? '';
   const deviceEntry = params.get('scope') === 'device';
   const [version, setVersion] = useState(0);
   const [level, setLevel] = useState<'全部层级' | EnergyScopeView>(deviceEntry ? '重点设备' : '全部层级');
-  const [year, setYear] = useState('2026');
+  const [year, setYear] = useState(params.get('year') ?? '2026');
   const [category, setCategory] = useState('');
-  const [keyword, setKeyword] = useState('');
-  const [appliedFilters, setAppliedFilters] = useState({ year: '2026', category: '', keyword: '' });
+  const [keyword, setKeyword] = useState(params.get('keyword') ?? '');
+  const [appliedFilters, setAppliedFilters] = useState({ year: params.get('year') ?? '2026', category: '', keyword: params.get('keyword') ?? '', energyTypeId: linkedEnergyTypeId });
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [editing, setEditing] = useState<V11EnergyRecord | 'new' | null>(deviceEntry && params.get('new') === '1' ? 'new' : null);
+  const [editing, setEditing] = useState<V11EnergyRecord | 'new' | null>(() => {
+    if (linkedRecordId) return listV11EnergyRecords().find((record) => record.energyRecordId === linkedRecordId) ?? null;
+    return deviceEntry && params.get('new') === '1' ? 'new' : null;
+  });
   const [deleting, setDeleting] = useState<V11EnergyRecord | null>(null);
   const types = listV11EnergyTypes();
   const devices = listV11KeyDevices();
@@ -247,6 +252,7 @@ function EnergyQuantityPage() {
         ? v11RecordScopeType(item) === 'device'
         : v11RecordScopeType(item) !== 'device' && item.scopeLevel === level)
     && (!linkedDeviceId || level !== '重点设备' || item.scopeId === linkedDeviceId)
+    && (!appliedFilters.energyTypeId || item.energyTypeId === appliedFilters.energyTypeId)
     && (!appliedFilters.category || types.find((type) => type.energyTypeId === item.energyTypeId)?.analysisCategory === appliedFilters.category)
     && (!appliedFilters.keyword || `${v11RecordScopeType(item) === 'device' ? devices.find((device) => device.deviceId === item.scopeId)?.deviceName ?? '' : v11ScopeName(item.energyUnitId)}${types.find((type) => type.energyTypeId === item.energyTypeId)?.energyTypeName ?? ''}`.includes(appliedFilters.keyword)))
     .sort((left, right) => {
@@ -266,6 +272,7 @@ function EnergyQuantityPage() {
   const countForLevel = (value: '全部层级' | EnergyScopeView) => records.filter((item) =>
     item.energyRole === '能源消费'
     && item.year === Number(appliedFilters.year)
+    && (!appliedFilters.energyTypeId || item.energyTypeId === appliedFilters.energyTypeId)
     && (!appliedFilters.category || types.find((type) => type.energyTypeId === item.energyTypeId)?.analysisCategory === appliedFilters.category)
     && (!appliedFilters.keyword || `${v11RecordScopeType(item) === 'device' ? devices.find((device) => device.deviceId === item.scopeId)?.deviceName ?? '' : v11ScopeName(item.energyUnitId)}${types.find((type) => type.energyTypeId === item.energyTypeId)?.energyTypeName ?? ''}`.includes(appliedFilters.keyword))
     && (value === '全部层级'
@@ -276,7 +283,7 @@ function EnergyQuantityPage() {
   return <Page toast={toast}>
     <section className={styles.card}>
       <EnergyDataTabs active="quantity" />
-      <Toolbar actions={<><Button primary onClick={() => setAppliedFilters({ year, category, keyword })}>查询</Button><Button onClick={() => { setYear('2026'); setCategory(''); setKeyword(''); setLevel(deviceEntry ? '重点设备' : '全部层级'); setAppliedFilters({ year: '2026', category: '', keyword: '' }); }}>重置</Button>{level === '全部层级' ? <span className={styles.entryHint}>请切换至具体层级页签后录入</span> : <Button primary onClick={() => setEditing('new')}>＋ 新增能源数据</Button>}</>}>
+      <Toolbar actions={<><Button primary onClick={() => setAppliedFilters({ year, category, keyword, energyTypeId: linkedEnergyTypeId })}>查询</Button><Button onClick={() => { setYear('2026'); setCategory(''); setKeyword(''); setLevel(deviceEntry ? '重点设备' : '全部层级'); setAppliedFilters({ year: '2026', category: '', keyword: '', energyTypeId: linkedEnergyTypeId }); }}>重置</Button>{level === '全部层级' ? <span className={styles.entryHint}>请切换至具体层级页签后录入</span> : <Button primary onClick={() => setEditing('new')}>＋ 新增能源数据</Button>}</>}>
         <Field label="年度"><select value={year} onChange={(event) => setYear(event.target.value)}><option>2026</option><option>2025</option></select></Field>
         <Field label="能源分析类别"><select value={category} onChange={(event) => setCategory(event.target.value)}><option value="">全部</option>{categories.map((item) => <option key={item}>{item}</option>)}</select></Field>
         <Field label="关键字"><input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder={level === '重点设备' ? '重点设备 / 能源品种' : '用能单元 / 能源品种'} /></Field>
@@ -684,12 +691,14 @@ function ConversionOutputDialog({ item, onClose, onEditExisting, onSaved }: { it
 }
 
 function OperationsPage() {
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
   const { toast, notify } = useNotice();
   const [version, setVersion] = useState(0);
-  const [yearInput, setYearInput] = useState('2026');
+  const [yearInput, setYearInput] = useState(params.get('year') ?? '2026');
   const [categoryInput, setCategoryInput] = useState('');
-  const [keywordInput, setKeywordInput] = useState('');
-  const [filters, setFilters] = useState({ year: '2026', category: '', keyword: '' });
+  const [keywordInput, setKeywordInput] = useState(params.get('keyword') ?? '');
+  const [filters, setFilters] = useState({ year: params.get('year') ?? '2026', category: '', keyword: params.get('keyword') ?? '' });
   const [level, setLevel] = useState<OperationScopeView>('全部层级');
   const [newScopeLevel, setNewScopeLevel] = useState<ScopeLevel | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);

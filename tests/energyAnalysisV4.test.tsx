@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { resetDataManagementV11Store, saveV11EnergyRecord } from '../src/mocks/dataManagementV11Store';
 import { buildBenchmarkDataset } from '../src/mocks/energyBenchmarkSelector';
+import { buildIntensityCalculationView } from '../src/mocks/energyIntensitySelector';
 import { getBenchmarkTarget } from '../src/mocks/benchmarkTargetStore';
 import { buildFlowAnalysisDataset } from '../src/mocks/energyFlowSelector';
 import { getProduct, saveProduct, updateProductAllocation } from '../src/mocks/productMasterStore';
@@ -67,6 +68,7 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     await click(button('查询'));
     expect(container.textContent).toContain('综合能耗｜生产车间A');
     expect(container.textContent).toContain('5,160');
+    expect([...container.querySelectorAll('button')].filter((item) => item.textContent?.includes('导出明细台账'))).toHaveLength(1);
 
     await click(button('查看明细'));
     const dialog = container.querySelector('[role="dialog"]')!;
@@ -103,20 +105,23 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(container.textContent).toContain('指标计算条件');
     expect(container.textContent).toContain('全厂（2026年）');
     expect(container.textContent).toContain('全厂已生成 4 项指标');
-    expect(container.textContent).not.toContain('可计算');
+    expect(container.textContent).toContain('单位产品综合能耗');
+    expect(container.textContent).toContain('单位产值综合能耗');
+    expect(container.textContent).toContain('单位营业收入电耗');
     expect(container.textContent).not.toContain('导出明细台账');
 
-    await setSelect(container.querySelector('select[aria-label="分析对象"]')!, 'production');
-    expect(container.textContent).toContain('具体对象');
+    await click(button('用能单元'));
+    await setSelect(container.querySelector('select[aria-label="用能单元层级"]')!, 'level1');
     const productionObjectSelect = container.querySelector(
-      'select[aria-label="具体对象"]',
+      'select[aria-label="具体分析对象"]',
     ) as HTMLSelectElement;
     expect([...productionObjectSelect.options].map((option) => option.textContent)).toEqual([
+      '全部用能单元',
       '生产车间A',
       '生产车间B',
+      '动力中心',
     ]);
-    expect(productionObjectSelect.textContent).not.toContain('1号熟料生产线');
-    expect(productionObjectSelect.textContent).not.toContain('水泥粉磨线');
+    await setSelect(productionObjectSelect, 'eu-clinker-line-1');
     await click(button('查询'));
 
     expect(container.textContent).toContain('生产车间A（2026年）');
@@ -145,8 +150,9 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
 
   it('shows object-specific utility calculation requirements instead of generic scope results', async () => {
     await render('/energy-analysis/intensity');
-    await setSelect(container.querySelector('select[aria-label="分析对象"]')!, 'utility');
-    const objectSelect = container.querySelector('select[aria-label="具体对象"]')!;
+    await click(button('用能单元'));
+    await setSelect(container.querySelector('select[aria-label="用能单元层级"]')!, 'level2');
+    const objectSelect = container.querySelector('select[aria-label="具体分析对象"]')!;
     expect(objectSelect.textContent).toContain('空压系统');
     expect(objectSelect.textContent).toContain('锅炉系统');
     expect(objectSelect.textContent).toContain('能源回收系统');
@@ -158,6 +164,24 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(container.textContent).toContain('未匹配到当前对象的运营数据');
     expect(container.textContent).toContain('缺少蒸汽产量');
     expect(container.textContent).toContain('单位蒸汽综合能耗');
+  });
+
+  it('switches intensity results across product and device objects', async () => {
+    await render('/energy-analysis/intensity');
+
+    await click(button('产品'));
+    const productSelect = container.querySelector('select[aria-label="具体分析对象"]') as HTMLSelectElement;
+    expect(productSelect.options.length).toBeGreaterThan(1);
+    await click(button('查询'));
+    expect(container.textContent).toContain('单位产品综合能耗');
+    expect(container.textContent).toContain('单位产品电耗');
+
+    await click(button('设备'));
+    const deviceSelect = container.querySelector('select[aria-label="具体分析对象"]') as HTMLSelectElement;
+    expect(deviceSelect.options.length).toBeGreaterThan(1);
+    await click(button('查询'));
+    expect(container.textContent).toContain('设备年度总能耗');
+    expect(container.textContent).toContain('单位运行时长能耗');
   });
 
   it('closes benchmark data through units, products, devices and shared energy records', async () => {
@@ -227,6 +251,28 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     await setInput(target, '0.330');
     await click(button('保存配置'));
     expect(container.querySelector('[aria-label="指标摘要"]')?.textContent).toContain('目标值0.330tce/万元');
+  });
+
+  it('reuses intensity actual values in benchmark rows', () => {
+    const intensity = buildIntensityCalculationView(2026, 'factory', 'factory');
+    const benchmark = buildBenchmarkDataset(2026);
+    expect(benchmark.rows.filter((row) => row.objectTypeKey === 'enterprise').length).toBeGreaterThan(0);
+    expect(benchmark.rows.filter((row) => row.objectTypeKey !== 'enterprise').length).toBeGreaterThan(0);
+    const pairs = [
+      ['单位产品综合能耗', 'energy_per_product'],
+      ['单位增加值综合能耗', 'energy_per_added_value'],
+    ] as const;
+
+    pairs.forEach(([metricName, metricCode]) => {
+      const source = intensity.metrics.find((metric) => metric.name === metricName);
+      const target = benchmark.rows.find((row) => row.objectTypeKey === 'enterprise' && row.metricCode === metricCode);
+      expect(source?.value).not.toBeNull();
+      expect(target?.actual).toBe(source?.value);
+      expect(target?.energyRecordIds).toEqual(source?.energyRecordIds);
+      expect(target?.operationMetricIds).toEqual(source?.operationMetricIds);
+      expect([0, 12]).toContain(target?.trend.length);
+      expect(target?.trend.every((value) => Number.isFinite(value))).toBe(true);
+    });
   });
 
   it('aggregates multi-unit product energy with explicit allocation and blocks invalid shared-line ratios', () => {

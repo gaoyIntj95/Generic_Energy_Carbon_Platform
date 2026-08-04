@@ -31,7 +31,7 @@ const iconNames: Record<string, string> = {
   碳排放报告: 'report',
   碳足迹核算: 'footprint',
   能耗查询: 'preview',
-  能耗强度指标: 'analysis',
+  能耗指标: 'analysis',
   能效对标: 'balance',
   能流分析: 'energyData',
   能源平衡与优化: 'balance',

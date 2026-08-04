@@ -179,6 +179,15 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(dialog?.textContent).not.toContain('数据角色');
   });
 
+  it('opens an existing device energy record directly in the edit dialog', async () => {
+    await render('/data-management/energy-data?scope=device&deviceId=v11-device-79&year=2026&energyTypeId=v11-energy-electricity&recordId=v11-er-device-79');
+
+    expect(container.textContent).toContain('编辑能源数据');
+    const dialog = [...container.querySelectorAll('form')].find((form) => form.textContent?.includes('编辑能源数据'));
+    expect(dialog).toBeDefined();
+    expect((dialog?.querySelector('[aria-label="归属对象类型"]') as HTMLInputElement).value).toBe('重点设备');
+  });
+
   it('keeps device energy, targets and renames linked by stable device id', () => {
     const enterpriseBefore = buildBenchmarkDataset(2026).rows.find((row) =>
       row.objectTypeKey === 'enterprise')?.actual;
@@ -398,7 +407,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
 
   it('keeps product output as a product dimension linked by stable productId', async () => {
     const products = listProducts();
-    const productOutputs = listV11OperationMetrics().filter((record) => record.metricCode === 'product_output');
+    const productOutputs = listV11OperationMetrics().filter((record) => record.metricCode === 'product_output' && record.productId !== null);
 
     expect(products.map((product) => product.productName)).toEqual(['产品A', '产品B', '产品C']);
     expect(productOutputs.every((record) => record.metricName === '产品产量')).toBe(true);

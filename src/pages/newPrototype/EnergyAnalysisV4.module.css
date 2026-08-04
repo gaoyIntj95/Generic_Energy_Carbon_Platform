@@ -106,6 +106,13 @@
   border-color: var(--brand);
 }
 
+.button:disabled {
+  color: #9aa5b1;
+  background: #f7f9fa;
+  border-color: #dfe5ea;
+  cursor: not-allowed;
+}
+
 .buttonPrimary {
   color: #fff;
   background: var(--brand);
@@ -441,6 +448,14 @@
   box-shadow: 0 7px 20px rgb(25 54 70 / 7%);
 }
 
+.treeBranch {
+  display: inline-block;
+  min-width: 22px;
+  margin-right: 4px;
+  color: var(--brand);
+  font-weight: 700;
+}
+
 .tableToolbar {
   display: flex;
   align-items: flex-start;
@@ -641,11 +656,11 @@
 
 .benchmarkBasisStrip {
   display: flex;
-  min-height: 68px;
+  min-height: 48px;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 11px 16px;
+  padding: 8px 12px;
   background: #f7fbf9;
   border: 1px solid #dce9e3;
   border-radius: 9px;
@@ -794,6 +809,7 @@
 }
 
 .benchmarkFacts {
+  display: none;
   margin: 14px 0 0;
 }
 
@@ -851,6 +867,46 @@
   margin-top: 3px;
 }
 
+.benchmarkCompactBasis {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 9px 10px;
+  background: #f8fbfa;
+  border: 1px solid #e0ebe6;
+  border-radius: 7px;
+}
+
+.benchmarkCompactBasis > div {
+  min-width: 0;
+}
+
+.benchmarkCompactBasis span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.benchmarkCompactBasis strong {
+  display: block;
+  max-width: 100%;
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.benchmarkCompactBasis :global(button) {
+  flex: none;
+  padding: 5px 8px;
+  font-size: 11px;
+}
+
 .emptyState {
   padding: 56px 20px;
   color: var(--muted);
@@ -867,6 +923,16 @@
 .emptyState span,
 .emptyState small {
   display: block;
+}
+
+.modalSection + .modalSection {
+  margin-top: 18px;
+}
+
+.modalSection h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: #1f2937;
 }
 
 .emptyState small {
@@ -1868,6 +1934,12 @@
 
 .formulaBox strong {
   color: var(--text);
+}
+
+.modalSourceActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
 }
 
 .modalForm {

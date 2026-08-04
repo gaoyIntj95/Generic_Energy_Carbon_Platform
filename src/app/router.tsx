@@ -23,7 +23,7 @@ const dataManagementItems: NavItem[] = [
 
 const energyAnalysisItems: NavItem[] = [
   { label: '能耗查询', path: '/energy-analysis/consumption-query', description: '查询和分析能源消费数据，掌握能耗趋势与能源结构。' },
-  { label: '能耗强度指标', path: '/energy-analysis/intensity', description: '基于能源消费数据与运营数据自动计算能耗强度指标，支持查看指标结果及数据来源。' },
+  { label: '能耗指标', path: '/energy-analysis/intensity', description: '基于能源消费数据、产品产量及经济指标自动计算典型能耗指标，支持查看结果、计算口径及数据来源。' },
   { label: '能效对标', path: '/energy-analysis/benchmarking', description: '将实际能效指标与目标值进行对比，识别未达标对象，支撑节能管理。' },
   { label: '能流分析', path: '/energy-analysis/flow-analysis', description: '通过桑基图、能源平衡表和流向明细，分析企业能源输入、转换及一级分配。' },
 ];
