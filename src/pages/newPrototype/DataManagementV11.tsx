@@ -50,7 +50,7 @@ type EnergyScopeView = ScopeLevel | '重点设备';
 const levels: Array<'全部层级' | EnergyScopeView> = ['全部层级', '企业', '一级用能单元', '二级用能单元', '重点设备'];
 type OperationScopeView = ScopeLevel | '全部层级';
 const operationLevels: OperationScopeView[] = ['全部层级', '企业', '一级用能单元', '二级用能单元'];
-const deviceTypePresets = ['动力设备', '泵类', '风机', '空压设备', '制冷/空调设备', '加热/锅炉设备', '输送设备', '加工设备', '表面处理设备', '检测设备', '其他（自定义）'];
+const deviceTypePresets = ['能源转换设备', '动力设备', '泵类', '风机', '空压设备', '制冷/空调设备', '加热/锅炉设备', '输送设备', '加工设备', '表面处理设备', '检测设备', '其他（自定义）'];
 const metricPresets = {
   产量: [
     ['产品产量', 't'],
@@ -88,6 +88,7 @@ function energyDataProgress(record: V11EnergyRecord) {
   if (count < 12) return record.annualAmount > 0 ? `${count}/12月｜年度已补录` : `${count}/12月｜年度待完善`;
   return '12/12月';
 }
+const PAGE_SIZE = 10;
 function format(value: number, digits = 0) {
   return value.toLocaleString('zh-CN', { maximumFractionDigits: digits });
 }
@@ -111,8 +112,15 @@ function Toolbar({ children, actions }: { children: ReactNode; actions: ReactNod
 function Notice({ children }: { children: ReactNode }) {
   return <div className={styles.notice}>{children}</div>;
 }
-function Pagination({ count }: { count: number }) {
-  return <div className={styles.pagination}><span>共 {count} 条</span><span className={styles.pageDot}>1</span></div>;
+function Pagination({ count, currentPage = 1, onPageChange }: { count: number; currentPage?: number; onPageChange?: (page: number) => void }) {
+  const pageCount = Math.max(1, Math.ceil(count / PAGE_SIZE));
+  const canChange = !!onPageChange && pageCount > 1;
+  return <div className={styles.pagination}>
+    <span>共 {count} 条</span>
+    {canChange && <button type="button" disabled={currentPage === 1} onClick={() => onPageChange?.(currentPage - 1)}>上一页</button>}
+    {canChange && <span>{currentPage} / {pageCount}</span>}
+    <button type="button" className={styles.pageDot} disabled={!canChange || currentPage === pageCount} onClick={() => onPageChange?.(currentPage + 1)}>{canChange ? '下一页' : '1'}</button>
+  </div>;
 }
 function EmptyRow({ colSpan }: { colSpan: number }) {
   return <tr><td className={styles.empty} colSpan={colSpan}>暂无匹配数据</td></tr>;
@@ -220,6 +228,7 @@ function EnergyQuantityPage() {
   const deviceEntry = params.get('scope') === 'device';
   const [version, setVersion] = useState(0);
   const [level, setLevel] = useState<'全部层级' | EnergyScopeView>(deviceEntry ? '重点设备' : '全部层级');
+  const [currentPage, setCurrentPage] = useState(1);
   const [year, setYear] = useState(params.get('year') ?? '2026');
   const [category, setCategory] = useState('');
   const [keyword, setKeyword] = useState(params.get('keyword') ?? '');
@@ -268,6 +277,10 @@ function EnergyQuantityPage() {
       if (scope) return scope;
       return (energyTypeOrder.get(left.energyTypeId) ?? 999) - (energyTypeOrder.get(right.energyTypeId) ?? 999);
     });
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, pageCount);
+  const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  useEffect(() => { setCurrentPage(1); }, [appliedFilters, level]);
   void version;
   const countForLevel = (value: '全部层级' | EnergyScopeView) => records.filter((item) =>
     item.energyRole === '能源消费'
@@ -293,7 +306,7 @@ function EnergyQuantityPage() {
         ? <><strong>重点设备能源数据：</strong>设备数据用于设备用能分析和能效对标，是所属用能单元能源量的明细拆分，不重复增加企业或用能单元总能耗。</>
         : <><strong>能源量数据：</strong>企业级记录用于边界总量控制，一级和二级用能单元按实际计量条件分别录入。系统依据归属层级自动识别能源输入、分配和利用阶段；回收、产出及外供不在此处重复维护。</>}</Notice>
       {level === '重点设备' ? <div className={styles.tableWrap}><table className={styles.wideTable}><thead><tr><th>重点设备</th><th>所属用能单元</th><th>设备类型</th><th>能源分析类别</th><th>能源品种</th><th>数据进度</th><th>年度合计</th><th>操作</th></tr></thead>
-        <tbody>{rows.length ? rows.flatMap((row) => {
+        <tbody>{pageRows.length ? pageRows.flatMap((row) => {
           const type = types.find((item) => item.energyTypeId === row.energyTypeId);
           const device = devices.find((item) => item.deviceId === row.scopeId);
           const total = annual(row.monthlyAmounts, row.annualAmount);
@@ -302,7 +315,7 @@ function EnergyQuantityPage() {
           detail && <tr className={styles.detailRow} key={`${row.energyRecordId}-detail`}><td colSpan={8}><MonthDetail values={row.monthlyAmounts} reported={reportedMonths(row)} annualValue={total} annualSupplemented={row.annualAmount > 0} unit={type?.measurementUnit ?? ''} /></td></tr>];
         }) : <EmptyRow colSpan={8} />}</tbody>
       </table></div> : <div className={styles.tableWrap}><table className={styles.wideTable}><thead><tr><th>归属范围</th><th>归属层级</th><th>能流阶段</th><th>能源分析类别</th><th>能源品种</th><th>单位</th><th>数据进度</th><th>年度合计</th><th>操作</th></tr></thead>
-        <tbody>{rows.length ? rows.flatMap((row, index) => {
+        <tbody>{pageRows.length ? pageRows.flatMap((row, index) => {
           const type = types.find((item) => item.energyTypeId === row.energyTypeId);
           const scopeType = v11RecordScopeType(row);
           const unit = row.energyUnitId ? unitById.get(row.energyUnitId) : null;
@@ -311,7 +324,7 @@ function EnergyQuantityPage() {
           const scopeLevel = scopeType === 'device' ? '重点设备' : row.scopeLevel;
           const depth = scopeType === 'enterprise' ? 0 : scopeType === 'device' ? (unit?.unitLevel === 'level1' ? 2 : 3) : unit?.unitLevel === 'level1' ? 1 : 2;
           const currentScopeKey = scopeType === 'device' ? `device:${row.scopeId}` : `${scopeType}:${row.energyUnitId ?? 'enterprise'}`;
-          const previous = rows[index - 1];
+          const previous = pageRows[index - 1];
           const previousScopeType = previous ? v11RecordScopeType(previous) : null;
           const previousScopeKey = previous
             ? previousScopeType === 'device' ? `device:${previous.scopeId}` : `${previousScopeType}:${previous.energyUnitId ?? 'enterprise'}`
@@ -322,7 +335,7 @@ function EnergyQuantityPage() {
           detail && <tr className={styles.detailRow} key={`${row.energyRecordId}-detail`}><td colSpan={9}><MonthDetail values={row.monthlyAmounts} reported={reportedMonths(row)} annualValue={total} annualSupplemented={row.annualAmount > 0} unit={type?.measurementUnit ?? ''} /></td></tr>];
         }) : <EmptyRow colSpan={9} />}</tbody>
       </table></div>}
-      <Pagination count={rows.length} />
+      <Pagination count={rows.length} currentPage={safePage} onPageChange={setCurrentPage} />
     </section>
     {editing && <EnergyRecordDialog item={editing === 'new' ? undefined : editing} dataYear={Number(appliedFilters.year)} lockedScopeLevel={editing === 'new' && level !== '全部层级' ? level : undefined} initialDeviceId={linkedDeviceId} onClose={() => setEditing(null)} onSaved={(message) => { setEditing(null); setVersion((value) => value + 1); notify(message); }} />}
     {deleting && <Modal title="删除能源数据" width={520} submitText="确认删除" onClose={() => setDeleting(null)} onSubmit={() => {
@@ -497,6 +510,15 @@ function conversionBalance(item: V11ConversionOutput) {
   return { tone: 'green' as const, text: '已平衡' };
 }
 
+function monthlyConversionText(values?: number[]) {
+  return values?.length === 12 ? values.join(',') : '';
+}
+
+function parseMonthlyConversionText(value: string) {
+  if (!value.trim()) return undefined;
+  return value.split(/[,，\s]+/).filter(Boolean).map(Number);
+}
+
 function conversionInputText(item: V11ConversionOutput, records: V11EnergyRecord[], types: V11EnergyType[]) {
   if (item.recordType === '自发电') return { main: '—', sub: '无燃料投入' };
   if (item.inputMode === 'linked' || item.inputMode === 'direct') {
@@ -586,6 +608,10 @@ function ConversionOutputDialog({ item, onClose, onEditExisting, onSaved }: { it
   const [outputAmount, setOutputAmount] = useState(String(item?.outputAmount ?? 0));
   const [internalAmount, setInternalAmount] = useState(String(item?.internalAmount ?? 0));
   const [externalAmount, setExternalAmount] = useState(String(item?.externalAmount ?? 0));
+  const [monthlyInputAmounts, setMonthlyInputAmounts] = useState(monthlyConversionText(item?.monthlyInputAmounts));
+  const [monthlyOutputAmounts, setMonthlyOutputAmounts] = useState(monthlyConversionText(item?.monthlyOutputAmounts));
+  const [monthlyInternalAmounts, setMonthlyInternalAmounts] = useState(monthlyConversionText(item?.monthlyInternalAmounts));
+  const [monthlyExternalAmounts, setMonthlyExternalAmounts] = useState(monthlyConversionText(item?.monthlyExternalAmounts));
   const [receiver, setReceiver] = useState(item?.receiver ?? '');
   const [remark, setRemark] = useState(item?.remark ?? '');
   const [error, setError] = useState('');
@@ -651,6 +677,13 @@ function ConversionOutputDialog({ item, onClose, onEditExisting, onSaved }: { it
     if (hasOverAllocated) return setError('内部使用量与外供量不能大于产出总量。');
     if ((recordType === '锅炉产汽/产热' || recordType === '其他转换') && !inputRecordId) return setError('当前系统暂无可关联的能源数据，请先补录后再保存。');
     const outputType = types.find((type) => type.energyTypeName === outputEnergyName && type.analysisCategory === outputCategory);
+    const monthlyInput = parseMonthlyConversionText(monthlyInputAmounts);
+    const monthlyOutput = parseMonthlyConversionText(monthlyOutputAmounts);
+    const monthlyInternal = parseMonthlyConversionText(monthlyInternalAmounts);
+    const monthlyExternal = parseMonthlyConversionText(monthlyExternalAmounts);
+    if ([monthlyInput, monthlyOutput, monthlyInternal, monthlyExternal].some((values) => values && values.length !== 12)) {
+      return setError('月度数据请按1月至12月填写12个数值，多个数值用逗号分隔。');
+    }
     const result = saveV11ConversionOutput({
       year: Number(year), recordType, conversionEnergyUnitId: unitId, inputMode,
       inputEnergyRecordId: inputMode === 'linked' ? inputRecordId : undefined,
@@ -660,6 +693,7 @@ function ConversionOutputDialog({ item, onClose, onEditExisting, onSaved }: { it
       recoveryUnit: inputMode === 'recovery' ? recoveryUnit : undefined,
       outputAnalysisCategory: outputCategory, outputEnergyTypeId: outputType?.energyTypeId, outputEnergyName, outputUnit,
       outputAmount: outputValue, internalAmount: internalValue, externalAmount: externalValue, lossAmount: Math.max(unallocatedAmount, 0), remark,
+      monthlyInputAmounts: monthlyInput, monthlyOutputAmounts: monthlyOutput, monthlyInternalAmounts: monthlyInternal, monthlyExternalAmounts: monthlyExternal,
     }, item?.conversionOutputId);
     if (!result.ok) return setError(result.error);
     onSaved(item ? '能源转换/输出记录已更新' : '能源转换/输出记录已新增');
@@ -683,6 +717,7 @@ function ConversionOutputDialog({ item, onClose, onEditExisting, onSaved }: { it
       </div></div>}
       {(recordType === '余热发电' || recordType === '回收利用') && <div className={styles.conversionFormSection}><h3>回收信息</h3><div className={styles.conversionFormBody}><div className={styles.compactGrid}><Field label="回收能源/介质" required><select value={recoveryEnergy} onChange={(event) => { setRecoveryEnergy(event.target.value); setRecoveryUnit(['余热', '压力能'].includes(event.target.value) ? 'GJ' : event.target.value === '可燃尾气' ? 'Nm³' : 't'); }}>{recoveryEnergyOptions.map((value) => <option key={value}>{value}</option>)}</select></Field><Field label="计量单位"><input value={recoveryUnit} readOnly /></Field></div><button type="button" className={styles.advancedToggle} onClick={() => setRecoveryTraceVisible((value) => !value)}>{recoveryTraceVisible ? '收起补充追溯信息' : '补充来源追溯信息（选填）'}</button>{recoveryTraceVisible && <div className={`${styles.compactGrid} ${styles.advancedBody}`}><Field label="回收来源单元"><select value={recoverySourceId} onChange={(event) => setRecoverySourceId(event.target.value)}><option value="">请选择（选填）</option>{units.map((unit) => <option key={unit.energyUnitId} value={unit.energyUnitId}>{unit.energyUnitName}</option>)}</select></Field><Field label="回收来源量"><input type="number" min="0" value={recoveryAmount} onChange={(event) => setRecoveryAmount(event.target.value)} placeholder="未计量可留空" /></Field></div>}<div className={styles.helpText}>{recordType === '余热发电' ? '未计量余热量时，可直接填写发电量。' : '来源单元仅用于补充追溯，不影响回收量录入。'}</div></div></div>}
       <div className={styles.conversionFormSection}><h3>{recordType === '回收利用' ? '回收量与去向' : '产出能源与去向'}</h3><div className={`${styles.compactGrid} ${styles.conversionFormBody}`}>{recordType === '其他转换' ? <Field label="能源分析类别" required><select value={outputCategory} onChange={(event) => { const category = event.target.value as AnalysisCategory; const next = types.find((type) => type.analysisCategory === category); setOutputCategory(category); setOutputEnergyName(next?.energyTypeName ?? ''); setOutputUnit(next?.measurementUnit ?? ''); }}>{categories.map((value) => <option key={value}>{value}</option>)}</select></Field> : <Field label="能源分析类别"><input value={outputCategory} readOnly /></Field>}<Field label="能源品种" required>{soleOutputOption ? <input value={soleOutputOption} readOnly /> : <select value={outputEnergyName} onChange={(event) => { const name = event.target.value; const type = types.find((value) => value.energyTypeName === name); setOutputEnergyName(name); setOutputUnit(type?.measurementUnit ?? (name === '回收热水' ? 'GJ' : '')); }}>{outputOptions.map((value) => <option key={value}>{value}</option>)}</select>}</Field><Field label="单位"><input value={outputUnit} readOnly /></Field><Field label={conversionQuantityLabel(recordType, outputEnergyName)} required><input type="number" min="0" value={outputAmount} onChange={(event) => setOutputAmount(event.target.value)} /></Field><Field label="内部使用量" required><input type="number" min="0" value={internalAmount} onChange={(event) => setInternalAmount(event.target.value)} /></Field><Field label="外供量"><input type="number" min="0" value={externalAmount} onChange={(event) => setExternalAmount(event.target.value)} /></Field><div className={`${styles.balanceBox} ${hasOverAllocated ? styles.balanceWarn : ''} ${styles.full}`}><div><strong>{hasOverAllocated ? '去向量超过本次产出量' : unallocatedAmount > 0 ? `待确认差额：${format(unallocatedAmount, 2)} ${outputUnit}` : '本次产出量已全部归属'}</strong><p>{hasOverAllocated ? '请调整内部使用量或外供量。' : '系统按本次产出、内部使用和外供自动计算管理差额，不需要手工录入。'}</p></div><Tag tone={hasOverAllocated ? 'orange' : unallocatedAmount > 0 ? 'orange' : 'green'}>{hasOverAllocated ? '需调整' : unallocatedAmount > 0 ? '待确认' : '已平衡'}</Tag></div></div></div>
+      <div className={styles.conversionFormSection}><h3>月度转换数据（选填）</h3><div className={styles.conversionFormBody}><div className={styles.monthlyHint}>按1月至12月顺序填写，多个数值用逗号分隔；未填写时，关联上游能源记录可按其月度数据计算。</div><div className={styles.compactGrid}><Field label="月度投入量"><input value={monthlyInputAmounts} onChange={(event) => setMonthlyInputAmounts(event.target.value)} placeholder="如：100,120,……" /></Field><Field label="月度产出量"><input value={monthlyOutputAmounts} onChange={(event) => setMonthlyOutputAmounts(event.target.value)} placeholder="如：100,120,……" /></Field><Field label="月度内部使用量"><input value={monthlyInternalAmounts} onChange={(event) => setMonthlyInternalAmounts(event.target.value)} placeholder="如：90,110,……" /></Field><Field label="月度外供量"><input value={monthlyExternalAmounts} onChange={(event) => setMonthlyExternalAmounts(event.target.value)} placeholder="如：10,10,……" /></Field></div></div></div>
       <div className={styles.conversionRemark}><Field label="备注"><textarea value={remark} onChange={(event) => setRemark(event.target.value)} /></Field></div>
     </>}
     {existingRecord && <div className={styles.duplicateRecordNotice}><span>{year} 年度“{recordType}”在“{recordType === '直接外供' ? '企业边界' : v11ScopeName(unitId)}”已维护。请直接编辑已有记录后再调整数据。</span><button type="button" onClick={() => onEditExisting(existingRecord)}>编辑已有记录</button></div>}
@@ -693,16 +728,20 @@ function ConversionOutputDialog({ item, onClose, onEditExisting, onSaved }: { it
 function OperationsPage() {
   const { search } = useLocation();
   const params = new URLSearchParams(search);
+  const requestedScopeLevel = params.get('scopeLevel');
+  const requestedScope = requestedScopeLevel === '一级用能单元' || requestedScopeLevel === '二级用能单元' ? requestedScopeLevel : undefined;
+  const requestedUnitId = params.get('unitId') ?? '';
   const { toast, notify } = useNotice();
   const [version, setVersion] = useState(0);
   const [yearInput, setYearInput] = useState(params.get('year') ?? '2026');
   const [categoryInput, setCategoryInput] = useState('');
   const [keywordInput, setKeywordInput] = useState(params.get('keyword') ?? '');
   const [filters, setFilters] = useState({ year: params.get('year') ?? '2026', category: '', keyword: params.get('keyword') ?? '' });
-  const [level, setLevel] = useState<OperationScopeView>('全部层级');
-  const [newScopeLevel, setNewScopeLevel] = useState<ScopeLevel | null>(null);
+  const [level, setLevel] = useState<OperationScopeView>(requestedScope ?? '全部层级');
+  const [newScopeLevel, setNewScopeLevel] = useState<ScopeLevel | null>(requestedScope ?? null);
+  const [newUnitId, setNewUnitId] = useState(requestedUnitId);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [editing, setEditing] = useState<V11OperationMetric | 'new' | null>(null);
+  const [editing, setEditing] = useState<V11OperationMetric | 'new' | null>(() => params.get('new') === '1' ? 'new' : null);
   const [deleting, setDeleting] = useState<V11OperationMetric | null>(null);
   const products = listProducts();
   const productNames = new Map(products.map((product) => [product.productId, product.productName]));
@@ -727,12 +766,12 @@ function OperationsPage() {
       detail && <tr className={styles.detailRow} key={`${row.operationMetricId}-detail`}><td colSpan={7}><MonthDetail values={row.monthlyValues} annualValue={total} unit={row.metricUnit} /></td></tr>];
     }) : <EmptyRow colSpan={7} />}</tbody></table></div><Pagination count={rows.length} />
   </section>
-  {editing && <OperationDialog item={editing === 'new' ? undefined : editing} dataYear={Number(filters.year)} scopeContext={editing === 'new' ? newScopeLevel ?? undefined : undefined} onClose={() => { setEditing(null); setNewScopeLevel(null); }} onSaved={(message) => { setEditing(null); setNewScopeLevel(null); setVersion((value) => value + 1); notify(message); }} />}
+  {editing && <OperationDialog item={editing === 'new' ? undefined : editing} dataYear={Number(filters.year)} scopeContext={editing === 'new' ? newScopeLevel ?? undefined : undefined} initialUnitId={editing === 'new' ? newUnitId : undefined} onClose={() => { setEditing(null); setNewScopeLevel(null); setNewUnitId(''); }} onSaved={(message) => { setEditing(null); setNewScopeLevel(null); setNewUnitId(''); setVersion((value) => value + 1); notify(message); }} />}
   {deleting && <Modal title="删除运营数据" width={500} submitText="确认删除" onClose={() => setDeleting(null)} onSubmit={() => { deleteV11OperationMetric(deleting.operationMetricId); setDeleting(null); setVersion((value) => value + 1); notify('运营数据已删除，相关分析将按最新数据重新计算'); }}><div className={styles.warning}>确认删除“{deleting.metricName}”数据吗？删除后会影响相关能耗强度、能效对标和分析结果。</div></Modal>}
   </Page>;
 }
 
-function OperationDialog({ item, dataYear, scopeContext, onClose, onSaved }: { item?: V11OperationMetric; dataYear: number; scopeContext?: ScopeLevel; onClose: () => void; onSaved: (message: string) => void }) {
+function OperationDialog({ item, dataYear, scopeContext, initialUnitId, onClose, onSaved }: { item?: V11OperationMetric; dataYear: number; scopeContext?: ScopeLevel; initialUnitId?: string; onClose: () => void; onSaved: (message: string) => void }) {
   const units = listEnergyUnits();
   const products = listProducts();
   const initialUnit = units.find((unit) => unit.energyUnitId === item?.energyUnitId);
@@ -748,7 +787,7 @@ function OperationDialog({ item, dataYear, scopeContext, onClose, onSaved }: { i
   const [newProductCategory, setNewProductCategory] = useState('通用工业产品');
   const [newProductUnit, setNewProductUnit] = useState('t');
   const [scopeLevel, setScopeLevel] = useState<ScopeLevel>(item?.scopeLevel ?? scopeContext ?? '企业');
-  const [unitId, setUnitId] = useState(item ? item.energyUnitId ?? '__enterprise__' : '');
+  const [unitId, setUnitId] = useState(item ? item.energyUnitId ?? '__enterprise__' : initialUnitId ?? '');
   const [parentUnitId, setParentUnitId] = useState(initialUnit?.unitLevel === 'level2' ? initialUnit.parentEnergyUnitId ?? '' : '');
   const [metricUnit, setMetricUnit] = useState(item?.metricUnit ?? '');
   const [values, setValues] = useState<string[]>(item?.monthlyValues.map(String) ?? Array(12).fill(''));

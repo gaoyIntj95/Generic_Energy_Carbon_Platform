@@ -22,10 +22,19 @@ import {
   buildIntensityCalculationView,
   buildIntensityCalculationViews,
   type CalculatedIntensityMetric,
+  type IntensityMonthlyMetric,
+  type IntensityMonthlyDataStatus,
 } from './energyIntensitySelector';
+
+export interface BenchmarkMonthlyMetric {
+  month: number;
+  actual: number | null;
+  status: '已计算' | '数据不完整' | '暂无月度数据';
+}
 
 export interface BenchmarkMetric {
   benchmarkMetricId: string;
+  sourceMetricId?: string;
   metricCode: string;
   objectId: string;
   objectName: string;
@@ -48,12 +57,16 @@ export interface BenchmarkMetric {
   scopeNames: string[];
   energyScopeDescription: string;
   outputScopeDescription: string;
+  numeratorDescription?: string;
+  denominatorDescription?: string;
   allocationDescription: string;
   formulaDescription: string;
   periodDescription: string;
   monthlyTargets?: number[];
   dataCompleteness?: string;
   trendBasisLabel?: string;
+  monthlyMetrics?: BenchmarkMonthlyMetric[];
+  monthlyDataStatus?: IntensityMonthlyDataStatus;
 }
 
 export interface BenchmarkDataset {
@@ -68,6 +81,7 @@ function productSummaryBenchmarkMetric(year: number): BenchmarkMetric {
   const available = metric?.resultType === 'ok';
   return {
     benchmarkMetricId: `benchmark-product-summary-${year}`,
+    sourceMetricId: metric?.intensityMetricId,
     metricCode: 'energy_per_product',
     objectId: 'product-summary',
     objectName: view.object.objectName,
@@ -90,10 +104,18 @@ function productSummaryBenchmarkMetric(year: number): BenchmarkMetric {
     scopeNames: ['企业'],
     energyScopeDescription: '能源数据—企业层级',
     outputScopeDescription: '运营数据—同计量单位产品产量合计',
+    numeratorDescription: metric?.numerator,
+    denominatorDescription: metric?.denominator,
     allocationDescription: '企业级产品能源口径',
     formulaDescription: metric?.formula ?? '企业年度综合能耗 ×1000 ÷ 产品年度产量合计',
     periodDescription: `${year}年度`,
+    monthlyMetrics: metric?.monthlyMetrics?.map(toBenchmarkMonthlyMetric),
+    monthlyDataStatus: metric?.monthlyDataStatus,
   };
+}
+
+function toBenchmarkMonthlyMetric(item: IntensityMonthlyMetric): BenchmarkMonthlyMetric {
+  return { month: item.month, actual: item.value, status: item.status };
 }
 
 function intensityMetricCode(metric: CalculatedIntensityMetric) {
@@ -116,6 +138,7 @@ function intensityBenchmarkMetric(
   const available = metric.resultType === 'ok';
   return {
     benchmarkMetricId: `benchmark-${objectTypeKey}-${view.object.objectId}-${metric.intensityMetricId}`,
+    sourceMetricId: metric.intensityMetricId,
     metricCode,
     objectId: view.object.objectId === 'factory' ? 'enterprise' : view.object.objectId,
     objectName: view.object.objectName,
@@ -132,12 +155,14 @@ function intensityBenchmarkMetric(
     unavailableReason: available ? '' : metric.issue ?? '指标暂不可计算',
     availabilityLabel: available ? '可对标' : '待完善',
     energyUnitId: view.object.energyUnitId,
-    productId: null,
+    productId: objectTypeKey === 'product' ? view.object.objectId : null,
     energyRecordIds: metric.energyRecordIds,
     operationMetricIds: metric.operationMetricIds,
     scopeNames: [view.object.objectName],
     energyScopeDescription: metric.numeratorSource ?? '能源数据',
     outputScopeDescription: metric.denominatorSource ?? '运营数据',
+    numeratorDescription: metric.numerator,
+    denominatorDescription: metric.denominator,
     allocationDescription: metric.allocationDescription ?? '按能耗强度指标口径计算',
     formulaDescription: metric.formula,
     periodDescription: metric.period,
@@ -146,16 +171,28 @@ function intensityBenchmarkMetric(
       : metric.trendBasis === 'actual-monthly'
         ? '真实月度能源与运营数据'
         : undefined,
+    monthlyMetrics: metric.monthlyMetrics.map(toBenchmarkMonthlyMetric),
+    monthlyDataStatus: metric.monthlyDataStatus,
   };
 }
 
 function deviceIntensityBenchmarkMetrics(year: number): BenchmarkMetric[] {
-  return buildDeviceIntensityRows(year).map((row) => {
-    const target = targetValue('device', row.deviceId, row.metricCode, year);
+  return buildDeviceIntensityRows(year).flatMap((row) => {
+    const metricCode = row.metricCode ?? 'device_template_missing';
+    const target = targetValue('device', row.deviceId, metricCode, year);
     const available = row.value !== null;
+    const monthlyMetrics: BenchmarkMonthlyMetric[] = row.monthlyMetricValues.map((value, index) => ({
+      month: index + 1,
+      actual: value,
+      status: value === null
+        ? row.reportedMonths[index] ? '鏁版嵁涓嶅畬鏁?' : '鏆傛棤鏈堝害鏁版嵁'
+        : '宸茶绠?',
+    })) as unknown as BenchmarkMonthlyMetric[];
+    const monthlyDataStatus: IntensityMonthlyDataStatus = row.completeEnergy ? 'complete' : row.reportedMonths.some(Boolean) ? 'incomplete' : 'unavailable';
     return {
-      benchmarkMetricId: `benchmark-device-${row.deviceId}-${row.metricCode}`,
-      metricCode: row.metricCode,
+      benchmarkMetricId: `benchmark-device-${row.deviceId}-${metricCode}`,
+      sourceMetricId: `${row.deviceId}-${metricCode}`,
+      metricCode,
       objectId: row.deviceId,
       objectName: row.deviceName,
       objectType: '设备',
@@ -166,7 +203,7 @@ function deviceIntensityBenchmarkMetrics(year: number): BenchmarkMetric[] {
       target: target?.value ?? 0,
       targetConfigured: Boolean(target),
       direction: target?.direction ?? 'low',
-      trend: [],
+      trend: row.monthlyMetricValues.filter((value): value is number => value !== null),
       available,
       unavailableReason: available ? '' : row.resultReason ?? '设备典型能耗指标暂不可计算',
       availabilityLabel: available ? '可对标' : '待完善',
@@ -181,6 +218,8 @@ function deviceIntensityBenchmarkMetrics(year: number): BenchmarkMetric[] {
       formulaDescription: row.formula,
       periodDescription: `${year}年度`,
       dataCompleteness: row.dataProgress,
+      monthlyMetrics,
+      monthlyDataStatus,
     };
   });
 }
@@ -500,8 +539,19 @@ function deviceMetric(
   const metricCode = deviceMetricCode(type.energyTypeId);
   const target = targetValue('device', device.deviceId, metricCode, year);
   const actual = annualRecordAmount(record);
-  const monthCount = (record.monthlyReportedMonths ?? record.monthlyAmounts.map((value) => value > 0)).filter(Boolean).length;
+  const reportedMonths = record.monthlyReportedMonths ?? record.monthlyAmounts.map((value) => value !== 0);
+  const monthCount = reportedMonths.filter(Boolean).length;
   const hasAnnualSupplement = record.annualAmount > 0;
+  const monthlyDataStatus: IntensityMonthlyDataStatus = record.entryMode !== 'monthly'
+    ? 'unavailable'
+    : monthCount === 12 ? 'complete' : 'incomplete';
+  const monthlyMetrics: BenchmarkMonthlyMetric[] = Array.from({ length: 12 }, (_, index) => ({
+    month: index + 1,
+    actual: record.entryMode === 'monthly' && reportedMonths[index] ? record.monthlyAmounts[index] : null,
+    status: record.entryMode !== 'monthly'
+      ? '暂无月度数据'
+      : reportedMonths[index] ? '已计算' : '数据不完整',
+  }));
   return {
     benchmarkMetricId: `benchmark-device-${device.deviceId}-${type.energyTypeId}`,
     metricCode,
@@ -515,9 +565,9 @@ function deviceMetric(
     target: target?.value ?? 0,
     targetConfigured: Boolean(target),
     direction: target?.direction ?? 'low',
-    trend: record.entryMode === 'monthly'
+    trend: monthlyDataStatus === 'complete'
       ? [...record.monthlyAmounts]
-      : Array.from({ length: 12 }, () => 0),
+      : [],
     available: true,
     unavailableReason: target ? '' : '当前指标尚未配置目标值，暂不判定达标状态。',
     availabilityLabel: target ? '可对标' : '待完善',
@@ -533,6 +583,8 @@ function deviceMetric(
     periodDescription: `${year}年度（${monthCount ? hasAnnualSupplement && monthCount < 12 ? '月度数据+年度补录' : '月度数据汇总' : '年度汇总录入'}）`,
     monthlyTargets: target?.monthlyTargets ? [...target.monthlyTargets] : undefined,
     dataCompleteness: !monthCount ? '年度汇总录入' : monthCount < 12 ? hasAnnualSupplement ? `${monthCount}/12月｜年度已补录` : `${monthCount}/12月｜年度待完善` : '12/12月',
+    monthlyMetrics,
+    monthlyDataStatus,
   };
 }
 
@@ -560,26 +612,9 @@ export function buildBenchmarkDataset(year: number): BenchmarkDataset {
     record.year === year && record.energyRole === '能源消费' && v11RecordScopeType(record) === 'device');
   const sourceOperations = listV11OperationMetrics().filter((record) => record.year === year);
 
-  const unitRows = sourceUnits
-    .filter((unit) => unit.unitType === '生产单元')
-    .flatMap((unit) => {
-      const records = sourceEnergyRecords.filter((record) => record.energyUnitId === unit.energyUnitId);
-      const operation = sourceOperations.find((record) =>
-        record.energyUnitId === unit.energyUnitId && record.metricCode === 'product_output' && annualOperationAmount(record) > 0);
-      return records.length && operation
-        ? [unitMetric(unit.energyUnitId, unit.energyUnitName, records, operation, sourceTypes, year)]
-        : [];
-    });
-  const productRows = listProducts().map((product) =>
-    productMetric(product, year, sourceEnergyRecords, sourceOperations, sourceTypes, sourceUnitNames));
-  const deviceRows = listV11KeyDevices().flatMap((device) => {
-    const records = sourceDeviceEnergyRecords.filter((record) => record.scopeId === device.deviceId);
-    if (!records.length) return [unavailableDeviceMetric(device.deviceId, device.deviceName, device.deviceType, device.energyUnitId, sourceUnitNames.get(device.energyUnitId) ?? device.energyUnitId, year)];
-    return records.flatMap((record) => {
-      const type = sourceTypes.find((item) => item.energyTypeId === record.energyTypeId);
-      return type ? [deviceMetric(device, record, type, sourceUnitNames.get(device.energyUnitId) ?? device.energyUnitId, year)] : [];
-    });
-  });
+  const unitRows = intensityRows('unit');
+  const productRows = intensityRows('product');
+  const deviceRows = deviceIntensityBenchmarkMetrics(year);
 
   const sharedRows = [...intensityRows('factory'), ...unitRows, ...productRows, ...deviceRows];
 

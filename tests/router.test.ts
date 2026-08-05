@@ -12,7 +12,7 @@ describe('navigation manifest', () => {
       '数据管理',
     ]);
     expect(allNavItems.map((item) => item.label)).toEqual(expect.arrayContaining([
-      '能耗强度指标',
+      '能耗指标',
       '碳因子参数',
       '用能与碳排放预算管理',
       '用能单元',

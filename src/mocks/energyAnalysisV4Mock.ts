@@ -14,6 +14,8 @@ export interface EnergyQueryRow {
   yearOnYear: number;
   monthOnMonth?: number;
   sourceDescription: string;
+  /** 月度汇总不一定具备可下钻的日度计量数据。 */
+  dailyDataAvailable?: boolean;
 }
 
 export interface EnergyQueryDataset {
@@ -91,6 +93,8 @@ export function createEnergyQueryAnnualDetails(row: EnergyQueryRow): EnergyQuery
 }
 
 export function createEnergyQueryMonthlyDetails(row: EnergyQueryRow): EnergyQueryDayDetail[] {
+  if (row.dailyDataAvailable === false) return [];
+
   const physicalAmounts = allocateIntegerTotal(row.physicalAmount, monthDayWeights);
   const standardCoalAmounts = allocateIntegerTotal(row.standardCoalAmount, monthDayWeights);
   const dailyAverage = row.standardCoalAmount / monthDayWeights.length;
@@ -111,8 +115,7 @@ const allMonthRows: EnergyQueryRow[] = [
   { energyQueryRowId: 'eqr-prod-a-electricity-202606', energyUnitName: '生产车间A', analysisCategory: '电力', energyTypeName: '外购电力', physicalAmount: 5380000, measurementUnit: 'kWh', standardCoalAmount: 5160, share: 38.7, yearOnYear: 2.8, monthOnMonth: 1.2, sourceDescription: '能源数据｜生产车间A｜电力｜2026年6月' },
   { energyQueryRowId: 'eqr-power-gas-202606', energyUnitName: '动力中心', analysisCategory: '燃料', energyTypeName: '天然气', physicalAmount: 610000, measurementUnit: 'Nm³', standardCoalAmount: 3190, share: 23.9, yearOnYear: 1.6, monthOnMonth: 0.9, sourceDescription: '能源数据｜动力中心｜天然气｜2026年6月' },
   { energyQueryRowId: 'eqr-boiler-steam-202606', energyUnitName: '锅炉系统', analysisCategory: '热力', energyTypeName: '蒸汽', physicalAmount: 8250, measurementUnit: 'GJ', standardCoalAmount: 1999, share: 15, yearOnYear: -0.8, monthOnMonth: 0.3, sourceDescription: '能源数据｜锅炉系统｜蒸汽｜2026年6月' },
-  { energyQueryRowId: 'eqr-air-electricity-202606', energyUnitName: '空压系统', analysisCategory: '电力', energyTypeName: '外购电力', physicalAmount: 1150000, measurementUnit: 'kWh', standardCoalAmount: 1103, share: 8.3, yearOnYear: 3.4, monthOnMonth: 1.5, sourceDescription: '能源数据｜空压系统｜电力｜2026年6月' },
-  { energyQueryRowId: 'eqr-heat-recovery-202606', energyUnitName: '能源回收系统', analysisCategory: '其他', energyTypeName: '余热回收', physicalAmount: 2600, measurementUnit: 'GJ', standardCoalAmount: 938, share: 7, yearOnYear: -1.2, monthOnMonth: -0.4, sourceDescription: '能源数据｜能源回收系统｜余热｜2026年6月' },
+  { energyQueryRowId: 'eqr-air-electricity-202606', energyUnitName: '空压系统', analysisCategory: '电力', energyTypeName: '外购电力', physicalAmount: 1150000, measurementUnit: 'kWh', standardCoalAmount: 1103, share: 8.3, yearOnYear: 3.4, monthOnMonth: 1.5, dailyDataAvailable: false, sourceDescription: '能源数据｜空压系统｜电力｜2026年6月' },
 ];
 
 const allYearRows: EnergyQueryRow[] = [
@@ -120,35 +123,32 @@ const allYearRows: EnergyQueryRow[] = [
   { energyQueryRowId: 'eqr-power-gas-2026', energyUnitName: '动力中心', analysisCategory: '燃料', energyTypeName: '天然气', physicalAmount: 7200000, measurementUnit: 'Nm³', standardCoalAmount: 38500, share: 27.8, yearOnYear: -2.2, sourceDescription: '能源数据｜动力中心｜天然气｜2026年度' },
   { energyQueryRowId: 'eqr-boiler-steam-2026', energyUnitName: '锅炉系统', analysisCategory: '热力', energyTypeName: '蒸汽', physicalAmount: 98500, measurementUnit: 'GJ', standardCoalAmount: 19390, share: 14, yearOnYear: -0.7, sourceDescription: '能源数据｜锅炉系统｜蒸汽｜2026年度' },
   { energyQueryRowId: 'eqr-air-electricity-2026', energyUnitName: '空压系统', analysisCategory: '电力', energyTypeName: '外购电力', physicalAmount: 13100000, measurementUnit: 'kWh', standardCoalAmount: 13100, share: 9.5, yearOnYear: 0.6, sourceDescription: '能源数据｜空压系统｜电力｜2026年度' },
-  { energyQueryRowId: 'eqr-heat-recovery-2026', energyUnitName: '能源回收系统', analysisCategory: '其他', energyTypeName: '余热回收', physicalAmount: 31100, measurementUnit: 'GJ', standardCoalAmount: 8610, share: 6.2, yearOnYear: -3.1, sourceDescription: '能源数据｜能源回收系统｜余热｜2026年度' },
 ];
 
 export const energyQueryData: Record<EnergyAnalysisScope, Record<EnergyAnalysisPeriod, EnergyQueryDataset>> = {
   all: {
     month: {
-      total: 13320,
+      total: 12382,
       yearOnYear: 2.1,
       monthOnMonth: 0.8,
-      trend: [8420, 9210, 10340, 11280, 12260, 13320],
+      trend: [7482, 8272, 9402, 10342, 11322, 12382],
       labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
       structure: [
-        { color: '#00A870', label: '电力', share: 46, amount: 6127 },
-        { color: '#1677FF', label: '燃料', share: 32, amount: 4256 },
-        { color: '#F79009', label: '热力', share: 15, amount: 1999 },
-        { color: '#7A5AF8', label: '其他', share: 7, amount: 938 },
+        { color: '#00A870', label: '电力', share: 49.5, amount: 6127 },
+        { color: '#1677FF', label: '燃料', share: 34.4, amount: 4256 },
+        { color: '#F79009', label: '热力', share: 16.1, amount: 1999 },
       ],
       rows: allMonthRows,
     },
     year: {
-      total: 138500,
+      total: 129890,
       yearOnYear: -1.8,
-      trend: [112800, 119400, 126600, 132200, 138500],
+      trend: [104190, 110790, 117990, 123590, 129890],
       labels: ['2022', '2023', '2024', '2025', '2026'],
       structure: [
-        { color: '#00A870', label: '电力', share: 45, amount: 62325 },
-        { color: '#1677FF', label: '燃料', share: 34, amount: 47090 },
-        { color: '#F79009', label: '热力', share: 14, amount: 19390 },
-        { color: '#7A5AF8', label: '其他', share: 7, amount: 9695 },
+        { color: '#00A870', label: '电力', share: 48.8, amount: 63410 },
+        { color: '#1677FF', label: '燃料', share: 36.3, amount: 47090 },
+        { color: '#F79009', label: '热力', share: 14.9, amount: 19390 },
       ],
       rows: allYearRows,
     },

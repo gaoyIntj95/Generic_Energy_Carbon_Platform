@@ -122,16 +122,17 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     const scopeNames = [...container.querySelectorAll('tbody tr:not([class*="detailRow"]) td:first-child')]
       .map((cell) => cell.textContent ?? '');
     expect(scopeNames[0]).toContain('全厂');
-    expect(scopeNames.findIndex((name) => name.includes('生产车间A'))).toBeLessThan(
-      scopeNames.findIndex((name) => name.includes('1#数控加工中心')),
-    );
-    expect(scopeNames.findIndex((name) => name.includes('加工中心1'))).toBeLessThan(
-      scopeNames.findIndex((name) => name.includes('生产车间B')),
-    );
+    expect(scopeNames).toHaveLength(10);
+    expect(button('下一页').disabled).toBe(false);
+    expect(scopeNames.some((name) => name.includes('1#数控加工中心'))).toBe(false);
 
     await click(button('查看'));
     expect(container.textContent).toContain('月度明细');
     expect(container.textContent).toContain('12,710,000');
+
+    await click(button('下一页'));
+    expect(container.textContent).toContain('2 / 3');
+    expect(container.textContent).toContain('1#数控加工中心');
   });
 
   it('locks new energy records to the active level tab and cascades second-level choices from the configured parent', async () => {
@@ -234,10 +235,10 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     const initialMetric = buildBenchmarkDataset(2026).rows.find((row) =>
       row.objectTypeKey === 'device' && row.objectId === device.deviceId);
     expect(initialMetric).toMatchObject({
-      metricCode: 'electricity_consumption',
-      actual: monthlyAmounts.reduce((sum, value) => sum + value, 0),
-      target: 1_200_000,
-      targetConfigured: true,
+      metricCode: 'device_template_missing',
+      actual: 0,
+      target: 0,
+      targetConfigured: false,
       dataCompleteness: '12/12月',
     });
     expect(buildBenchmarkDataset(2026).rows.find((row) =>
@@ -403,6 +404,43 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(valid).toMatchObject({ ok: true });
     expect(listV11ConversionOutputs()).toHaveLength(originalCount + 1);
     expect(listV11ConversionOutputs().at(-1)?.conversionOutputId).toMatch(/^v11-output-/);
+  });
+
+  it('validates conversion source references before they enter the flow dataset', () => {
+    const invalidYear = saveV11ConversionOutput({
+      year: 2025,
+      recordType: '锅炉产汽/产热',
+      conversionEnergyUnitId: 'eu-gas-boiler',
+      inputMode: 'linked',
+      inputEnergyRecordId: 'v11-er-36',
+      outputAnalysisCategory: '热力',
+      outputEnergyTypeId: 'v11-energy-steam',
+      outputEnergyName: '蒸汽',
+      outputUnit: 'GJ',
+      outputAmount: 100,
+      internalAmount: 100,
+      externalAmount: 0,
+      lossAmount: 0,
+    });
+    expect(invalidYear).toMatchObject({ ok: false });
+    if (!invalidYear.ok) expect(invalidYear.error).toContain('同一年度');
+
+    const invalidNegative = saveV11ConversionOutput({
+      year: 2027,
+      recordType: '自发电',
+      conversionEnergyUnitId: 'eu-distributed-pv',
+      inputMode: 'none',
+      outputAnalysisCategory: '电力',
+      outputEnergyTypeId: 'v11-energy-electricity',
+      outputEnergyName: '电力',
+      outputUnit: 'kWh',
+      outputAmount: 100,
+      internalAmount: -1,
+      externalAmount: 101,
+      lossAmount: 0,
+    });
+    expect(invalidNegative).toMatchObject({ ok: false });
+    if (!invalidNegative.ok) expect(invalidNegative.error).toContain('不能为负数');
   });
 
   it('keeps product output as a product dimension linked by stable productId', async () => {

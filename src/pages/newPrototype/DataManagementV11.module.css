@@ -415,9 +415,26 @@
   font-size: 13px;
 }
 
+.pagination button {
+  min-width: 52px;
+  height: 30px;
+  padding: 0 8px;
+  color: #1677ff;
+  background: #fff;
+  border: 1px solid #d8dee7;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pagination button:disabled {
+  color: #b7c0cc;
+  cursor: not-allowed;
+}
+
 .pageDot {
   display: grid;
-  width: 30px;
+  width: 52px;
   height: 30px;
   color: #00a870;
   border: 1px solid #00a870;
@@ -1080,6 +1097,14 @@
   margin-top: 10px;
   color: #8a94a3;
   font-size: 12px;
+}
+
+.monthlyHint {
+  grid-column: 1 / -1;
+  margin-bottom: 10px;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .advancedToggle {

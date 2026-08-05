@@ -585,6 +585,7 @@
 
 .groupHead > span { width: 18px; color: #4e6960; }
 .groupHead em { margin-left: 5px; font-style: normal; font-weight: 400; }
+.groupStatus { margin-left: 12px; color: #d1842d; font-size: 12px; font-weight: 400; }
 .groupHead strong { margin-left: auto; color: #3676d8; }
 
 .groupTable {
@@ -628,6 +629,11 @@
   line-height: 1.35;
 }
 
+.validationMessage { display: block; margin-top: 4px; color: #d1842d; font-size: 11px; }
+
+.actionList { display: grid; gap: 12px; }
+.actionList p { margin: 0 0 4px; }
+
 .groupTable td small,
 .factorTable td small,
 .parameterTable td small {
@@ -636,6 +642,8 @@
   color: var(--muted);
   font-size: 11px;
 }
+
+.compactMeta { display: none; }
 
 .rowActions {
   text-align: left;

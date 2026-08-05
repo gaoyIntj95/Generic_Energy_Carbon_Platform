@@ -28,6 +28,8 @@ export interface FlowNode {
   stage: FlowStage;
   name: string;
   valueLabel: string;
+  detailLabel?: string;
+  detailLabelSecondary?: string;
   standardCoalAmount: number;
   nodeType: string;
   share: number;
@@ -60,6 +62,8 @@ export interface FlowLevelOneBalanceRow {
   externalOutputStandardAmount: number;
   unallocatedAmount: number;
   unallocatedStandardAmount: number;
+  overAllocatedAmount: number;
+  overAllocatedStandardAmount: number;
   distributionRate: number;
   status: '已分配' | '存在未分配' | '一级分配超出可用量';
 }
@@ -207,6 +211,13 @@ function recordPhysicalAmount(record: V11EnergyRecord, period: FlowPeriod) {
   return record.monthlyAmounts[period.month - 1] ?? 0;
 }
 
+function hasPeriodData(record: V11EnergyRecord, period: FlowPeriod) {
+  if (period.grain === 'year') return v11EnergyRecordAnnualAmount(record) > 0;
+  const monthIndex = period.month - 1;
+  return record.monthlyReportedMonths?.[monthIndex]
+    ?? (record.monthlyAmounts[monthIndex] ?? 0) > 0;
+}
+
 function standardAmount(physical: number, type: V11EnergyType | null) {
   if (!type) return 0;
   const converted = physical * type.standardCoalFactor;
@@ -225,7 +236,8 @@ function recordAmount(record: V11EnergyRecord, type: V11EnergyType | null, perio
 function conversionScale(conversion: V11ConversionOutput, records: V11EnergyRecord[], period: FlowPeriod) {
   if (period.grain === 'year') return 1;
   const input = records.find((record) => record.energyRecordId === conversion.inputEnergyRecordId);
-  if (!input) return 1 / 12;
+  // Annual-only/manual conversion data must not be silently spread into months.
+  if (!input) return 0;
   const annual = v11EnergyRecordAnnualAmount(input);
   return annual > 0 ? recordPhysicalAmount(input, period) / annual : 0;
 }
@@ -237,6 +249,11 @@ function conversionAmount(
   period: FlowPeriod,
 ): ConversionAmount {
   const scale = conversionScale(conversion, records, period);
+  const monthIndex = period.month - 1;
+  const periodValue = (annualValue: number | undefined, monthlyValues?: number[]) => {
+    if (period.grain === 'year') return annualValue ?? 0;
+    return monthlyValues?.[monthIndex] ?? (annualValue ?? 0) * scale;
+  };
   const linkedInput = records.find((record) => record.energyRecordId === conversion.inputEnergyRecordId);
   const inputType = linkedInput
     ? types.find((type) => type.energyTypeId === linkedInput.energyTypeId) ?? null
@@ -249,10 +266,10 @@ function conversionAmount(
     ?? inputType;
   const linkedAmount = linkedInput ? recordAmount(linkedInput, inputType, period) : null;
   const inputPhysical = linkedAmount?.physical
-    ?? (conversion.recoveryAmount ?? conversion.inputAmount ?? 0) * scale;
-  const outputPhysical = (conversion.outputAmount ?? 0) * scale;
-  const internalPhysical = (conversion.internalAmount ?? 0) * scale;
-  const externalPhysical = conversion.externalAmount * scale;
+    ?? periodValue(conversion.recoveryAmount ?? conversion.inputAmount, conversion.monthlyInputAmounts);
+  const outputPhysical = periodValue(conversion.outputAmount, conversion.monthlyOutputAmounts);
+  const internalPhysical = periodValue(conversion.internalAmount, conversion.monthlyInternalAmounts);
+  const externalPhysical = periodValue(conversion.externalAmount, conversion.monthlyExternalAmounts);
   const input = {
     physical: inputPhysical,
     standard: linkedAmount?.standard ?? standardAmount(inputPhysical, inputType),
@@ -281,6 +298,50 @@ function conversionAmount(
     },
     lossStandard: Math.max(input.standard - output.standard, 0),
   };
+}
+
+function conversionDataQualityIssues(
+  conversions: V11ConversionOutput[],
+  records: V11EnergyRecord[],
+  types: V11EnergyType[],
+  period: FlowPeriod,
+) {
+  const issues: string[] = [];
+  conversions.forEach((conversion) => {
+    const source = conversion.inputEnergyRecordId
+      ? records.find((record) => record.energyRecordId === conversion.inputEnergyRecordId)
+      : null;
+    if (conversion.inputMode === 'linked' && !source) {
+      issues.push(`${conversion.recordType}缺少有效的投入能源数据引用`);
+      return;
+    }
+    if (source && source.year !== conversion.year) {
+      issues.push(`${conversion.recordType}引用了不同年度的能源数据`);
+    }
+    if (source && !['能源消费', '回收能源'].includes(source.energyRole)) {
+      issues.push(`${conversion.recordType}引用的能源记录角色为“${source.energyRole}”，不能作为转换投入`);
+    }
+    const inputType = source
+      ? types.find((type) => type.energyTypeId === source.energyTypeId)
+      : types.find((type) => type.energyTypeId === conversion.inputEnergyTypeId)
+        ?? types.find((type) => type.energyTypeName === conversion.recoveryEnergyName);
+    const outputType = types.find((type) => type.energyTypeId === conversion.outputEnergyTypeId)
+      ?? types.find((type) => type.energyTypeName === conversion.outputEnergyName);
+    if (inputType && outputType && inputType.energyTypeId === outputType.energyTypeId && conversion.recordType === '其他转换') {
+      issues.push(`${conversion.recordType}存在“${inputType.energyTypeName}→${outputType.energyTypeName}”同品种转换，请确认是否应改为能源分配或自产能源`);
+    }
+    const assigned = (conversion.internalAmount ?? 0) + conversion.externalAmount + (conversion.lossAmount ?? 0);
+    if (Math.abs((conversion.outputAmount ?? 0) - assigned) > 1e-8) {
+      issues.push(`${conversion.recordType}产出总量与内部去向、外部输出及损失不一致`);
+    }
+    if (period.grain === 'month'
+      && !source
+      && conversion.inputMode !== 'none'
+      && !conversion.monthlyInputAmounts?.length) {
+      issues.push(`${conversion.recordType}没有月度投入数据，本月未生成转换量`);
+    }
+  });
+  return [...new Set(issues)];
 }
 
 function addAmount(map: Map<string, Amount>, type: V11EnergyType, amount: Amount) {
@@ -373,21 +434,28 @@ export function buildFlowAnalysisDataset(
   const types = listV11EnergyTypes();
   const typeById = new Map(types.map((type) => [type.energyTypeId, type]));
   const unitById = new Map(units.map((unit) => [unit.energyUnitId, unit]));
-  const records = listV11EnergyRecords().filter((record) =>
+  const sourceRecords = listV11EnergyRecords().filter((record) =>
     record.year === period.year
-    && record.energyRole === '能源消费'
     && v11RecordScopeType(record) !== 'device');
+  const records = sourceRecords.filter((record) => record.energyRole === '能源消费');
+  const periodRecords = records.filter((record) => hasPeriodData(record, period));
   const conversionAmounts = listV11ConversionOutputs()
     .filter((conversion) => conversion.year === period.year)
-    .map((conversion) => conversionAmount(conversion, records, types, period));
+    .map((conversion) => conversionAmount(conversion, sourceRecords, types, period));
+  const conversionIssues = conversionDataQualityIssues(
+    listV11ConversionOutputs().filter((conversion) => conversion.year === period.year),
+    sourceRecords,
+    types,
+    period,
+  );
   const linkedInputIds = new Set(conversionAmounts.flatMap((item) =>
     item.conversion.inputEnergyRecordId ? [item.conversion.inputEnergyRecordId] : []));
-  const boundaryRecords = records.filter((record) => record.energyUnitId === null);
-  const levelOneRecords = records.filter((record) =>
+  const boundaryRecords = periodRecords.filter((record) => record.energyUnitId === null);
+  const levelOneRecords = periodRecords.filter((record) =>
     Boolean(record.energyUnitId)
     && !linkedInputIds.has(record.energyRecordId)
     && unitById.get(record.energyUnitId!)?.unitLevel === 'level1');
-  const levelTwoRecords = records.filter((record) =>
+  const levelTwoRecords = periodRecords.filter((record) =>
     Boolean(record.energyUnitId)
     && !linkedInputIds.has(record.energyRecordId)
     && unitById.get(record.energyUnitId!)?.unitLevel === 'level2');
@@ -472,6 +540,8 @@ export function buildFlowAnalysisDataset(
       externalOutputStandardAmount: external.standard,
       unallocatedAmount: Math.max(difference, 0),
       unallocatedStandardAmount: Math.max(standardDifference, 0),
+      overAllocatedAmount: Math.max(-difference, 0),
+      overAllocatedStandardAmount: Math.max(-standardDifference, 0),
       distributionRate: availableStandardAmount > 0
         ? distribution.standard / availableStandardAmount * 100
         : 0,
@@ -598,7 +668,7 @@ export function buildFlowAnalysisDataset(
       name: `企业输入·${typeById.get(energyTypeId)?.energyTypeName ?? energyTypeId}`,
       valueLabel: amountLabel(amount.standard),
       standardCoalAmount: amount.standard,
-      nodeType: '企业能源输入',
+      nodeType: '企业边界输入',
       share: inputStandard > 0 ? amount.standard / inputStandard * 100 : 0,
     });
   });
@@ -612,6 +682,8 @@ export function buildFlowAnalysisDataset(
         ? unitById.get(item.conversion.conversionEnergyUnitId)?.energyUnitName
         : null) ?? item.conversion.recordType,
       valueLabel: `${item.inputType?.energyTypeName ?? '无投入自产'} → ${item.outputType?.energyTypeName ?? '产出能源'}`,
+      detailLabel: `投入 ${amountLabel(item.input.standard)}`,
+      detailLabelSecondary: `产出 ${amountLabel(item.output.standard)}`,
       standardCoalAmount: item.output.standard,
       nodeType: '能源转换',
       share: conversionOutputStandard > 0 ? item.output.standard / conversionOutputStandard * 100 : 0,
@@ -641,7 +713,7 @@ export function buildFlowAnalysisDataset(
       name: `厂内${typeById.get(energyTypeId)?.energyTypeName ?? energyTypeId}`,
       valueLabel: amountLabel(available),
       standardCoalAmount: available,
-      nodeType: '厂内能源介质',
+      nodeType: '厂内可供分配能源',
       share: availableForInternal > 0 ? available / availableForInternal * 100 : 0,
     });
     const direct = Math.max(input - conversionInput, 0);
@@ -1034,7 +1106,11 @@ export function buildFlowAnalysisDataset(
   const overAllocatedObjectCount = new Set(levelTwoBalanceRows
     .filter((row) => row.status === '层级异常')
     .map((row) => row.level1EnergyUnitId)).size;
-  const dataNotice = levelOneRecords.length === 0
+  const missingPeriodRecordCount = records.filter((record) => !hasPeriodData(record, period)).length;
+  const periodDataNotice = period.grain === 'month' && missingPeriodRecordCount > 0
+    ? `\u5f53\u524d\u6708\u4efd\u6709 ${missingPeriodRecordCount} \u6761\u80fd\u6e90\u6570\u636e\u4ec5\u7ef4\u62a4\u5e74\u5ea6\u503c\u6216\u5c1a\u672a\u586b\u62a5\u6708\u5ea6\u503c\uff0c\u672c\u6b21\u5206\u6790\u4e0d\u6309\u5e74\u5ea6\u503c\u5206\u644a\u5230\u6708\u5ea6\u3002`
+    : '';
+  const baseDataNotice = levelOneRecords.length === 0
     ? '当前期间尚未维护一级用能单元能源分配数据，暂无法生成能流分析。'
     : viewLevel === 'level2' && (pendingObjectCount > 0 || overAllocatedObjectCount > 0)
       ? [
@@ -1046,6 +1122,12 @@ export function buildFlowAnalysisDataset(
           : '',
       ].filter(Boolean).join(' ')
       : '';
+
+  const dataNotice = [
+    conversionIssues.length ? `能源转换源头校验：${conversionIssues.join('；')}` : '',
+    periodDataNotice,
+    baseDataNotice,
+  ].filter(Boolean).join(' ');
 
   return {
     viewLevel,

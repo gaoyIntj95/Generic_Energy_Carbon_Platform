@@ -74,6 +74,12 @@ export interface V11ConversionOutput {
   internalAmount?: number;
   externalAmount: number;
   lossAmount?: number;
+  /** 月度转换量；存在时优先用于月度能流分析，不以年度值平均摊分。 */
+  monthlyInputAmounts?: number[];
+  monthlyOutputAmounts?: number[];
+  monthlyInternalAmounts?: number[];
+  monthlyExternalAmounts?: number[];
+  monthlyLossAmounts?: number[];
   receiver?: string;
   remark: string;
 }
@@ -133,17 +139,16 @@ const seedEnergyRecords: V11EnergyRecord[] = [
   { energyRecordId: 'v11-er-44', year: 2026, scopeLevel: '企业', energyUnitId: null, energyRole: '能源消费', energyTypeId: 'v11-energy-natural-gas', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [137000,133000,143000,146000,151000,154000,157000,156000,153000,150000,152000,161000] },
   { energyRecordId: 'v11-er-45', year: 2026, scopeLevel: '企业', energyUnitId: null, energyRole: '能源消费', energyTypeId: 'v11-energy-steam', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000] },
   { energyRecordId: 'v11-er-device-60', year: 2026, scopeLevel: '二级用能单元', scopeType: 'device', scopeId: 'v11-device-60', energyUnitId: 'eu-raw-material', energyRole: '能源消费', energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [252000,248000,260000,265000,271000,276000,282000,279000,274000,270000,278000,285000] },
-  { energyRecordId: 'v11-er-device-61', year: 2026, scopeLevel: '二级用能单元', scopeType: 'device', scopeId: 'v11-device-61', energyUnitId: 'eu-cement-grinding', energyRole: '能源消费', energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [138000,142000,145000,149000,151000,154000,157000,160000,0,0,0,0], monthlyReportedMonths: [true,true,true,true,true,true,true,true,false,false,false,false] },
+  { energyRecordId: 'v11-er-device-62', year: 2026, scopeLevel: '二级用能单元', scopeType: 'device', scopeId: 'v11-device-62', energyUnitId: 'eu-compressed-air', energyRole: '能源消费', energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [92000,88000,95000,97000,101000,104000,108000,106000,102000,99000,105000,110000] },
   { energyRecordId: 'v11-er-device-63', year: 2026, scopeLevel: '一级用能单元', scopeType: 'device', scopeId: 'v11-device-63', energyUnitId: 'eu-clinker-line-1', energyRole: '能源消费', energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [115000,112000,118000,120000,123000,125000,128000,126000,124000,121000,126000,130000] },
-  { energyRecordId: 'v11-er-device-64', year: 2026, scopeLevel: '一级用能单元', scopeType: 'device', scopeId: 'v11-device-64', energyUnitId: 'eu-clinker-line-1', energyRole: '能源消费', energyTypeId: 'v11-energy-natural-gas', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [42000,40000,43500,44800,46200,47000,48100,47600,46500,45500,0,0], monthlyReportedMonths: [true,true,true,true,true,true,true,true,true,true,false,false] },
+  { energyRecordId: 'v11-er-device-64', year: 2026, scopeLevel: '一级用能单元', scopeType: 'device', scopeId: 'v11-device-64', energyUnitId: 'eu-clinker-line-1', energyRole: '能源消费', energyTypeId: 'v11-energy-natural-gas', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [42000,40000,43500,44800,46200,47000,48100,47600,46500,45500,46800,47200] },
   { energyRecordId: 'v11-er-device-66', year: 2026, scopeLevel: '二级用能单元', scopeType: 'device', scopeId: 'v11-device-66', energyUnitId: 'eu-raw-material', energyRole: '能源消费', energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [94000,90000,97000,99000,101000,103000,105000,104000,101000,100000,103000,107000] },
   { energyRecordId: 'v11-er-device-70', year: 2026, scopeLevel: '一级用能单元', scopeType: 'device', scopeId: 'v11-device-70', energyUnitId: 'eu-cement-grinding-line', energyRole: '能源消费', energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [185000,182000,190000,194000,198000,201000,205000,203000,199000,196000,202000,210000] },
-  { energyRecordId: 'v11-er-device-74', year: 2026, scopeLevel: '二级用能单元', scopeType: 'device', scopeId: 'v11-device-74', energyUnitId: 'eu-production-processing', energyRole: '能源消费', energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [126000,123000,130000,133000,136000,138000,142000,140000,137000,134000,0,0], monthlyReportedMonths: [true,true,true,true,true,true,true,true,true,true,false,false] },
+  { energyRecordId: 'v11-er-device-74', year: 2026, scopeLevel: '二级用能单元', scopeType: 'device', scopeId: 'v11-device-74', energyUnitId: 'eu-production-processing', energyRole: '能源消费', energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [126000,123000,130000,133000,136000,138000,142000,140000,137000,134000,139000,141000] },
   { energyRecordId: 'v11-er-device-78', year: 2026, scopeLevel: '一级用能单元', scopeType: 'device', scopeId: 'v11-device-78', energyUnitId: 'eu-utilities', energyRole: '能源消费', energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [72000,70000,73500,75000,77000,78500,80000,79200,77500,76000,78000,81000] },
   { energyRecordId: 'v11-er-device-79', year: 2026, scopeLevel: '二级用能单元', scopeType: 'device', scopeId: 'v11-device-79', energyUnitId: 'eu-compressed-air', energyRole: '能源消费', energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [106000,103000,110000,112000,115000,118000,120000,119000,116000,114000,0,0], monthlyReportedMonths: [true,true,true,true,true,true,true,true,true,true,false,false] },
   { energyRecordId: 'v11-er-device-81', year: 2026, scopeLevel: '二级用能单元', scopeType: 'device', scopeId: 'v11-device-81', energyUnitId: 'eu-waste-heat-power', energyRole: '能源消费', energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [54000,52000,56000,57000,58000,59000,60000,59500,58000,57000,59000,61000] },
   { energyRecordId: 'v11-er-device-82', year: 2026, scopeLevel: '二级用能单元', scopeType: 'device', scopeId: 'v11-device-82', energyUnitId: 'eu-gas-boiler', energyRole: '能源消费', energyTypeId: 'v11-energy-natural-gas', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [78000,75000,81000,83500,86000,88000,90000,89500,87000,85000,88000,93000] },
-  { energyRecordId: 'v11-er-device-84', year: 2026, scopeLevel: '一级用能单元', scopeType: 'device', scopeId: 'v11-device-84', energyUnitId: 'eu-office', energyRole: '能源消费', energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [62000,60000,64000,67000,71000,76000,82000,80000,72000,68000,65000,63000] },
 ];
 
 const seedEnergyCosts: V11EnergyCost[] = [
@@ -153,9 +158,9 @@ const seedEnergyCosts: V11EnergyCost[] = [
 ];
 
 const seedConversionOutputs: V11ConversionOutput[] = [
-  { conversionOutputId: 'v11-output-200', year: 2026, recordType: '余热发电', conversionEnergyUnitId: 'eu-waste-heat-power', inputMode: 'recovery', recoverySourceEnergyUnitId: 'eu-production-processing', recoveryEnergyName: '余热', recoveryAmount: 85000, recoveryUnit: 'GJ', outputAnalysisCategory: '电力', outputEnergyTypeId: 'v11-energy-electricity', outputEnergyName: '电力', outputUnit: 'kWh', outputAmount: 18300000, internalAmount: 16300000, externalAmount: 2000000, lossAmount: 0, remark: '生产加工过程余热经能源回收系统转换为电力。' },
-  { conversionOutputId: 'v11-output-201', year: 2026, recordType: '锅炉产汽/产热', conversionEnergyUnitId: 'eu-gas-boiler', inputMode: 'linked', inputEnergyRecordId: 'v11-er-36', outputAnalysisCategory: '热力', outputEnergyTypeId: 'v11-energy-steam', outputEnergyName: '蒸汽', outputUnit: 'GJ', outputAmount: 52000, internalAmount: 50000, externalAmount: 2000, lossAmount: 0, remark: '天然气经锅炉系统转换为蒸汽。' },
-  { conversionOutputId: 'v11-output-202', year: 2026, recordType: '其他转换', conversionEnergyUnitId: 'eu-distributed-pv', inputMode: 'linked', inputEnergyRecordId: 'v11-er-40', outputAnalysisCategory: '电力', outputEnergyTypeId: 'v11-energy-electricity', outputEnergyName: '电力', outputUnit: 'kWh', outputAmount: 8000000, internalAmount: 8000000, externalAmount: 0, lossAmount: 0, remark: '配电系统完成厂内电力转换与分配。' },
+  { conversionOutputId: 'v11-output-200', year: 2026, recordType: '余热发电', conversionEnergyUnitId: 'eu-waste-heat-power', inputMode: 'recovery', recoverySourceEnergyUnitId: 'eu-production-processing', recoveryEnergyName: '余热', recoveryAmount: 85000, recoveryUnit: 'GJ', monthlyInputAmounts: [6500,6200,7000,7200,7400,7600,7800,7600,7200,7000,7600,5900], outputAnalysisCategory: '电力', outputEnergyTypeId: 'v11-energy-electricity', outputEnergyName: '电力', outputUnit: 'kWh', outputAmount: 18300000, monthlyOutputAmounts: [1400000,1350000,1450000,1500000,1550000,1600000,1650000,1600000,1500000,1450000,1600000,1650000], internalAmount: 16300000, monthlyInternalAmounts: [1300000,1250000,1300000,1350000,1400000,1450000,1450000,1450000,1350000,1300000,1400000,1300000], externalAmount: 2000000, monthlyExternalAmounts: [100000,100000,150000,150000,150000,150000,200000,150000,150000,150000,200000,350000], lossAmount: 0, remark: '生产加工过程余热经能源回收系统转换为电力。' },
+  { conversionOutputId: 'v11-output-201', year: 2026, recordType: '锅炉产汽/产热', conversionEnergyUnitId: 'eu-gas-boiler', inputMode: 'linked', inputEnergyRecordId: 'v11-er-36', outputAnalysisCategory: '热力', outputEnergyTypeId: 'v11-energy-steam', outputEnergyName: '蒸汽', outputUnit: 'GJ', outputAmount: 52000, monthlyOutputAmounts: [4000,3800,4200,4300,4500,4600,4700,4500,4300,4200,4400,4500], internalAmount: 50000, monthlyInternalAmounts: [3900,3700,4050,4150,4350,4450,4500,4350,4150,4050,4200,4150], externalAmount: 2000, monthlyExternalAmounts: [100,100,150,150,150,150,200,150,150,150,200,350], lossAmount: 0, remark: '天然气经锅炉系统转换为蒸汽。' },
+  { conversionOutputId: 'v11-output-202', year: 2026, recordType: '自发电', conversionEnergyUnitId: 'eu-distributed-pv', inputMode: 'none', outputAnalysisCategory: '电力', outputEnergyTypeId: 'v11-energy-electricity', outputEnergyName: '电力', outputUnit: 'kWh', outputAmount: 8000000, monthlyOutputAmounts: [600000,550000,650000,700000,750000,800000,850000,800000,700000,650000,750000,200000], internalAmount: 8000000, monthlyInternalAmounts: [600000,550000,650000,700000,750000,800000,850000,800000,700000,650000,750000,200000], externalAmount: 0, monthlyExternalAmounts: Array(12).fill(0), lossAmount: 0, remark: '分布式光伏自产电力直接进入厂内供能。' },
 ];
 
 const seedOperations: V11OperationMetric[] = [
@@ -177,16 +182,12 @@ const industrialDeviceDictionary: V11KeyDevice[] = [
   { deviceId: 'v11-device-64', deviceName: '连续式热处理炉', deviceType: '加热/锅炉设备', energyUnitId: 'eu-clinker-line-1', mainEnergyTypeId: 'v11-energy-natural-gas', remark: '天然气加热，直属生产车间A' },
   { deviceId: 'v11-device-66', deviceName: '颚式破碎机', deviceType: '加工设备', energyUnitId: 'eu-raw-material', mainEnergyTypeId: 'v11-energy-electricity', remark: '原料预处理重点设备' },
   { deviceId: 'v11-device-70', deviceName: '1#注塑机', deviceType: '加工设备', energyUnitId: 'eu-cement-grinding-line', mainEnergyTypeId: 'v11-energy-electricity', remark: '直属生产车间B的主生产设备' },
-  { deviceId: 'v11-device-61', deviceName: '前处理清洗线', deviceType: '表面处理设备', energyUnitId: 'eu-cement-grinding', mainEnergyTypeId: 'v11-energy-electricity', remark: '脱脂、清洗及表调工序设备' },
   { deviceId: 'v11-device-74', deviceName: '自动喷涂线', deviceType: '表面处理设备', energyUnitId: 'eu-production-processing', mainEnergyTypeId: 'v11-energy-electricity', remark: '喷涂及输送联动生产线' },
-  { deviceId: 'v11-device-75', deviceName: '燃气烘干炉', deviceType: '加热/锅炉设备', energyUnitId: 'eu-production-processing', mainEnergyTypeId: 'v11-energy-natural-gas', remark: '涂层固化设备' },
   { deviceId: 'v11-device-78', deviceName: '冷却水循环泵组', deviceType: '泵类', energyUnitId: 'eu-utilities', mainEnergyTypeId: 'v11-energy-electricity', remark: '直属动力中心的公辅循环设备' },
   { deviceId: 'v11-device-62', deviceName: '1#螺杆空压机', deviceType: '空压设备', energyUnitId: 'eu-compressed-air', mainEnergyTypeId: 'v11-energy-electricity', remark: '额定排气量 20m³/min' },
   { deviceId: 'v11-device-79', deviceName: '2#螺杆空压机', deviceType: '空压设备', energyUnitId: 'eu-compressed-air', mainEnergyTypeId: 'v11-energy-electricity', remark: '备用及调峰空压设备' },
-  { deviceId: 'v11-device-81', deviceName: '余热发电机组', deviceType: '动力设备', energyUnitId: 'eu-waste-heat-power', mainEnergyTypeId: 'v11-energy-electricity', remark: '余热回收发电辅助用电设备' },
+  { deviceId: 'v11-device-81', deviceName: '余热发电机组', deviceType: '能源转换设备', energyUnitId: 'eu-waste-heat-power', mainEnergyTypeId: 'v11-energy-electricity', remark: '余热回收发电辅助用电设备' },
   { deviceId: 'v11-device-82', deviceName: '2t/h天然气蒸汽锅炉', deviceType: '加热/锅炉设备', energyUnitId: 'eu-gas-boiler', mainEnergyTypeId: 'v11-energy-natural-gas', remark: '公辅蒸汽供应设备' },
-  { deviceId: 'v11-device-83', deviceName: '1#配电变压器', deviceType: '动力设备', energyUnitId: 'eu-distributed-pv', mainEnergyTypeId: 'v11-energy-electricity', remark: '厂内配电及电能分配设备' },
-  { deviceId: 'v11-device-84', deviceName: '中央空调主机', deviceType: '制冷/空调设备', energyUnitId: 'eu-office', mainEnergyTypeId: 'v11-energy-electricity', remark: '办公区域集中制冷设备' },
 ];
 
 const seedDevices = industrialDeviceDictionary.map((item) => ({ ...item }));
@@ -341,6 +342,51 @@ export function saveV11ConversionOutput(input: Omit<V11ConversionOutput, 'conver
     && item.conversionEnergyUnitId === normalizedInput.conversionEnergyUnitId,
   );
   if (duplicate) return { ok: false as const, error: '该年度、该系统的同类业务记录已维护，请编辑已有记录。' };
+  const amounts = [
+    normalizedInput.outputAmount ?? 0,
+    normalizedInput.internalAmount ?? 0,
+    normalizedInput.externalAmount,
+    normalizedInput.lossAmount ?? 0,
+  ];
+  if (amounts.some((amount) => !Number.isFinite(amount) || amount < 0)) {
+    return { ok: false as const, error: '产出、内部去向、外部输出和损失量不能为负数。' };
+  }
+  if (normalizedInput.externalAmount > (normalizedInput.outputAmount ?? 0)) {
+    return { ok: false as const, error: '外部输出量不能超过能源产出总量。' };
+  }
+  const monthlyFields = [
+    normalizedInput.monthlyInputAmounts,
+    normalizedInput.monthlyOutputAmounts,
+    normalizedInput.monthlyInternalAmounts,
+    normalizedInput.monthlyExternalAmounts,
+    normalizedInput.monthlyLossAmounts,
+  ].filter((values): values is number[] => Boolean(values));
+  if (monthlyFields.some((values) => values.length !== 12 || values.some((value) => !Number.isFinite(value) || value < 0))) {
+    return { ok: false as const, error: '转换月度数据必须填写12个月且不能为负数。' };
+  }
+  if (normalizedInput.monthlyOutputAmounts) {
+    for (let index = 0; index < 12; index += 1) {
+      const assigned = (normalizedInput.monthlyInternalAmounts?.[index] ?? 0)
+        + (normalizedInput.monthlyExternalAmounts?.[index] ?? 0)
+        + (normalizedInput.monthlyLossAmounts?.[index] ?? 0);
+      if (Math.abs(normalizedInput.monthlyOutputAmounts[index] - assigned) > 1e-8) {
+        return { ok: false as const, error: '转换月度产出与内部使用、外供及损失不平衡。' };
+      }
+    }
+  }
+  if (normalizedInput.inputMode === 'linked') {
+    if (!normalizedInput.inputEnergyRecordId) return { ok: false as const, error: '关联投入模式必须选择上游能源数据记录。' };
+    const source = energyRecords.find((item) => item.energyRecordId === normalizedInput.inputEnergyRecordId);
+    if (!source) return { ok: false as const, error: '关联的投入能源数据不存在。' };
+    if (source.year !== normalizedInput.year) return { ok: false as const, error: '转换记录与投入能源数据必须属于同一年度。' };
+    if (!['能源消费', '回收能源'].includes(source.energyRole)) {
+      return { ok: false as const, error: '只有能源消费或回收能源记录可以作为转换投入。' };
+    }
+  }
+  if (normalizedInput.inputMode === 'recovery'
+    && (!(normalizedInput.recoveryAmount ?? 0) || !normalizedInput.recoveryEnergyName)) {
+    return { ok: false as const, error: '回收能源模式必须填写回收能源品种和投入量。' };
+  }
   if (normalizedInput.recordType === '直接外供' && normalizedInput.inputEnergyRecordId) {
     const source = energyRecords.find((item) => item.energyRecordId === normalizedInput.inputEnergyRecordId);
     if (!source) return { ok: false as const, error: '外供来源能源数据不存在。' };
