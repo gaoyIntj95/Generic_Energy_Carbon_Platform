@@ -23,6 +23,9 @@ import {
   DEMO_ORGANIZATION_ID,
   listEnergyUnits,
 } from '../../mocks/energyUnitMockStore';
+import { listV11EnergyCosts } from '../../mocks/dataManagementV11Store';
+import { buildEnergyQueryDataset } from '../../mocks/energyQuerySelector';
+import { buildIntensityCalculationView } from '../../mocks/energyIntensitySelector';
 import type { BudgetType, CarbonAsset, CarbonAssetType } from '../../types/platformDomain';
 import { Button, Drawer, Field, Modal, Tag, Toast } from './PrototypeUI';
 import { AssetAiAnalysis } from './AssetAiAnalysis';
@@ -31,14 +34,6 @@ import styles from './AssetOperationsV2.module.css';
 
 const months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 const scopes = ['全企业', '生产车间A', '生产车间B', '动力中心', '仓储物流区域', '办公区域'];
-
-const analysisRows = [
-  { name: '生产车间A', consumption: 6320, share: '31.9%', cost: 2450, change: '+2.8%', attention: '重点关注' },
-  { name: '生产车间B', consumption: 4650, share: '23.5%', cost: 1830, change: '+1.6%', attention: '关注' },
-  { name: '动力中心', consumption: 3330, share: '16.8%', cost: 1120, change: '-0.4%', attention: '一般关注' },
-  { name: '办公区域', consumption: 2880, share: '14.5%', cost: 760, change: '-1.2%', attention: '一般关注' },
-  { name: '仓储物流区域', consumption: 2640, share: '13.3%', cost: 520, change: '+1.9%', attention: '关注' },
-];
 
 const budgetRows = {
   energy: [
@@ -618,30 +613,82 @@ function BalanceDiagnosisDrawer({
   </Drawer>;
 }
 
+export function buildStrategyAnalysis(period: 'month' | 'year', scopeName: string) {
+  const year = 2026;
+  const month = 6;
+  const allUnits = listEnergyUnits().filter((unit) => unit.parentEnergyUnitId === null);
+  const selectedUnit = scopeName === '全企业' ? undefined : allUnits.find((unit) => unit.energyUnitName === scopeName);
+  const query = buildEnergyQueryDataset({ year, period, month, energyUnitId: selectedUnit?.energyUnitId });
+  const unitQueries = allUnits.map((unit) => ({ unit, query: buildEnergyQueryDataset({ year, period, month, energyUnitId: unit.energyUnitId }) }));
+  const typeConsumption = new Map<string, number>();
+  unitQueries.forEach(({ query: unitQuery }) => unitQuery.rows.forEach((row) => {
+    typeConsumption.set(row.energyTypeName, (typeConsumption.get(row.energyTypeName) ?? 0) + row.standardCoalAmount);
+  }));
+  const costs = listV11EnergyCosts().filter((item) => item.year === year);
+  const costByType = new Map<string, number>();
+  costs.forEach((cost) => {
+    const energyRow = query.rows.find((row) => row.energyQueryRowId.includes(`:${cost.energyTypeId}`));
+    const unitRows = unitQueries.flatMap((item) => item.query.rows);
+    const source = energyRow ?? unitRows.find((row) => row.energyQueryRowId.includes(`:${cost.energyTypeId}`));
+    if (!source) return;
+    const value = period === 'month' ? (cost.monthlyCosts[month - 1] ?? 0) : cost.monthlyCosts.reduce((sum, amount) => sum + amount, 0);
+    costByType.set(source.energyTypeName, value);
+  });
+  const totalCost = [...costByType.values()].reduce((sum, value) => sum + value, 0);
+  const costStructure = [...costByType.entries()].map(([name, value], index) => ({
+    name,
+    value,
+    share: totalCost ? value / totalCost * 100 : 0,
+    color: ['#2878FF', '#14AA72', '#FF8A00', '#7657F6', '#8D98A8'][index % 5],
+  })).sort((a, b) => b.value - a.value);
+  const totalUnitConsumption = unitQueries.reduce((sum, item) => sum + item.query.total, 0);
+  const rows = (selectedUnit ? unitQueries.filter((item) => item.unit.energyUnitId === selectedUnit.energyUnitId) : unitQueries)
+    .filter((item) => item.query.total > 0)
+    .map(({ unit, query: unitQuery }) => {
+      const estimatedCost = unitQuery.rows.reduce((sum, row) => {
+        const totalForType = typeConsumption.get(row.energyTypeName) ?? 0;
+        return sum + (costByType.get(row.energyTypeName) ?? 0) * (totalForType ? row.standardCoalAmount / totalForType : 0);
+      }, 0);
+      return {
+        name: unit.energyUnitName,
+        consumption: unitQuery.total,
+        share: totalUnitConsumption ? unitQuery.total / totalUnitConsumption * 100 : 0,
+        cost: estimatedCost,
+        change: unitQuery.yearOnYear,
+        attention: unitQuery.total / Math.max(totalUnitConsumption, 1) >= 0.2 ? '重点关注' : '一般关注',
+      };
+    }).sort((a, b) => b.consumption - a.consumption);
+  const intensityView = buildIntensityCalculationView(year, selectedUnit ? 'unit' : 'factory', selectedUnit?.energyUnitId ?? 'factory');
+  const intensity = intensityView.metrics.find((metric) => metric.name === '单位产品综合能耗');
+  const intensityValue = period === 'month'
+    ? intensity?.monthlyMetrics.find((item) => item.month === month)?.value ?? intensity?.value ?? null
+    : intensity?.value ?? null;
+  return { query, totalCost, costStructure, rows, intensity: intensityValue, intensityUnit: intensity?.unit ?? 'kgce/t' };
+}
+
 function AnalysisPage() {
   const { toast, notify } = useFeedback();
   const [period, setPeriod] = useState<'month' | 'year'>('month');
   const [scope, setScope] = useState('全企业');
   const [appliedScope, setAppliedScope] = useState('全企业');
   const [aiVersion, setAiVersion] = useState(0);
-  const rows = appliedScope === '全企业' ? analysisRows : analysisRows.filter((row) => row.name === appliedScope);
+  const analysis = useMemo(() => buildStrategyAnalysis(period, appliedScope), [period, appliedScope]);
   return <Page toast={toast}>
     <CommonFilters period={period} setPeriod={(value) => { setPeriod(value); setAiVersion((current) => current + 1); }} scope={scope} setScope={setScope} onQuery={() => { setAppliedScope(scope); setAiVersion((current) => current + 1); notify('查询条件已更新，AI结果需重新生成'); }} onReset={() => { setPeriod('month'); setScope('全企业'); setAppliedScope('全企业'); setAiVersion((current) => current + 1); notify('已重置查询条件，AI结果需重新生成'); }} />
-    <div className={styles.kpiThree}><Kpi label="能源消费总量" value="12,580" unit="tce" icon="◔" sub={<>同比　<b className={styles.up}>+2.3%</b></>} /><Kpi label="综合能源成本" value="10,837" unit="万元" icon="◉" sub={<>同比　<b className={styles.up}>+2.3%</b></>} /><Kpi label="单位产品综合能耗" value="97.6" unit="kgce/t" icon="↗" sub={<>同比　<b className={styles.down}>-0.7%</b></>} /></div>
-    <div className={styles.twoColumns}><section className={`${styles.card} ${styles.panel}`}><h2>能源消费结构</h2><EnergyDonut /></section><section className={`${styles.card} ${styles.panel}`}><h2>能源成本结构</h2><CostBars /></section></div>
-    <section className={`${styles.card} ${styles.tableCard}`}><h2>重点用能单元分析</h2><div className={styles.tableWrap}><table><thead><tr><th>用能单元</th><th>能源消费量（tce）</th><th>占比</th><th>能源成本（万元）</th><th>同比变化</th><th>关注建议</th></tr></thead><tbody>{rows.map((row) => <tr key={row.name}><td>{row.name}</td><td>{format(row.consumption)}</td><td>{row.share}</td><td>{format(row.cost)}</td><td className={row.change.startsWith('+') ? styles.up : styles.down}>{row.change}</td><td><Status value={row.attention} /></td></tr>)}</tbody></table></div></section>
+    <div className={styles.kpiThree}><Kpi label="能源消费总量" value={format(analysis.query.total, 1)} unit="tce" icon="◔" sub={<>同比　<b className={analysis.query.yearOnYear > 0 ? styles.up : styles.down}>{analysis.query.yearOnYear >= 0 ? '+' : ''}{analysis.query.yearOnYear.toFixed(1)}%</b></>} /><Kpi label="综合能源成本" value={format(analysis.totalCost, 1)} unit="万元" icon="◉" sub={<>来自数据管理－能源成本</>} /><Kpi label="单位产品综合能耗" value={analysis.intensity === null ? '—' : format(analysis.intensity, 1)} unit={analysis.intensityUnit} icon="↗" sub={<>来自能耗指标</>} /></div>
+    <div className={styles.twoColumns}><section className={`${styles.card} ${styles.panel}`}><h2>能源消费结构</h2><EnergyDonut data={analysis.query} /></section><section className={`${styles.card} ${styles.panel}`}><h2>能源成本结构</h2><CostBars rows={analysis.costStructure} /></section></div>
+    <section className={`${styles.card} ${styles.tableCard}`}><h2>重点用能单元分析</h2><div className={styles.tableWrap}><table><thead><tr><th>用能单元</th><th>能源消费量（tce）</th><th>占比</th><th>能源成本（万元）</th><th>同比变化</th><th>关注建议</th></tr></thead><tbody>{analysis.rows.map((row) => <tr key={row.name}><td>{row.name}</td><td>{format(row.consumption, 1)}</td><td>{row.share.toFixed(1)}%</td><td>{format(row.cost, 1)}</td><td className={row.change > 0 ? styles.up : styles.down}>{row.change >= 0 ? '+' : ''}{row.change.toFixed(1)}%</td><td><Status value={row.attention} /></td></tr>)}</tbody></table></div></section>
     <AssetAiAnalysis analysisKey="analysis" invalidationVersion={aiVersion} notify={notify} />
   </Page>;
 }
 
-function EnergyDonut() {
-  const data = [['#3B82F6','煤炭','6,920 tce','55.0%'],['#35B99A','外购电力','3,546 tce','28.2%'],['#FF9D24','替代燃料','1,734 tce','13.8%'],['#7D61E8','天然气','226 tce','1.8%'],['#9BA7B6','其他','154 tce','1.2%']];
-  return <div className={styles.donutLayout}><div className={styles.donut}><div>12,580<small>tce</small></div></div><div className={styles.legend}>{data.map(([color, name, value, share]) => <div key={name}><i style={{ background: color }} /><span>{name}</span><b>{value}</b><em>{share}</em></div>)}</div></div>;
+function EnergyDonut({ data }: { data: ReturnType<typeof buildEnergyQueryDataset> }) {
+  return <div className={styles.donutLayout}><div className={styles.donut}><div>{format(data.total, 1)}<small>tce</small></div></div><div className={styles.legend}>{data.structure.map((item) => <div key={item.label}><i style={{ background: item.color }} /><span>{item.label}</span><b>{format(item.amount, 1)} tce</b><em>{item.share.toFixed(1)}%</em></div>)}</div></div>;
 }
 
-function CostBars() {
-  const rows = [['煤炭','6,240 万元','57.6%',100,'#2878FF'],['外购电力','2,340 万元','21.6%',55,'#14AA72'],['替代燃料','1,260 万元','11.6%',29,'#FF8A00'],['天然气','488 万元','4.5%',10,'#7657F6'],['其他','509 万元','4.7%',8,'#8D98A8']] as const;
-  return <div className={styles.costBars}>{rows.map(([name, value, share, width, color], index) => <div key={name}><i style={{ background: color }}>{index + 1}</i><span>{name}</span><b><em style={{ width: `${width}%`, background: color }} /></b><strong>{value}</strong><small>{share}</small></div>)}</div>;
+function CostBars({ rows }: { rows: Array<{ name: string; value: number; share: number; color: string }> }) {
+  const largest = Math.max(...rows.map((row) => row.value), 1);
+  return <div className={styles.costBars}>{rows.map((row, index) => <div key={row.name}><i style={{ background: row.color }}>{index + 1}</i><span>{row.name}</span><b><em style={{ width: `${row.value / largest * 100}%`, background: row.color }} /></b><strong>{format(row.value, 1)} 万元</strong><small>{row.share.toFixed(1)}%</small></div>)}</div>;
 }
 
 function BudgetPage() {

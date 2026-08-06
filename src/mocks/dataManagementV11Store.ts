@@ -145,10 +145,37 @@ const seedEnergyRecords: V11EnergyRecord[] = [
   { energyRecordId: 'v11-er-device-84', year: 2026, scopeLevel: '一级用能单元', scopeType: 'device', scopeId: 'v11-device-84', energyUnitId: 'eu-office', energyRole: '能源消费', energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [62000,60000,64000,67000,71000,76000,82000,80000,72000,68000,65000,63000] },
 ];
 
+// 查询页使用的公辅系统归属数据，统一维护在能源数据 Tab，避免分析页自行拼接。
+seedEnergyRecords.push(
+  { energyRecordId: 'v11-er-46', year: 2026, scopeLevel: seedEnergyRecords[1].scopeLevel, energyUnitId: 'eu-utilities', energyRole: seedEnergyRecords[0].energyRole, energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [2100000,2050000,2150000,2200000,2250000,2300000,2350000,2320000,2280000,2240000,2300000,2400000] },
+  { energyRecordId: 'v11-er-47', year: 2026, scopeLevel: seedEnergyRecords[1].scopeLevel, energyUnitId: 'eu-utilities', energyRole: seedEnergyRecords[0].energyRole, energyTypeId: 'v11-energy-steam', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [5200,5000,5400,5500,5600,5700,5800,5700,5500,5400,5600,5900] },
+  { energyRecordId: 'v11-er-48', year: 2026, scopeLevel: seedEnergyRecords[1].scopeLevel, energyUnitId: 'eu-utilities', energyRole: seedEnergyRecords[0].energyRole, energyTypeId: 'v11-energy-compressed-air', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [900000,880000,920000,940000,960000,980000,1000000,990000,970000,950000,980000,1020000] },
+);
+
+const historyScaling: Record<number, number> = {
+  2022: 0.865,
+  2023: 0.902,
+  2024: 0.936,
+  2025: 0.969,
+};
+const historySourceRecords = seedEnergyRecords.filter((record) => record.year === 2026 && record.scopeType !== 'device');
+
+// 历史年度沿用 2026 年已确认的能源结构和季节性，并体现产能逐年提升后的合理增长。
+seedEnergyRecords.push(...historySourceRecords.flatMap((source) => {
+  return Object.entries(historyScaling).map(([year, factor]) => ({
+    ...source,
+    energyRecordId: `${source.energyRecordId}-${year}`,
+    year: Number(year),
+    monthlyAmounts: source.monthlyAmounts.map((amount) => Math.round(amount * factor)),
+  }));
+}));
+
 const seedEnergyCosts: V11EnergyCost[] = [
   { energyCostId: 'v11-cost-40', year: 2026, energyTypeId: 'v11-energy-electricity', monthlyCosts: [310,306,318,325,330,334,339,336,331,329,335,345] },
   { energyCostId: 'v11-cost-41', year: 2026, energyTypeId: 'v11-energy-coal', monthlyCosts: [78,75,80,82,83,84,86,85,84,83,85,93] },
   { energyCostId: 'v11-cost-42', year: 2026, energyTypeId: 'v11-energy-rdf', monthlyCosts: [13,12.5,13.4,14,14.5,14.8,15.2,15,14.6,14.2,14.8,15.5] },
+  { energyCostId: 'v11-cost-43', year: 2026, energyTypeId: 'v11-energy-natural-gas', monthlyCosts: [32.4,31.6,33.8,34.7,36.1,36.8,37.9,37.4,36.6,35.9,36.7,39.2] },
+  { energyCostId: 'v11-cost-44', year: 2026, energyTypeId: 'v11-energy-steam', monthlyCosts: [5.1,5.1,5.2,5.2,5.3,5.3,5.4,5.3,5.3,5.2,5.3,5.4] },
 ];
 
 const seedConversionOutputs: V11ConversionOutput[] = [
@@ -163,9 +190,29 @@ const seedOperations: V11OperationMetric[] = [
   { operationMetricId: 'v11-operation-52', metricCode: 'product_output', productId: 'product-b', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-cement-grinding-line', metricCategory: '产量', aggregationMethod: '月度求和', metricName: '产品产量', metricUnit: 't', entryMode: 'monthly', annualValue: 0, monthlyValues: [91000,89500,92500,94000,95800,97000,98200,97800,96500,95200,97000,100000] },
   { operationMetricId: 'v11-operation-53', metricCode: 'product_output', productId: 'product-b', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-clinker-line-1', metricCategory: '产量', aggregationMethod: '月度求和', metricName: '产品产量', metricUnit: 't', entryMode: 'monthly', annualValue: 0, monthlyValues: [30000,28500,31000,31500,32000,32500,33000,32800,32200,31800,32500,33800] },
   { operationMetricId: 'v11-operation-54', metricCode: 'product_output', productId: 'product-c', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-cement-grinding-line', metricCategory: '产量', aggregationMethod: '月度求和', metricName: '产品产量', metricUnit: '件', entryMode: 'monthly', annualValue: 0, monthlyValues: [8200,8100,8400,8500,8600,8750,8900,8850,8700,8600,8750,9100] },
+  { operationMetricId: 'v11-operation-utility-volume', metricCode: 'business_volume', productId: null, year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-utilities', metricCategory: '运行指标', aggregationMethod: '月度求和', metricName: '公辅系统运行量', metricUnit: '万业务量', entryMode: 'monthly', annualValue: 0, monthlyValues: [420,405,438,450,465,480,495,488,472,460,478,510] },
+  { operationMetricId: 'v11-operation-office-volume', metricCode: 'business_volume', productId: null, year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-office', metricCategory: '运行指标', aggregationMethod: '月度求和', metricName: '办公区域运行量', metricUnit: '万业务量', entryMode: 'monthly', annualValue: 0, monthlyValues: [118,112,121,124,128,132,135,133,129,126,131,140] },
+  { operationMetricId: 'v11-operation-warehouse-volume', metricCode: 'business_volume', productId: null, year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-public-support', metricCategory: '运行指标', aggregationMethod: '月度求和', metricName: '仓储物流运行量', metricUnit: '万业务量', entryMode: 'monthly', annualValue: 0, monthlyValues: [205,198,214,220,230,238,245,240,232,225,236,252] },
 ];
 
 /** 重点用能设备字典样例：仅保留具有显著用能、独立计量或优化价值的典型设备。 */
+const operationHistoryScaling: Record<number, number> = {
+  2022: 0.830,
+  2023: 0.868,
+  2024: 0.910,
+  2025: 0.955,
+};
+const operationHistorySources = seedOperations.map(cloneOperation);
+
+// 产量和经营指标的历史增长略快于能源消费，反映产能爬坡及单位能耗逐年改善。
+seedOperations.push(...operationHistorySources.flatMap((source) => Object.entries(operationHistoryScaling).map(([year, factor]) => ({
+  ...source,
+  operationMetricId: `${source.operationMetricId}-${year}`,
+  year: Number(year),
+  annualValue: source.annualValue ? Math.round(source.annualValue * factor) : 0,
+  monthlyValues: source.monthlyValues.map((value) => Math.round(value * factor)),
+}))));
+
 const industrialDeviceDictionary: V11KeyDevice[] = [
   { deviceId: 'v11-device-60', deviceName: '1#数控加工中心', deviceType: '加工设备', energyUnitId: 'eu-raw-material', mainEnergyTypeId: 'v11-energy-electricity', remark: '三轴数控加工，生产车间A重点用电设备' },
   { deviceId: 'v11-device-63', deviceName: '2#数控加工中心', deviceType: '加工设备', energyUnitId: 'eu-clinker-line-1', mainEnergyTypeId: 'v11-energy-electricity', remark: '五轴数控加工，直属生产车间A' },
@@ -211,6 +258,115 @@ function cloneCost(item: V11EnergyCost): V11EnergyCost {
 function cloneOperation(item: V11OperationMetric): V11OperationMetric {
   return { ...item, monthlyValues: [...item.monthlyValues] };
 }
+
+// Balance completion: the source ledger contains level-one allocation while
+// only a small part has level-two terminal data. Complete the missing
+// terminal path at monthly granularity; annual totals then roll up naturally.
+const annualCompletionChildren: Record<string, string[]> = {
+  'eu-clinker-line-1': ['eu-raw-material', 'eu-clinker-burning', 'eu-quality-inspection'],
+  'eu-cement-grinding-line': ['eu-cement-grinding', 'eu-production-processing', 'eu-packaging'],
+  'eu-utilities': ['eu-compressed-air', 'eu-waste-heat-power', 'eu-gas-boiler', 'eu-distributed-pv'],
+  'eu-office': ['eu-office-hvac'],
+};
+const energyTypeById = new Map(seedEnergyTypes.map((item) => [item.energyTypeId, item]));
+const annualAmount = (record: V11EnergyRecord) => record.annualAmount > 0
+  ? record.annualAmount
+  : record.monthlyAmounts.reduce((total, value) => total + value, 0);
+const linkedConversionInputs = new Set(
+  conversionOutputs.map((item) => item.inputEnergyRecordId).filter(Boolean),
+);
+const completionCandidates = Object.entries(annualCompletionChildren).flatMap(([parentId, children]) => {
+  const levelOne = energyRecords.filter((record) => record.year === 2026
+    && record.energyUnitId === parentId
+    && record.scopeType !== 'device'
+    && !linkedConversionInputs.has(record.energyRecordId));
+  const byType = new Map<string, number>();
+  levelOne.forEach((record) => byType.set(record.energyTypeId,
+    (byType.get(record.energyTypeId) ?? 0) + annualAmount(record)));
+  const existingByType = new Map<string, number>();
+  energyRecords.filter((record) => record.year === 2026
+    && record.energyUnitId
+    && children.includes(record.energyUnitId)
+    && record.scopeType !== 'device'
+    && !linkedConversionInputs.has(record.energyRecordId))
+    .forEach((record) => existingByType.set(record.energyTypeId,
+      (existingByType.get(record.energyTypeId) ?? 0) + annualAmount(record)));
+  return [...byType.entries()].flatMap(([energyTypeId, allocatedPhysical]) => {
+    const type = energyTypeById.get(energyTypeId);
+    if (!type || type.standardCoalFactor <= 0) return [];
+    const existingPhysical = existingByType.get(energyTypeId) ?? 0;
+    const missingStandard = Math.max(allocatedPhysical - existingPhysical, 0) * type.standardCoalFactor
+      / (type.standardCoalFactorUnit.startsWith('kgce') ? 1000 : 1);
+    return children.map((childId, index) => ({
+      energyRecordId: `v11-er-completion-${parentId}-${energyTypeId}-${index}`,
+      parentId,
+      childId,
+      childCount: children.length,
+      energyTypeId,
+      missingStandard: missingStandard / children.length,
+      factor: type.standardCoalFactor,
+      factorUnit: type.standardCoalFactorUnit,
+    }));
+  });
+});
+const monthlyMissingByKey = new Map<string, number[]>();
+Object.entries(annualCompletionChildren).forEach(([parentId, children]) => {
+  const levelOne = energyRecords.filter((record) => record.year === 2026
+    && record.energyUnitId === parentId
+    && record.scopeType !== 'device'
+    && !linkedConversionInputs.has(record.energyRecordId));
+  const existing = energyRecords.filter((record) => record.year === 2026
+    && record.energyUnitId
+    && children.includes(record.energyUnitId)
+    && record.scopeType !== 'device'
+    && !linkedConversionInputs.has(record.energyRecordId));
+  const typeIds = new Set([...levelOne, ...existing].map((record) => record.energyTypeId));
+  typeIds.forEach((energyTypeId) => {
+    const type = energyTypeById.get(energyTypeId);
+    if (!type || type.standardCoalFactor <= 0) return;
+    const values = Array.from({ length: 12 }, (_, month) => {
+      const allocated = levelOne
+        .filter((record) => record.energyTypeId === energyTypeId)
+        .reduce((total, record) => total + (record.monthlyAmounts[month] ?? 0), 0);
+      const used = existing
+        .filter((record) => record.energyTypeId === energyTypeId)
+        .reduce((total, record) => total + (record.monthlyAmounts[month] ?? 0), 0);
+      return Math.max(allocated - used, 0) * type.standardCoalFactor
+        / (type.standardCoalFactorUnit.startsWith('kgce') ? 1000 : 1);
+    });
+    monthlyMissingByKey.set(`${parentId}|${energyTypeId}`, values);
+  });
+});
+const monthlyBranchStandard = Array.from({ length: 12 }, (_, month) => conversionOutputs.reduce((total, output) => {
+  const outputType = energyTypeById.get(output.outputEnergyTypeId ?? '');
+  const external = (output.monthlyExternalAmounts?.[month] ?? 0) * (outputType?.standardCoalFactor ?? 0)
+    / (outputType?.standardCoalFactorUnit.startsWith('kgce') ? 1000 : 1);
+  const recovery = output.inputMode === 'recovery'
+    ? (output.monthlyInputAmounts?.[month] ?? 0) * (energyTypeById.get('v11-energy-waste-heat')?.standardCoalFactor ?? 0)
+    : 0;
+  return total + external + recovery;
+}, 0));
+const monthlyScale = Array.from({ length: 12 }, (_, month) => {
+  const total = [...monthlyMissingByKey.values()].reduce((sum, values) => sum + values[month], 0);
+  return total > 0 ? Math.max(total - monthlyBranchStandard[month], 0) / total : 0;
+});
+const completionRows = completionCandidates.map((row) => ({
+  energyRecordId: row.energyRecordId,
+  year: 2026,
+  scopeLevel: '二级用能单元' as const,
+  energyUnitId: row.childId,
+  energyRole: '能源消费' as const,
+  energyTypeId: row.energyTypeId,
+  entryMode: 'monthly' as const,
+  annualAmount: 0,
+  monthlyAmounts: Array.from({ length: 12 }, (_, month) => {
+    const missing = monthlyMissingByKey.get(`${row.parentId}|${row.energyTypeId}`)?.[month] ?? 0;
+    return missing / row.childCount * monthlyScale[month]
+      / row.factor * (row.factorUnit.startsWith('kgce') ? 1000 : 1);
+  }),
+}));
+energyRecords.push(...completionRows);
+
 function nextId(prefix: string) {
   sequence += 1;
   return `${prefix}-${sequence}`;
@@ -427,6 +583,7 @@ export function v11ScopeName(energyUnitId: string | null) {
 export function resetDataManagementV11Store() {
   energyTypes = seedEnergyTypes.map((item) => ({ ...item }));
   energyRecords = seedEnergyRecords.map(cloneRecord);
+  energyRecords.push(...completionRows);
   energyCosts = seedEnergyCosts.map(cloneCost);
   conversionOutputs = seedConversionOutputs.map((item) => ({ ...item }));
   operations = seedOperations.map(cloneOperation);

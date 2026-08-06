@@ -26,6 +26,13 @@ async function setInput(element: HTMLInputElement, value: string) {
   });
 }
 
+async function setSelect(element: HTMLSelectElement, value: string) {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set?.call(element, value);
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
 async function render(pathname: string) {
   await act(async () => root.render(<MemoryRouter><CarbonAccountingV4 pathname={pathname} /></MemoryRouter>));
 }
@@ -50,7 +57,7 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
     expect(container.textContent).toContain('排放趋势（近5年）');
     expect(container.textContent).toContain('主要排放源排行');
     expect(container.textContent).toContain('本次核算排放汇总');
-    expect(container.textContent).toContain('正式核算清单 V1');
+    expect(container.textContent).toContain('正式核算清单｜确认人：管理员');
     expect(container.textContent).toContain('确认人：管理员');
     expect(container.textContent).toContain('正式核算清单数据完整，共8项排放源');
     expect(container.textContent).toContain('化石燃料燃烧排放');
@@ -88,7 +95,7 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
     await click(button('取消', dialog));
 
     await click(button('生成报告'));
-    expect(container.textContent).toContain('已基于正式核算清单 V1 生成排放报告');
+    expect(container.textContent).toContain('已基于当前正式核算清单生成排放报告');
   });
 
   it('filters, creates and deletes inventory records with real mock-state changes', async () => {
@@ -98,7 +105,7 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
     expect(gasRow.querySelector('[data-column="source"]')?.textContent).toContain('天然气燃烧（锅炉房）');
     expect(gasRow.querySelector('[data-column="activity"]')?.textContent).toContain('120,000 Nm³');
     expect(gasRow.querySelector('[data-column="gas-species"]')?.textContent).toContain('CO₂');
-    expect(gasRow.querySelector('[data-column="factor"]')?.textContent).toContain('2.154 kgCO₂/Nm³');
+    expect(gasRow.querySelector('[data-column="emission-factor"]')?.textContent).toContain('2.154 kgCO₂/Nm³');
     expect(gasRow.querySelector('[data-column="emission"]')?.textContent).toContain('258.48');
     expect(gasRow.querySelector('[data-column="actions"]')?.textContent).toContain('查看');
     const search = container.querySelector('input[placeholder="搜索排放源、因子或参数"]') as HTMLInputElement;
@@ -109,8 +116,9 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
     await click(button('发起修订'));
 
     await click(button('新增排放源'));
-    await setInput(container.querySelector('input[placeholder="例如：制冷剂逸散源"]')!, '制冷剂逸散源');
-    await setInput(container.querySelector('input[placeholder="请输入排放源名称"]')!, '测试制冷剂补充');
+    const sourceDialog = container.querySelector('[role="dialog"]')!;
+    await setSelect(sourceDialog.querySelectorAll('select')[1] as HTMLSelectElement, '其他/自定义');
+    await setInput(container.querySelector('input[placeholder="请输入具体排放源名称"]')!, '测试制冷剂补充');
     await setInput(container.querySelector('input[type="number"]')!, '10');
     await setInput(container.querySelector('input[placeholder="例如：kg、t、MWh"]')!, 'kg');
     await click(button('保存排放源'));
@@ -118,9 +126,42 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
 
     const row = [...container.querySelectorAll('tr')].find((item) => item.textContent?.includes('测试制冷剂补充'))!;
     await click(button('删除', row));
-    expect(container.textContent).toContain('该记录为人工新增');
+    expect(container.textContent).toContain('关联的上游能源或运营数据不会被删除');
     await click(button('确认删除'));
     expect(container.textContent).not.toContain('测试制冷剂补充');
+  });
+
+  it('previews an energy-only draft without replacing the current inventory until confirmed', async () => {
+    await render('/carbon-accounting/inventory');
+    const currentRowCount = container.querySelectorAll('section[class*="inventoryShell"] table[class*="groupTable"] tbody tr').length;
+    await click(button('开始年度核算'));
+    expect(container.textContent).toContain('开始年度核算');
+    await click(button('确定并开始核算'));
+
+    const preview = container.querySelector('[role="dialog"]')!;
+    expect(preview.textContent).toContain('年度草稿清单生成预览');
+    expect(preview.textContent).toContain('即将生成的草稿清单');
+    expect(preview.textContent).toContain('温室气体源类型');
+    expect(preview.textContent).toContain('5 项');
+    expect(preview.textContent).toContain('原煤（企业层级）');
+    expect(preview.textContent).toContain('天然气（企业层级）');
+    expect(preview.textContent).not.toContain('生产车间A');
+    expect(preview.textContent).toContain('化石燃料燃烧排放（2）');
+    expect(preview.textContent).toContain('218,735.82');
+    expect(preview.textContent).not.toContain('待匹配排放类别');
+    expect(preview.textContent).toContain('待完善 1');
+    expect(preview.textContent).not.toContain('废水处理');
+    expect(container.querySelectorAll('section[class*="inventoryShell"] table[class*="groupTable"] tbody tr').length).toBe(currentRowCount);
+
+    await click(button('返回修改任务设置', preview));
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.querySelectorAll('section[class*="inventoryShell"] table[class*="groupTable"] tbody tr').length).toBe(currentRowCount);
+
+    await click(button('开始年度核算'));
+    await click(button('确定并开始核算'));
+    await click(button('确认生成草稿清单'));
+    expect(container.textContent).toContain('草稿已自动保存');
+    expect(container.textContent).toContain('天然气');
   });
 
   it('opens the dedicated source drawer, switches a parameter group and confirms a formal snapshot', async () => {
@@ -129,9 +170,13 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
     const row = [...container.querySelectorAll('tr')].find((item) => item.textContent?.includes('天然气燃烧（锅炉房）'))!;
     await click(button('编辑', row));
     expect(container.textContent).toContain('编辑排放源');
-    expect(container.textContent).toContain('计算因子拆解');
+    expect(container.textContent).toContain('结果因子/折算值');
+    expect(container.textContent).toContain('因子拆解');
+    expect(container.textContent).toContain('低位发热量 NCV');
+    expect(container.querySelector('input[type="number"]')).not.toBeNull();
+    expect(container.textContent).not.toContain('数据追溯信息');
 
-    await click(button('从因子与参数库重新选择'));
+    await click(button('更换因子/参数'));
     const radios = container.querySelectorAll('input[type="radio"]');
     await click(radios[1] as HTMLInputElement);
     await click(button('确认选择'));
@@ -142,14 +187,16 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
     expect(container.textContent).toContain('本次修改详情');
     await click(button('关闭'));
     await click(button('确认并更新正式清单'));
-    expect(container.textContent).toContain('正式版本');
+    expect(container.textContent).toContain('更新后状态');
     await click(button('确认更新'));
-    expect(container.textContent).toContain('正式清单版本：V2');
+    expect(container.textContent).toContain('正式清单当前有效');
+    expect(container.textContent).not.toContain('V2');
+    expect(container.textContent).not.toContain('查看更新记录');
     expect(button('新增排放源').disabled).toBe(true);
 
     await render('/carbon-accounting/preview');
     expect(container.textContent).toContain('本次核算排放汇总');
-    expect(container.textContent).toContain('正式核算清单 V2');
+    expect(container.textContent).toContain('正式核算清单｜确认人：管理员');
     expect(container.textContent).toContain('确认人：管理员');
     expect(container.textContent).toContain('查看正式核算清单');
     expect(container.textContent).toContain('导出核算结果');
@@ -161,11 +208,14 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
     expect(container.querySelectorAll('[data-support-table] col')).toHaveLength(7);
     expect(container.querySelector('[data-group-title="核算主体与边界"]')?.textContent).toContain('核算主体与边界');
     await click(button('排放源支撑材料'));
-    expect(container.querySelectorAll('[data-support-table] col')).toHaveLength(8);
+    expect(container.querySelectorAll('[data-support-table] col')).toHaveLength(7);
     expect(container.querySelector('[data-group-title="化石燃料燃烧排放"]')?.textContent).toContain('化石燃料燃烧排放');
     expect(container.textContent).toContain('外购电力（企业整体）');
     expect(container.textContent).toContain('用户可根据企业实际台账、报表和凭证进行确认、调整或补充');
+    expect(container.textContent).toContain('查看');
+    await click(button('查看'));
     expect(container.textContent).toContain('支撑管理');
+    await click(button('关闭'));
 
     await render('/carbon-accounting/factors');
     await click(button('企业自定义因子/参数'));

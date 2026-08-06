@@ -170,6 +170,57 @@ export interface FlowAnalysisDataset {
   dataNotice: string;
 }
 
+export interface EnergyBalanceSummary {
+  inputStandardCoalAmount: number;
+  effectiveUseStandardCoalAmount: number;
+  recoveredStandardCoalAmount: number;
+  externalOutputStandardCoalAmount: number;
+  differenceStandardCoalAmount: number;
+}
+
+export function summarizeFlowBalance(
+  levelOneDataset: FlowAnalysisDataset,
+  levelTwoDataset: FlowAnalysisDataset,
+  scope = 'enterprise',
+): EnergyBalanceSummary {
+  if (scope === 'enterprise') {
+    const recovered = sum(levelOneDataset.levelOneBalanceRows.map(
+      (row) => row.internalRecoveryStandardAmount,
+    ));
+    // Optimization uses the same internal-balance boundary shown in the
+    // overview: level-one distribution, not the enterprise-boundary input.
+    const input = levelOneDataset.utilizationStandardCoalAmount;
+    const difference = input
+      - levelTwoDataset.utilizationStandardCoalAmount
+      - recovered
+      - levelOneDataset.externalStandardCoalAmount;
+    return {
+      inputStandardCoalAmount: input,
+      effectiveUseStandardCoalAmount: levelTwoDataset.utilizationStandardCoalAmount,
+      recoveredStandardCoalAmount: recovered,
+      externalOutputStandardCoalAmount: levelOneDataset.externalStandardCoalAmount,
+      differenceStandardCoalAmount: difference,
+    };
+  }
+
+  const rows = levelTwoDataset.levelTwoBalanceRows.filter(
+    (row) => row.level1EnergyUnitId === scope,
+  );
+  const input = sum(rows.map((row) => row.distributionStandardAmount));
+  const effectiveUse = sum(rows.map((row) => row.utilizationStandardAmount));
+  const unitName = rows[0]?.level1EnergyUnitName;
+  const external = sum(levelOneDataset.detailRows
+    .filter((row) => row.stage === '外部输出' && row.level1EnergyUnitName === unitName)
+    .map((row) => row.standardCoalAmount));
+  return {
+    inputStandardCoalAmount: input,
+    effectiveUseStandardCoalAmount: effectiveUse,
+    recoveredStandardCoalAmount: 0,
+    externalOutputStandardCoalAmount: external,
+    differenceStandardCoalAmount: input - effectiveUse - external,
+  };
+}
+
 type Amount = { physical: number; standard: number; unit: string };
 type RecordBucket = Amount & { records: V11EnergyRecord[] };
 type ConversionAmount = {

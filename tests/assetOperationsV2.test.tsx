@@ -30,13 +30,6 @@ async function setInput(element: HTMLInputElement, value: string) {
   });
 }
 
-async function setSelect(element: HTMLSelectElement, value: string) {
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set?.call(element, value);
-    element.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-}
-
 async function render(pathname: string) {
   await act(async () => root.render(<AssetOperationsV2 pathname={pathname} />));
 }
@@ -55,47 +48,40 @@ describe('AssetOperationsV2 V2 prototype fidelity and interactions', () => {
   });
 
   it('uses the shared flow aggregation in the V7 balance overview and opens unit details', async () => {
-    const levelTwo = buildFlowAnalysisDataset({ year: 2026, grain: 'month', month: 6 }, 'level2');
-    const unitInput = levelTwo.levelTwoBalanceRows
-      .reduce((total, row) => total + row.distributionStandardAmount, 0);
+    const levelOne = buildFlowAnalysisDataset({ year: 2026, grain: 'month', month: 6 }, 'level1');
+    const availableInput = levelOne.levelOneBalanceRows
+      .reduce((total, row) => total + row.availableStandardAmount, 0);
     await render('/asset-strategy/balance');
-    expect(container.textContent).toContain('能源输入量');
-    expect(container.textContent).toContain('终端有效利用量');
-    expect(container.textContent).toContain('回收利用量');
+    expect(container.textContent).toContain('厂内可供分配量');
+    expect(container.textContent).toContain('一级已分配量');
+    expect(container.textContent).toContain('内部回收/转换产出');
     expect(container.textContent).toContain('外部输出量');
-    expect(container.textContent).toContain('平衡偏差');
-    expect(container.textContent).toContain('能效平衡总览');
-    expect(container.textContent).toContain('关键偏差对象 TOP5');
-    expect(container.textContent).toContain('用能单元平衡清单');
-    expect(container.textContent).toContain('AI平衡研判');
+    expect(container.textContent).toContain('一级未分配量');
+    expect(container.textContent).toContain('一级能源分配平衡总览');
+    expect(container.textContent).toContain('一级分配问题 TOP5');
+    expect(container.textContent).toContain('一级能源分配诊断清单');
+    expect(container.textContent).toContain('AI一级分配诊断');
+    expect(container.textContent).not.toContain('二级利用归集诊断');
     expect(container.textContent).toContain(
-      unitInput.toLocaleString('zh-CN', { maximumFractionDigits: 1 }),
+      availableInput.toLocaleString('zh-CN', { maximumFractionDigits: 1 }),
     );
     expect(container.textContent).not.toContain('待细分量');
     expect(container.textContent).not.toContain('层级异常量');
     expect(container.textContent).not.toContain('利用归集率');
 
     await click(button('查看详情'));
-    expect(container.textContent).toContain('能效平衡诊断');
-    expect(container.textContent).toContain('问题判断');
+    expect(container.textContent).toContain('能效综合诊断');
+    expect(container.textContent).toContain('综合判断');
     expect(container.textContent).toContain('查看能流分析');
     expect(container.textContent).toContain('前往能源数据');
   });
 
-  it('filters a single unit with the simplified business balance fields', async () => {
+  it('keeps the phase-one balance scope fixed at the enterprise level', async () => {
     await render('/asset-strategy/balance');
     const selects = [...container.querySelectorAll('select')];
-    await setSelect(selects[2], 'eu-clinker-line-1');
-    await click(button('查询'));
-
-    expect(container.textContent).toContain('生产车间A');
-    expect(container.textContent).toContain('能源输入量');
-    expect(container.textContent).toContain('终端有效利用量');
-    expect(container.textContent).toContain('平衡偏差');
-    expect(container.textContent).toContain('偏差率');
-    expect(container.textContent).not.toContain('待细分量');
-    expect(container.textContent).not.toContain('利用归集率');
-    expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
+    expect(selects[2].value).toBe('enterprise');
+    expect(selects[2].disabled).toBe(true);
+    expect(container.textContent).toContain('一期');
   });
 
   it('switches budget tabs and saves target configuration into the shared store', async () => {

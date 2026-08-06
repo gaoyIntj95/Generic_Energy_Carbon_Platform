@@ -105,6 +105,25 @@ export interface CarbonSnapshot {
   otherIndirectEmission: number;
   monthlyEmissions: number[];
   sourceItems: EmissionSource[];
+  /** 正式版本固化的手动活动数据，避免草稿变更影响历史清单。 */
+  activityRecords?: CarbonActivityRecord[];
+}
+
+export interface CarbonActivityRecord {
+  activityRecordId: string;
+  emissionSourceId: string;
+  carbonTaskId: string;
+  year: number;
+  /** 当前原型支持年度录入；月度/季度录入可直接扩展 period。 */
+  period: string;
+  value: number;
+  unit: string;
+  dataSource: string;
+  sourceReference?: string;
+  evidenceFileIds: string[];
+  status: 'draft' | 'confirmed' | 'void';
+  createdBy: string;
+  createdAt: string;
 }
 
 export interface EmissionSource {
@@ -138,6 +157,10 @@ export interface EmissionSource {
   supportRemark?: string;
   relatedEnergyRecordId?: string;
   relatedOperationMetricId?: string;
+  /** 手动录入时指向 carbon_activity_record；自动接入时为空。 */
+  activityRecordIds?: string[];
+  calculationFormula?: string;
+  recordStatus?: 'draft' | 'confirmed' | 'not_applicable';
   emissionAmount: number;
   entryMode: 'system' | 'manual';
 }

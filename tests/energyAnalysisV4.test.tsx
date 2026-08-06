@@ -279,7 +279,7 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(container.textContent).toContain('仓储物流区域');
     expect(container.textContent).toContain('办公区域');
     expect(container.innerHTML).toContain('全厂一级能源分配视图');
-    expect(container.textContent).toContain('重点用能单元 TOP5');
+    expect(container.textContent).not.toContain('重点用能单元 TOP5');
     expect(container.textContent).toContain('转换损失');
     expect(container.textContent).not.toContain('加工工段');
 

@@ -77,8 +77,21 @@ export function listIntensityObjects(objectType: IntensityObjectType): Intensity
     }));
 }
 
+<<<<<<< Updated upstream
 function annualEnergyAmount(record: V11EnergyRecord) {
   return v11EnergyRecordAnnualAmount(record);
+=======
+function utilityMetrics(object: IntensityObjectOption, year: number, energy: V11EnergyRecord[], operations: V11OperationMetric[]) {
+  const isBoiler = object.objectName.includes('锅炉');
+  const output = operations.find((record) => isBoiler
+    ? record.metricCode === 'steam_output' || record.metricName.includes('蒸汽产量')
+    : record.metricCode === 'business_volume' || record.metricName.includes('业务量') || record.metricName.includes('运行量'));
+  const typeName = isBoiler ? '单位蒸汽综合能耗' : '单位运行能耗';
+  const unit = isBoiler ? 'kgce/t' : 'tce/业务量';
+  const missing: IntensityIssue | undefined = isBoiler && !output ? '缺少蒸汽产量' : !output ? '缺少必要关联关系' : undefined;
+  const coal = standardCoalTotal(energy);
+  return [baseMetric(`${object.objectId}-utility`, typeName, unit, isBoiler ? '年度折标综合能耗 ÷ 蒸汽产量' : '年度综合能耗 ÷ 运营业务量', missing ? null : coal * 1000 / annualAmount(output!), `${object.objectName}综合能耗 ${coal.toLocaleString('zh-CN')} tce`, output ? `${output.metricName} ${annualAmount(output).toLocaleString('zh-CN')} ${output.metricUnit}` : isBoiler ? '未匹配到当前对象的运营数据' : '未匹配到当前对象的运营数据', year, energy.map((record) => record.energyRecordId), output ? [output.operationMetricId] : [], missing)];
+>>>>>>> Stashed changes
 }
 
 function annualOperationAmount(record: V11OperationMetric) {

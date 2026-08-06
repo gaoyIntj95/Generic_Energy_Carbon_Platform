@@ -223,7 +223,15 @@ function EnergyQuantityPage() {
   const [keyword, setKeyword] = useState('');
   const [appliedFilters, setAppliedFilters] = useState({ year: '2026', category: '', keyword: '' });
   const [expanded, setExpanded] = useState<string | null>(null);
+<<<<<<< Updated upstream
   const [editing, setEditing] = useState<V11EnergyRecord | 'new' | null>(deviceEntry && params.get('new') === '1' ? 'new' : null);
+=======
+  const [collapsedScopes, setCollapsedScopes] = useState<Set<string>>(new Set());
+  const [editing, setEditing] = useState<V11EnergyRecord | 'new' | null>(() => {
+    if (linkedRecordId) return listV11EnergyRecords().find((record) => record.energyRecordId === linkedRecordId) ?? null;
+    return deviceEntry && params.get('new') === '1' ? 'new' : null;
+  });
+>>>>>>> Stashed changes
   const [deleting, setDeleting] = useState<V11EnergyRecord | null>(null);
   const types = listV11EnergyTypes();
   const devices = listV11KeyDevices();
@@ -294,8 +302,13 @@ function EnergyQuantityPage() {
           return [<tr key={row.energyRecordId}><td className={styles.strong}>{device?.deviceName ?? '设备档案已移除'}</td><td>{v11ScopeName(device?.energyUnitId ?? row.energyUnitId)}</td><td>{device?.deviceType ?? '—'}</td><td>{type?.analysisCategory}</td><td>{type?.energyTypeName}</td><td>{energyDataProgress(row)}</td><td className={styles.number}>{format(total, 2)} {type?.measurementUnit}</td><td><Actions onView={() => setExpanded(detail ? null : row.energyRecordId)} onEdit={() => setEditing(row)} onDelete={() => setDeleting(row)} /></td></tr>,
           detail && <tr className={styles.detailRow} key={`${row.energyRecordId}-detail`}><td colSpan={8}><MonthDetail values={row.monthlyAmounts} reported={reportedMonths(row)} annualValue={total} annualSupplemented={row.annualAmount > 0} unit={type?.measurementUnit ?? ''} /></td></tr>];
         }) : <EmptyRow colSpan={8} />}</tbody>
+<<<<<<< Updated upstream
       </table></div> : <div className={styles.tableWrap}><table className={styles.wideTable}><thead><tr><th>归属范围</th><th>归属层级</th><th>能流阶段</th><th>能源分析类别</th><th>能源品种</th><th>单位</th><th>数据进度</th><th>年度合计</th><th>操作</th></tr></thead>
         <tbody>{rows.length ? rows.flatMap((row, index) => {
+=======
+      </table></div> : <div className={styles.tableWrap}><table className={`${styles.wideTable} ${styles.quantityTable}`}><thead><tr><th>归属范围 / 能源品种</th><th>归属层级</th><th>能流阶段</th><th>能源分析类别</th><th>单位</th><th>数据进度</th><th>年度合计</th><th>操作</th></tr></thead>
+        <tbody>{pageRows.length ? pageRows.flatMap((row, index) => {
+>>>>>>> Stashed changes
           const type = types.find((item) => item.energyTypeId === row.energyTypeId);
           const scopeType = v11RecordScopeType(row);
           const unit = row.energyUnitId ? unitById.get(row.energyUnitId) : null;
@@ -311,9 +324,17 @@ function EnergyQuantityPage() {
             : '';
           const total = annual(row.monthlyAmounts, row.annualAmount);
           const detail = expanded === row.energyRecordId;
-          return [<tr className={currentScopeKey !== previousScopeKey ? styles.scopeGroupStart : ''} key={row.energyRecordId}><td><div className={`${styles.scopeCell} ${styles[`scopeDepth${depth}`]}`}><i /><span><b>{scopeName}</b>{device && <small>所属：{v11ScopeName(device.energyUnitId)}</small>}</span></div></td><td>{scopeLevel}</td><td><span className={styles.stagePill}>{energyStage(row)}</span></td><td>{type?.analysisCategory}</td><td>{type?.energyTypeName}</td><td>{type?.measurementUnit}</td><td>{energyDataProgress(row)}</td><td className={styles.number}>{format(total, 2)}</td><td><Actions onView={() => setExpanded(detail ? null : row.energyRecordId)} onEdit={() => setEditing(row)} onDelete={() => setDeleting(row)} /></td></tr>,
-          detail && <tr className={styles.detailRow} key={`${row.energyRecordId}-detail`}><td colSpan={9}><MonthDetail values={row.monthlyAmounts} reported={reportedMonths(row)} annualValue={total} annualSupplemented={row.annualAmount > 0} unit={type?.measurementUnit ?? ''} /></td></tr>];
-        }) : <EmptyRow colSpan={9} />}</tbody>
+          const isScopeStart = currentScopeKey !== previousScopeKey;
+          const isCollapsed = collapsedScopes.has(currentScopeKey);
+          const groupCount = pageRows.filter((item) => {
+            const itemType = v11RecordScopeType(item);
+            return (itemType === 'device' ? `device:${item.scopeId}` : `${itemType}:${item.energyUnitId ?? 'enterprise'}`) === currentScopeKey;
+          }).length;
+          if (isCollapsed && !isScopeStart) return [];
+          const groupRow = isScopeStart ? <tr className={styles.scopeGroupRow} key={`${currentScopeKey}-group`}><td><div className={`${styles.scopeCell} ${styles[`scopeDepth${depth}`]}`}><button type="button" className={styles.scopeToggle} aria-label={`${isCollapsed ? '展开' : '折叠'}${scopeName}`} onClick={() => setCollapsedScopes((current) => { const next = new Set(current); if (next.has(currentScopeKey)) next.delete(currentScopeKey); else next.add(currentScopeKey); return next; })}>{isCollapsed ? '+' : '−'}</button><i /><span><b>{scopeName}</b><em className={styles.scopeCount}>{groupCount}项</em>{device && <small>所属：{v11ScopeName(device.energyUnitId)}</small>}</span></div></td><td colSpan={7} /></tr> : null;
+          return [groupRow, <tr className={styles.scopeRecordRow} key={row.energyRecordId}><td><div className={`${styles.scopeChild} ${styles[`scopeDepth${depth}`]}`} aria-label={`${scopeName}下的${type?.energyTypeName ?? '能源记录'}`}><span>└─ {type?.energyTypeName}</span></div></td><td>{scopeLevel}</td><td><span className={styles.stagePill}>{energyStage(row)}</span></td><td>{type?.analysisCategory}</td><td>{type?.measurementUnit}</td><td>{energyDataProgress(row)}</td><td className={styles.number}>{format(total, 2)}</td><td><Actions onView={() => setExpanded(detail ? null : row.energyRecordId)} onEdit={() => setEditing(row)} onDelete={() => setDeleting(row)} /></td></tr>,
+          detail && <tr className={styles.detailRow} key={`${row.energyRecordId}-detail`}><td colSpan={8}><MonthDetail values={row.monthlyAmounts} reported={reportedMonths(row)} annualValue={total} annualSupplemented={row.annualAmount > 0} unit={type?.measurementUnit ?? ''} /></td></tr>];
+        }) : <EmptyRow colSpan={8} />}</tbody>
       </table></div>}
       <Pagination count={rows.length} />
     </section>

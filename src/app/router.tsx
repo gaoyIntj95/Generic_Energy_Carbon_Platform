@@ -53,7 +53,7 @@ const supplyChainPlanning: NavPlaceholder = {
 };
 
 const assetStrategyItems: NavItem[] = [
-  { label: '能源平衡与优化', path: '/asset-strategy/balance', description: '综合能源输入、终端利用、回收利用与外部输出，识别重点偏差对象并提供优化建议。' },
+  { label: '能效平衡与优化', path: '/asset-strategy/balance', description: '基于能耗查询、能耗指标、能效对标和能流分析结果，识别重点优化对象并提出改善方向。' },
   { label: '用能分析与策略推荐', path: '/asset-strategy/analysis', description: '基于用能数据，分析能源消费结构、成本结构和能效表现，识别重点用能单元并提供策略建议。' },
   { label: '用能与碳排放预算管理', path: '/asset-strategy/budget', description: '对一个时间周期内的能源消费和碳排放进行分析预测，实现预算目标、执行监控、预测预警和动态调整。' },
   { label: '碳资产管理', path: '/asset-strategy/assets', description: '支持履约周期资产管理、未来排放预测及履约风险预警。' },
@@ -108,6 +108,7 @@ export const router = createAppRouter([
       { path: 'data-management/energy-costs', element: <Navigate to="/data-management/energy-data?tab=costs" replace /> },
       { path: 'data-management/energy-relations', element: <Navigate to="/data-management/energy-data?tab=conversion" replace /> },
       { path: 'data-collection/energy-carbon', element: <Navigate to="/data-management/units" replace /> },
+      { path: 'energy-analysis/efficiency-optimization', element: <Navigate to="/asset-strategy/balance" replace /> },
       { path: '*', element: <Navigate to={allNavItems[0].path} replace /> },
     ],
   },

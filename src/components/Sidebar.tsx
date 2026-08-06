@@ -34,7 +34,7 @@ const iconNames: Record<string, string> = {
   能耗强度指标: 'analysis',
   能效对标: 'balance',
   能流分析: 'energyData',
-  能源平衡与优化: 'balance',
+  能效平衡与优化: 'balance',
   用能分析与策略推荐: 'analysis',
   用能与碳排放预算管理: 'budget',
   碳资产管理: 'assetManagement',

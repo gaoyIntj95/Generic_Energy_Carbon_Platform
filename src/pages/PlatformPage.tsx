@@ -4,6 +4,7 @@ import { CarbonAccountingV4 } from './newPrototype/CarbonAccountingV4';
 import { DataCollectionPage } from './newPrototype/DataCollectionPage';
 import { DataManagementV11 } from './newPrototype/DataManagementV11';
 import { EnergyAnalysisV4 } from './newPrototype/EnergyAnalysisV4';
+import { BalanceOptimizationPage } from './newPrototype/BalanceOptimizationPage';
 
 /**
  * Route-level module dispatcher.
@@ -25,6 +26,7 @@ export function PlatformPage() {
     return <CarbonAccountingV4 pathname={pathname} />;
   }
   if (pathname.startsWith('/asset-strategy/')) {
+    if (pathname === '/asset-strategy/balance') return <BalanceOptimizationPage />;
     return <AssetOperationsV2 pathname={pathname} />;
   }
   return <DataCollectionPage />;
