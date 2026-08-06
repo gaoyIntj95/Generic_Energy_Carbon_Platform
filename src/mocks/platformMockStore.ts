@@ -3,6 +3,7 @@ import type {
   BudgetType,
   CarbonAsset,
   CarbonAssetWriteInput,
+  CarbonActivityRecord,
   CarbonMarketConfig,
   CarbonSnapshot,
   DataCollectionSource,
@@ -106,14 +107,46 @@ const seedEmissionSources: EmissionSource[] = [
   { emissionSourceId: 'es-natural-gas', carbonTaskId: 'ct-2026', organizationBoundary: '企业法人边界', emissionCategory: '化石燃料燃烧排放', emissionGroup: '化石燃料燃烧排放', sourceType: '固定燃烧源', sourceName: '天然气燃烧（锅炉房）', greenhouseGasSpecies: ['CO₂'], activityValue: 120000, activityUnit: 'Nm³', activityData: '120,000 Nm³', activityDataSource: '数据管理·能源消费', factorName: '天然气固定燃烧参数组', emissionFactorId: 'pf-ng', recordGenerationType: 'system', sourceModule: '数据管理—能源数据', sourceRecordId: 'ENERGY-2026-001', factorObjectId: 'pf-ng', factorVersionId: '2026-v2', createdBy: '系统', createdAt: '2026-06-30 09:30:00', recommendedActivityDataSources: ['企业能源平衡表'], confirmedActivityDataSources: ['企业能源平衡表'], customActivityDataSources: [], evidenceFiles: [{ evidenceFileId: 'ev-001', fileName: '企业能源平衡表_2026.xlsx', activityDataSource: '企业能源平衡表' }], evidenceStatus: '已完成', relatedEnergyRecordId: 'er-utilities-gas', emissionAmount: 258.48, entryMode: 'system' },
   { emissionSourceId: 'es-diesel', carbonTaskId: 'ct-2026', organizationBoundary: '企业法人边界', emissionCategory: '化石燃料燃烧排放', emissionGroup: '化石燃料燃烧排放', sourceType: '移动燃烧源', sourceName: '柴油燃烧（厂内车辆）', greenhouseGasSpecies: ['CO₂'], activityValue: 15.6, activityUnit: 't', activityData: '15.6 t', activityDataSource: '数据管理·能源消费', factorName: '柴油移动燃烧参数组', emissionFactorId: 'pf-diesel', recordGenerationType: 'system', sourceModule: '数据管理—能源数据', sourceRecordId: 'ENERGY-2026-002', factorObjectId: 'pf-diesel', factorVersionId: '2026-v2', createdBy: '系统', createdAt: '2026-06-30 09:31:00', recommendedActivityDataSources: ['企业能源平衡表'], confirmedActivityDataSources: ['企业能源平衡表'], customActivityDataSources: [], evidenceFiles: [{ evidenceFileId: 'ev-002', fileName: '车辆燃料台账_2026.xlsx', activityDataSource: '企业能源平衡表' }], evidenceStatus: '已完成', emissionAmount: 49.47, entryMode: 'system' },
   { emissionSourceId: 'es-clinker', carbonTaskId: 'ct-2026', organizationBoundary: '企业法人边界', emissionCategory: '生产过程排放', emissionGroup: '生产过程排放', sourceType: '生产过程排放源', sourceName: '碳酸盐原料分解（工艺系统）', greenhouseGasSpecies: ['CO₂'], activityValue: 400, activityUnit: 't', activityData: '原料消耗量：400 t', activityDataSource: '核算清单·在线录入', factorName: '工业过程碳酸盐分解参数组', emissionFactorId: 'pf-process', recordGenerationType: 'manual', sourceModule: '核算清单—在线录入', sourceRecordId: 'CARBON-2026-001', factorObjectId: 'pf-process', factorVersionId: '2026-v1', createdBy: '管理员', createdAt: '2026-06-30 10:00:00', recommendedActivityDataSources: ['原料消耗表', '财务报表（原料购买量或购买额）'], confirmedActivityDataSources: ['原料消耗表'], customActivityDataSources: [], evidenceFiles: [{ evidenceFileId: 'ev-003', fileName: '碳酸盐原料消耗表_2026.xlsx', activityDataSource: '原料消耗表' }], evidenceStatus: '已完成', emissionAmount: 175.6, entryMode: 'manual' },
-  { emissionSourceId: 'es-water', carbonTaskId: 'ct-2026', organizationBoundary: '企业法人边界', emissionCategory: '废弃物处理处置排放', emissionGroup: '废弃物处理处置排放', sourceType: '废水处理排放源', sourceName: '工业废水处理系统', greenhouseGasSpecies: ['CH₄', 'N₂O'], activityValue: 8500, activityUnit: 't', activityData: '8,500 t', activityDataSource: '数据管理·运营数据', factorName: '工业废水处理排放因子', emissionFactorId: 'pf-waste', recordGenerationType: 'system', sourceModule: '数据管理—运营数据', sourceRecordId: 'OPERATION-2026-004', factorObjectId: 'pf-waste', factorVersionId: '2026-v2', createdBy: '系统', createdAt: '2026-06-30 09:32:00', recommendedActivityDataSources: ['水平衡表', '废水监测报表', '财务报表（处理量）'], confirmedActivityDataSources: ['废水监测报表'], customActivityDataSources: [], evidenceFiles: [], evidenceStatus: '待补充', emissionAmount: 36.5, entryMode: 'system' },
+  { emissionSourceId: 'es-water', carbonTaskId: 'ct-2026', organizationBoundary: '企业法人边界', emissionCategory: '废弃物处理处置排放', emissionGroup: '废弃物处理处置排放', sourceType: '废水处理排放源', sourceName: '工业废水处理系统', greenhouseGasSpecies: ['CH₄', 'N₂O'], activityValue: 104137.8542, activityUnit: '人·天/年', activityData: '104,137.8542 人·天/年', activityDataSource: '人力资源·考勤汇总表', factorName: '工业废水处理排放因子', emissionFactorId: 'pf-waste', recordGenerationType: 'system', sourceModule: '数据管理—运营数据', sourceRecordId: 'OPERATION-2026-004', factorObjectId: 'pf-waste', factorVersionId: '2026-v2', createdBy: '系统', createdAt: '2026-06-30 09:32:00', recommendedActivityDataSources: ['人力资源考勤汇总表', 'BOD适用地区缺省值', '工业修正因子依据'], confirmedActivityDataSources: ['人力资源考勤汇总表'], customActivityDataSources: [], evidenceFiles: [], evidenceStatus: '待补充', emissionAmount: 32.8, entryMode: 'system' },
   { emissionSourceId: 'es-r134a', carbonTaskId: 'ct-2026', organizationBoundary: '企业法人边界', emissionCategory: '逸散排放', emissionGroup: '逸散排放', sourceType: '制冷剂逸散源', sourceName: '制冷剂R134a补充（制冷系统）', greenhouseGasSpecies: ['HFCs（R134a）'], activityValue: 120, activityUnit: 'kg', activityData: '120 kg', activityDataSource: '核算清单·在线录入', factorName: 'R134a全球变暖潜势', emissionFactorId: 'pf-r134a', recordGenerationType: 'manual', sourceModule: '核算清单—在线录入', sourceRecordId: 'CARBON-2026-002', factorObjectId: 'pf-r134a', factorVersionId: 'AR5', createdBy: '管理员', createdAt: '2026-06-30 10:05:00', recommendedActivityDataSources: ['监测报表'], confirmedActivityDataSources: [], customActivityDataSources: [], evidenceFiles: [], evidenceStatus: '待确认', emissionAmount: 171.6, entryMode: 'manual' },
   { emissionSourceId: 'es-electricity', carbonTaskId: 'ct-2026', organizationBoundary: '企业法人边界', emissionCategory: '购入的电力与热力产生的排放', emissionGroup: '购入电力与热力产生的排放', sourceType: '购入电力', sourceName: '外购电力（企业整体）', greenhouseGasSpecies: ['CO₂e（综合因子）'], activityValue: 18600, activityUnit: 'MWh', activityData: '18,600 MWh', activityDataSource: '数据管理·能源消费', factorName: '外购电力排放因子（全国）', emissionFactorId: 'pf-power', recordGenerationType: 'system', sourceModule: '数据管理—能源数据', sourceRecordId: 'ENERGY-2026-003', factorObjectId: 'pf-power', factorVersionId: '2026-v1', createdBy: '系统', createdAt: '2026-06-30 09:33:00', recommendedActivityDataSources: ['企业能源平衡表', '财务报表', '采购发票或凭证'], confirmedActivityDataSources: ['企业能源平衡表'], customActivityDataSources: [], evidenceFiles: [{ evidenceFileId: 'ev-004', fileName: '电费结算单_2026.pdf', activityDataSource: '企业能源平衡表' }], evidenceStatus: '已完成', relatedEnergyRecordId: 'er-clinker-power', emissionAmount: 10607.58, entryMode: 'system' },
   { emissionSourceId: 'es-steam', carbonTaskId: 'ct-2026', organizationBoundary: '企业法人边界', emissionCategory: '购入的电力与热力产生的排放', emissionGroup: '购入电力与热力产生的排放', sourceType: '购入热力', sourceName: '外购热力（企业整体）', greenhouseGasSpecies: ['CO₂'], activityValue: 12500, activityUnit: 'GJ', activityData: '12,500 GJ', activityDataSource: '数据管理·能源消费', factorName: '外购热力排放因子', emissionFactorId: 'pf-heat', recordGenerationType: 'system', sourceModule: '数据管理—能源数据', sourceRecordId: 'ENERGY-2026-004', factorObjectId: 'pf-heat', factorVersionId: '2026-v1', createdBy: '系统', createdAt: '2026-06-30 09:34:00', recommendedActivityDataSources: ['企业能源平衡表', '财务报表', '采购发票或凭证'], confirmedActivityDataSources: ['采购发票或凭证'], customActivityDataSources: [], evidenceFiles: [{ evidenceFileId: 'ev-005', fileName: '热力采购发票_2026.pdf', activityDataSource: '采购发票或凭证' }], evidenceStatus: '已完成', relatedEnergyRecordId: 'er-utilities-steam', emissionAmount: 1387.5, entryMode: 'system' },
   { emissionSourceId: 'es-transport', carbonTaskId: 'ct-2026', organizationBoundary: '企业法人边界', emissionCategory: '交通运输产生的排放', emissionGroup: '其他间接排放', sourceType: '上游运输', sourceName: '原材料公路运输', greenhouseGasSpecies: ['CO₂e（综合因子）'], activityValue: 2500000, activityUnit: 't·km', activityData: '2,500,000 t·km', activityDataSource: '核算清单·在线录入', factorName: '公路货运排放因子', emissionFactorId: 'pf-transport', recordGenerationType: 'manual', sourceModule: '核算清单—在线录入', sourceRecordId: 'CARBON-2026-003', factorObjectId: 'pf-transport', factorVersionId: '2026-v2', createdBy: '管理员', createdAt: '2026-06-30 10:08:00', recommendedActivityDataSources: ['财务报表（可选）', '运输合同', '物流运单', '过磅单'], confirmedActivityDataSources: ['运输合同'], customActivityDataSources: [], evidenceFiles: [{ evidenceFileId: 'ev-006', fileName: '原材料运输合同_2026.pdf', activityDataSource: '运输合同' }], evidenceStatus: '已完成', emissionAmount: 297.5, entryMode: 'manual' },
 ];
-let emissionSources = seedEmissionSources.map((item) => ({ ...item }));
+let emissionSources = seedEmissionSources.map((item) => ({ ...item })).map((item) => {
+  if (item.emissionSourceId === 'es-electricity') {
+    return { ...item, evidenceFiles: [...item.evidenceFiles, { evidenceFileId: 'ev-004-2', fileName: '购电发票汇总_2026.pdf', activityDataSource: item.confirmedActivityDataSources[0] }] };
+  }
+  if (item.emissionSourceId === 'es-steam') {
+    return { ...item, evidenceFiles: [...item.evidenceFiles, { evidenceFileId: 'ev-005-2', fileName: '热力采购合同_2026.pdf', activityDataSource: item.confirmedActivityDataSources[0] }] };
+  }
+  return item;
+});
 let nextEmissionSourceId = 100;
+let nextCarbonActivityRecordId = 1;
+
+const activityRecordFromSource = (source: EmissionSource, id = `car-${nextCarbonActivityRecordId++}`): CarbonActivityRecord => ({
+  activityRecordId: id,
+  emissionSourceId: source.emissionSourceId,
+  carbonTaskId: source.carbonTaskId,
+  year: Number((source.sourceRecordId ?? '').match(/20\d{2}/)?.[0] ?? 2026),
+  period: 'annual',
+  value: Number(source.activityValue ?? 0),
+  unit: source.activityUnit || '—',
+  dataSource: source.activityDataSource || source.sourceModule || '核算清单·在线录入',
+  evidenceFileIds: (source.evidenceFiles ?? []).map((file) => file.evidenceFileId),
+  status: source.recordStatus === 'not_applicable' ? 'void' : source.recordStatus === 'confirmed' ? 'confirmed' : 'draft',
+  createdBy: source.createdBy || '管理员',
+  createdAt: source.createdAt || new Date().toISOString(),
+});
+
+let carbonActivityRecords = seedEmissionSources
+  .filter((item) => item.entryMode === 'manual' || item.recordGenerationType === 'manual')
+  .map((item) => activityRecordFromSource(item));
+emissionSources = emissionSources.map((source) => {
+  const records = carbonActivityRecords.filter((item) => item.emissionSourceId === source.emissionSourceId);
+  return records.length ? { ...source, activityRecordIds: records.map((item) => item.activityRecordId) } : source;
+});
 
 const seedCarbonSnapshots: CarbonSnapshot[] = [
   {
@@ -121,12 +154,12 @@ const seedCarbonSnapshots: CarbonSnapshot[] = [
     carbonTaskId: 'ct-2026',
     year: 2026,
     version: 1,
-    totalEmission: 12_984.23,
-    directEmission: 691.65,
+    totalEmission: 12_980.53,
+    directEmission: 687.95,
     purchasedEnergyEmission: 11_995.08,
     otherIndirectEmission: 297.5,
-    monthlyEmissions: [990, 965, 1015, 1040, 1060, 1085, 1108, 1102, 1080, 1075, 1092, 1352.23],
-    sourceItems: seedEmissionSources.map((item) => ({ ...item })),
+    monthlyEmissions: spread(12_980.53),
+    sourceItems: emissionSources.map((item) => ({ ...item })),
   },
   {
     carbonSnapshotId: 'cs-2025-v2',
@@ -142,6 +175,10 @@ const seedCarbonSnapshots: CarbonSnapshot[] = [
   },
 ];
 let carbonSnapshots = seedCarbonSnapshots.map((item) => ({ ...item, monthlyEmissions: [...item.monthlyEmissions], sourceItems: item.sourceItems.map((source) => ({ ...source })) }));
+carbonSnapshots = carbonSnapshots.map((item) => ({
+  ...item,
+  activityRecords: carbonActivityRecords.filter((record) => record.carbonTaskId === item.carbonTaskId).map((record) => ({ ...record, evidenceFileIds: [...record.evidenceFileIds] })),
+}));
 
 let budgetTargets: BudgetTarget[] = [
   { budgetTargetId: 'bt-energy-2026', budgetType: 'energy', organizationId: DEMO_ORGANIZATION_ID, energyUnitId: null, year: 2026, targetValue: 120_600, warningThreshold: 0.95, targetUnit: 'tce', description: '年度能源消费预算', version: 1, versionState: '生效', forecastMethod: 'recentAverage', adjustmentReason: 'V2原型初始配置' },
@@ -346,10 +383,23 @@ export function saveCarbonMarketConfig(config: CarbonMarketConfig) {
   return { ...carbonMarketConfig };
 }
 export function listEmissionSources() { return clone(emissionSources); }
+export function listCarbonActivityRecords() { return clone(carbonActivityRecords); }
 export function replaceEmissionSourcesForTask(carbonTaskId: string, sources: EmissionSource[]) {
+  const replacementSources = sources.filter((item) => item.carbonTaskId === carbonTaskId).map((item) => ({ ...item }));
+  const replacementActivityRecords = replacementSources
+    .filter((item) => item.entryMode === 'manual' || item.recordGenerationType === 'manual')
+    .map((item) => activityRecordFromSource(item));
+  const linkedSources = replacementSources.map((item) => {
+    const records = replacementActivityRecords.filter((record) => record.emissionSourceId === item.emissionSourceId);
+    return records.length ? { ...item, activityRecordIds: records.map((record) => record.activityRecordId) } : item;
+  });
   emissionSources = [
     ...emissionSources.filter((item) => item.carbonTaskId !== carbonTaskId),
-    ...sources.filter((item) => item.carbonTaskId === carbonTaskId).map((item) => ({ ...item })),
+    ...linkedSources,
+  ];
+  carbonActivityRecords = [
+    ...carbonActivityRecords.filter((item) => item.carbonTaskId !== carbonTaskId),
+    ...replacementActivityRecords,
   ];
   return listEmissionSources();
 }
@@ -360,22 +410,34 @@ export function saveEmissionSource(input: Omit<EmissionSource, 'emissionSourceId
     const index = emissionSources.findIndex((item) => item.emissionSourceId === emissionSourceId);
     if (index < 0) return { ok: false as const, error: '排放源记录不存在。' };
     emissionSources[index] = { ...input, emissionSourceId };
+    carbonActivityRecords = carbonActivityRecords.filter((item) => item.emissionSourceId !== emissionSourceId);
+    if (input.entryMode === 'manual' || input.recordGenerationType === 'manual') {
+      const activityRecord = activityRecordFromSource(emissionSources[index]);
+      carbonActivityRecords.push(activityRecord);
+      emissionSources[index] = { ...emissionSources[index], activityRecordIds: [activityRecord.activityRecordId] };
+    }
     return { ok: true as const, source: { ...emissionSources[index] } };
   }
   const source: EmissionSource = { ...input, emissionSourceId: `es-mock-${nextEmissionSourceId++}` };
   emissionSources.push(source);
+  if (source.entryMode === 'manual' || source.recordGenerationType === 'manual') {
+    const activityRecord = activityRecordFromSource(source);
+    carbonActivityRecords.push(activityRecord);
+    source.activityRecordIds = [activityRecord.activityRecordId];
+  }
   return { ok: true as const, source: { ...source } };
 }
 export function deleteEmissionSource(emissionSourceId: string) {
   const source = emissionSources.find((item) => item.emissionSourceId === emissionSourceId);
   if (!source) return { ok: false as const, error: '排放源记录不存在。' };
   emissionSources = emissionSources.filter((item) => item.emissionSourceId !== emissionSourceId);
+  carbonActivityRecords = carbonActivityRecords.filter((item) => item.emissionSourceId !== emissionSourceId);
   return { ok: true as const };
 }
-export function listCarbonSnapshots() { return carbonSnapshots.map((item) => ({ ...item, monthlyEmissions: [...item.monthlyEmissions], sourceItems: item.sourceItems.map((source) => ({ ...source })) })); }
+export function listCarbonSnapshots() { return carbonSnapshots.map((item) => ({ ...item, monthlyEmissions: [...item.monthlyEmissions], sourceItems: item.sourceItems.map((source) => ({ ...source })), activityRecords: item.activityRecords?.map((record) => ({ ...record, evidenceFileIds: [...record.evidenceFileIds] })) })); }
 export function latestCarbonSnapshot(year = 2026) {
   const snapshot = carbonSnapshots.filter((item) => item.year === year).sort((a, b) => b.version - a.version)[0];
-  return snapshot ? { ...snapshot, monthlyEmissions: [...snapshot.monthlyEmissions], sourceItems: snapshot.sourceItems.map((source) => ({ ...source })) } : undefined;
+  return snapshot ? { ...snapshot, monthlyEmissions: [...snapshot.monthlyEmissions], sourceItems: snapshot.sourceItems.map((source) => ({ ...source })), activityRecords: snapshot.activityRecords?.map((record) => ({ ...record, evidenceFileIds: [...record.evidenceFileIds] })) } : undefined;
 }
 export function publishCarbonSnapshot(carbonTaskId = 'ct-2026', year = 2026) {
   const taskSources = emissionSources.filter((item) => item.carbonTaskId === carbonTaskId);
@@ -397,11 +459,12 @@ export function publishCarbonSnapshot(carbonTaskId = 'ct-2026', year = 2026) {
     otherIndirectEmission: Number(otherIndirectEmission.toFixed(2)),
     monthlyEmissions: spread(totalEmission),
     sourceItems: taskSources.map((item) => ({ ...item })),
+    activityRecords: carbonActivityRecords.filter((item) => item.carbonTaskId === carbonTaskId).map((item) => ({ ...item, evidenceFileIds: [...item.evidenceFileIds] })),
   };
   carbonSnapshots.push(snapshot);
   const carbonCollection = collectionSources.find((item) => item.relatedDomain === 'carbonSnapshots');
   if (carbonCollection) carbonCollection.recordCount = carbonSnapshots.length;
-  return { ...snapshot, monthlyEmissions: [...snapshot.monthlyEmissions] };
+  return { ...snapshot, monthlyEmissions: [...snapshot.monthlyEmissions], activityRecords: snapshot.activityRecords?.map((record) => ({ ...record, evidenceFileIds: [...record.evidenceFileIds] })) };
 }
 export function listBudgetTargets() { return clone(budgetTargets); }
 export function getBudgetTarget(type: BudgetType, year = 2026) {
@@ -490,12 +553,21 @@ export function resetPlatformMockStore() {
   ];
   emissionSources = seedEmissionSources.map((item) => ({ ...item }));
   nextEmissionSourceId = 100;
+  nextCarbonActivityRecordId = 1;
+  carbonActivityRecords = seedEmissionSources
+    .filter((item) => item.entryMode === 'manual' || item.recordGenerationType === 'manual')
+    .map((item) => activityRecordFromSource(item));
   efficiencyTargets = [
     { efficiencyTargetId: 'et-clinker-2026', energyUnitId: 'eu-clinker-line-1', metricName: '单位熟料综合能耗', targetValue: 90, metricUnit: 'kgce/t', effectiveYear: 2026, evaluationDirection: 'lowerIsBetter', targetBasis: '企业年度节能目标' },
     { efficiencyTargetId: 'et-grinding-2026', energyUnitId: 'eu-cement-grinding-line', metricName: '单位水泥综合能耗', targetValue: 65, metricUnit: 'kgce/t', effectiveYear: 2026, evaluationDirection: 'lowerIsBetter', targetBasis: '企业年度节能目标' },
   ];
   strategies = clone(seedStrategies);
-  carbonSnapshots = seedCarbonSnapshots.map((item) => ({ ...item, monthlyEmissions: [...item.monthlyEmissions], sourceItems: item.sourceItems.map((source) => ({ ...source })) }));
+  carbonSnapshots = seedCarbonSnapshots.map((item) => ({
+    ...item,
+    monthlyEmissions: [...item.monthlyEmissions],
+    sourceItems: item.sourceItems.map((source) => ({ ...source })),
+    activityRecords: item.activityRecords?.map((record) => ({ ...record, evidenceFileIds: [...record.evidenceFileIds] })),
+  }));
   carbonAssets = clone(seedCarbonAssets);
   keyDevices = clone(seedKeyDevices);
   carbonMarketConfig = {

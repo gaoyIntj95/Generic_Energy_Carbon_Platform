@@ -108,21 +108,20 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(container.textContent).not.toContain('回收能源（');
     expect(container.textContent).not.toContain('能源产出（');
     expect([...container.querySelectorAll('th')].map((item) => item.textContent)).toEqual([
-      '归属范围',
+      '归属范围 / 能源品种',
       '归属层级',
       '能流阶段',
       '能源分析类别',
-      '能源品种',
       '单位',
       '数据进度',
       '年度合计',
       '操作',
     ]);
     expect(container.textContent).not.toContain('数据角色');
-    const scopeNames = [...container.querySelectorAll('tbody tr:not([class*="detailRow"]) td:first-child')]
+    const scopeNames = [...container.querySelectorAll('tbody tr[class*="scopeRecordRow"] td:first-child')]
       .map((cell) => cell.textContent ?? '');
-    expect(scopeNames[0]).toContain('全厂');
     expect(scopeNames).toHaveLength(10);
+    expect(container.querySelector('tbody tr[class*="scopeGroupRow"]')?.textContent).toContain('全厂');
     expect(button('下一页').disabled).toBe(false);
     expect(scopeNames.some((name) => name.includes('1#数控加工中心'))).toBe(false);
 
@@ -311,7 +310,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     const typeId = listV11EnergyTypes()[0].energyTypeId;
 
     const recordResult = saveV11EnergyRecord({
-      year: 2025,
+      year: 2021,
       energyRole: '能源消费',
       scopeLevel: '企业',
       energyUnitId: null,
@@ -321,7 +320,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
       annualAmount: 100,
     });
     const costResult = saveV11EnergyCost({
-      year: 2025,
+      year: 2021,
       energyTypeId: typeId,
       monthlyCosts: Array(12).fill(10),
     });
@@ -337,7 +336,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
   it('supports partial monthly readings with an annual supplemental total without fabricating missing months', () => {
     const typeId = listV11EnergyTypes()[0].energyTypeId;
     const saved = saveV11EnergyRecord({
-      year: 2025,
+      year: 2021,
       energyRole: '能源消费',
       scopeLevel: '企业',
       energyUnitId: null,
@@ -354,7 +353,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(savedRecord && v11EnergyRecordAnnualAmount(savedRecord)).toBe(100);
 
     const invalid = saveV11EnergyRecord({
-      year: 2024,
+      year: 2020,
       energyRole: '能源消费',
       scopeLevel: '企业',
       energyUnitId: null,
@@ -451,7 +450,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(productOutputs.every((record) => record.metricName === '产品产量')).toBe(true);
     expect(productOutputs.every((record) => record.metricCategory === '产量')).toBe(true);
     expect(productOutputs.every((record) => products.some((product) => product.productId === record.productId))).toBe(true);
-    expect(productOutputs.filter((record) => record.productId === 'product-b')).toHaveLength(2);
+    expect(productOutputs.filter((record) => record.productId === 'product-b')).toHaveLength(10);
     expect(productOutputs.some((record) => record.energyUnitId === null)).toBe(false);
 
     await render('/data-management/operations');
@@ -510,7 +509,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     const year = container.querySelector('select') as HTMLSelectElement;
     await change(year, '2025');
     await click(button('查询'));
-    expect(container.textContent).toContain('全部层级（0）');
+    expect(container.textContent).toContain('全部层级（9）');
 
     await click(button('企业（'));
     await click(button('新增运营数据'));

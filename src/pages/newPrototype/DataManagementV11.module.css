@@ -326,11 +326,127 @@
   border-top: 1px solid #dce8e4;
 }
 
+.scopeGroupRow td {
+  height: 46px;
+  padding: 0 14px;
+  background: #fff;
+  border-top: 1px solid #dce8e4;
+  border-bottom: 1px solid #e3eee9;
+}
+
+.scopeGroupRow td:first-child {
+  background: #f7fbf9;
+}
+
+.scopeRecordRow td:first-child {
+  padding-left: 14px;
+}
+
 .scopeCell {
   display: flex;
   min-width: 170px;
   align-items: center;
   gap: 9px;
+}
+
+.scopeToggle {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  place-items: center;
+  padding: 0;
+  color: #00875a;
+  background: #fff;
+  border: 1px solid #cfe5dc;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.scopeToggle:hover {
+  background: #f3faf7;
+  border-color: #00a870;
+}
+
+.scopeCount {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  padding: 2px 7px;
+  color: #00875a;
+  background: #eaf8f3;
+  border-radius: 10px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+}
+
+.scopeChild {
+  position: relative;
+  display: flex;
+  min-width: 170px;
+  align-items: center;
+  min-height: 30px;
+  padding-left: 36px;
+  color: #667085;
+}
+
+.quantityTable {
+  table-layout: fixed;
+}
+
+.quantityTable th:first-child,
+.quantityTable td:first-child {
+  width: 250px;
+}
+
+.quantityTable th:nth-child(2) {
+  width: 150px;
+}
+
+.quantityTable th:nth-child(3) {
+  width: 150px;
+}
+
+.quantityTable th:nth-child(4) {
+  width: 190px;
+}
+
+.quantityTable th:nth-child(5) {
+  width: 90px;
+}
+
+.quantityTable th:nth-child(6) {
+  width: 110px;
+}
+
+.quantityTable th:nth-child(7) {
+  width: 150px;
+}
+
+.quantityTable th:nth-child(8) {
+  width: 180px;
+}
+
+.scopeChild::before {
+  position: absolute;
+  top: 50%;
+  left: 18px;
+  width: 13px;
+  height: 18px;
+  border-bottom: 1px solid #c9d4cf;
+  border-left: 1px solid #c9d4cf;
+  content: '';
+  transform: translateY(-12px);
+}
+
+.scopeChild span {
+  display: block;
+  overflow: hidden;
+  max-width: 150px;
+  text-overflow: ellipsis;
 }
 
 .scopeCell i {

@@ -61,6 +61,12 @@ const fuelParameters = (kind: 'gas' | 'diesel'): CarbonFactorParameter[] => [
 
 export const carbonFactorsV4: CarbonFactor[] = [
   {
+    factorId: 'pf-rdf', scope: 'enterprise', name: 'RDF企业示例排放因子', objectType: '综合排放因子', activity: '固定燃烧', gas: 'CO₂e',
+    value: '1.850', unit: 'tCO₂e/t', source: '企业示例参数（待研发接入参数库）', version: '2026年度', geo: '当前企业', industry: '通用工业企业',
+    validity: '当前有效', raw: '1.850 tCO₂e/t', quality: '演示参数，正式使用前应由企业实测或适用标准替换', effective: '2026年度', reference: 'RDF燃料企业层级示例口径',
+    formula: '排放量 = RDF消耗量 × RDF排放因子', selectable: true, calculationType: 'direct', approval: '演示数据',
+  },
+  {
     factorId: 'pf-ng', scope: 'public', name: '天然气固定燃烧参数组', objectType: '参数组/公式模板', activity: '固定燃烧', gas: 'CO₂',
     value: '折算因子 2.154', unit: 'kgCO₂/Nm³', source: '国家温室气体排放因子数据库', version: '第二版（2026）', geo: '全国',
     industry: '通用工业', validity: '当前有效', raw: '由NCV、CC、OF及44/12折算', quality: '官方参数与方法学常数组合',
@@ -102,9 +108,9 @@ export const carbonFactorsV4: CarbonFactor[] = [
   },
   {
     factorId: 'pf-waste', scope: 'public', name: '工业废水处理排放因子', objectType: '综合排放因子', activity: '废弃物处理', gas: 'CO₂e',
-    value: '0.004294', unit: 'tCO₂e/t废水', source: '国家温室气体排放因子数据库', version: '第二版（2026）', geo: '全国',
+    value: '0.000315', unit: 'tCO₂e/人·天/年', source: '企业核查口径（缺省值法）', version: '2026年度', geo: '当前企业',
     industry: '通用工业', validity: '当前有效', raw: '0.004294 tCO₂e/t废水', quality: '官方推荐值', effective: '2026-03-01起',
-    reference: '废弃物处理—工业废水', formula: '排放量 = 废水处理量 × 排放因子', selectable: true, calculationType: 'direct',
+    reference: '废弃物处理—人员人天法', formula: '排放量 = 人天数 × BOD × 0.001 × I × Bo × MCF × GWP ÷ 1000', selectable: true, calculationType: 'direct',
   },
   {
     factorId: 'pf-r134a', scope: 'public', name: 'R134a全球变暖潜势', objectType: 'GWP值', activity: '逸散排放', gas: 'CO₂e',
@@ -169,6 +175,12 @@ export const carbonFactorsV4: CarbonFactor[] = [
     validity: '已被替代', raw: '0.7035 kgCO₂e/kWh', quality: '历史区域因子', effective: '历史年度',
     reference: '区域电网排放因子', formula: '排放量 = 外购电量 × 电力排放因子', selectable: false, calculationType: 'direct',
   },
+  {
+    factorId: 'pf-coal', scope: 'public', name: '原煤固定燃烧排放因子', objectType: '综合排放因子', activity: '固定燃烧', gas: 'CO₂',
+    value: '2.493', unit: 'tCO₂/t', source: '国家温室气体排放因子数据库', version: '当前任务适用版', geo: '全国', industry: '通用工业',
+    validity: '当前有效', raw: '2.493 tCO₂/t', quality: '标准推荐值；按核算年度匹配', effective: '按核算年度匹配',
+    reference: '能源活动—化石燃料固定燃烧—原煤', formula: '排放量 = 原煤消费量 × 原煤排放因子', selectable: true, calculationType: 'direct',
+  },
 ];
 
 export const supportBasicV4 = [
@@ -178,4 +190,14 @@ export const supportBasicV4 = [
   { group: '质量保证', item: '数据管理制度', activity: '核算数据收集与复核制度', origin: '在线上传', materials: 0, state: '待补充' as const },
 ];
 
-export const getCarbonFactorV4 = (factorId: string) => carbonFactorsV4.find((factor) => factor.factorId === factorId);
+const customCarbonFactorsV4: CarbonFactor[] = [];
+
+export const saveCarbonFactorV4 = (factor: CarbonFactor) => {
+  const index = customCarbonFactorsV4.findIndex((item) => item.factorId === factor.factorId);
+  if (index >= 0) customCarbonFactorsV4[index] = factor;
+  else customCarbonFactorsV4.push(factor);
+  return { ...factor };
+};
+
+export const getCarbonFactorV4 = (factorId: string) =>
+  customCarbonFactorsV4.find((factor) => factor.factorId === factorId) ?? carbonFactorsV4.find((factor) => factor.factorId === factorId);

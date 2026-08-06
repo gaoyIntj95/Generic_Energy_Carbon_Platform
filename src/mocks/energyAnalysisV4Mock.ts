@@ -14,6 +14,8 @@ export interface EnergyQueryRow {
   yearOnYear: number;
   monthOnMonth?: number;
   sourceDescription: string;
+  monthlyPhysicalAmounts?: number[];
+  monthlyStandardCoalAmounts?: number[];
   /** 月度汇总不一定具备可下钻的日度计量数据。 */
   dailyDataAvailable?: boolean;
 }
@@ -76,14 +78,18 @@ function allocateIntegerTotal(total: number, weights: number[]) {
 }
 
 export function createEnergyQueryAnnualDetails(row: EnergyQueryRow): EnergyQueryMonthDetail[] {
-  const physicalAmounts = allocateIntegerTotal(row.physicalAmount, annualMonthWeights);
-  const standardCoalAmounts = allocateIntegerTotal(row.standardCoalAmount, annualMonthWeights);
-  return annualMonthWeights.map((_, index) => {
+  const physicalAmounts = row.monthlyPhysicalAmounts?.length
+    ? row.monthlyPhysicalAmounts
+    : allocateIntegerTotal(row.physicalAmount, annualMonthWeights);
+  const standardCoalAmounts = row.monthlyStandardCoalAmounts?.length
+    ? row.monthlyStandardCoalAmounts
+    : allocateIntegerTotal(row.standardCoalAmount, annualMonthWeights);
+  return physicalAmounts.map((physicalAmount, index) => {
     const previous = index === 0 ? standardCoalAmounts[index] / (1 + row.yearOnYear / 100) : standardCoalAmounts[index - 1];
     return {
       detailId: `${row.energyQueryRowId}-month-${String(index + 1).padStart(2, '0')}`,
       month: `${index + 1}月`,
-      physicalAmount: physicalAmounts[index],
+      physicalAmount,
       standardCoalAmount: standardCoalAmounts[index],
       share: standardCoalAmounts[index] / row.standardCoalAmount * 100,
       yearOnYear: row.yearOnYear + ((index % 5) - 2) * 0.35,
@@ -93,7 +99,7 @@ export function createEnergyQueryAnnualDetails(row: EnergyQueryRow): EnergyQuery
 }
 
 export function createEnergyQueryMonthlyDetails(row: EnergyQueryRow): EnergyQueryDayDetail[] {
-  if (row.dailyDataAvailable === false) return [];
+  if (row.dailyDataAvailable !== true) return [];
 
   const physicalAmounts = allocateIntegerTotal(row.physicalAmount, monthDayWeights);
   const standardCoalAmounts = allocateIntegerTotal(row.standardCoalAmount, monthDayWeights);

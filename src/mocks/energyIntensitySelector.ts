@@ -270,7 +270,9 @@ export function listIntensityObjects(objectType: IntensityObjectType): Intensity
 
 function utilityMetrics(object: IntensityObjectOption, year: number, energy: V11EnergyRecord[], operations: V11OperationMetric[]) {
   const isBoiler = object.objectName.includes('锅炉');
-  const output = operations.find((record) => record.metricCode === 'steam_output' || record.metricName.includes('蒸汽产量'));
+  const output = operations.find((record) => isBoiler
+    ? record.metricCode === 'steam_output' || record.metricName.includes('蒸汽产量')
+    : record.metricCode === 'business_volume' || record.metricName.includes('业务量') || record.metricName.includes('运行量'));
   const typeName = isBoiler ? '单位蒸汽综合能耗' : '单位运行能耗';
   const unit = isBoiler ? 'kgce/t' : 'tce/业务量';
   const missing: IntensityIssue | undefined = isBoiler && !output ? '缺少蒸汽产量' : !output ? '缺少必要关联关系' : undefined;

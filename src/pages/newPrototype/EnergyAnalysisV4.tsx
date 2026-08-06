@@ -4,7 +4,6 @@ import {
   createEnergyQueryAnnualDetails,
   createEnergyQueryMonthlyDetails,
   energyAnalysisUnitLabels,
-  energyQueryData,
   type BenchmarkType,
   type EnergyAnalysisPeriod,
   type EnergyAnalysisScope,
@@ -12,6 +11,12 @@ import {
   type EnergyQueryDayDetail,
   type EnergyQueryMonthDetail,
 } from '../../mocks/energyAnalysisV4Mock';
+import {
+  buildEnergyQueryDataset,
+  ENERGY_QUERY_CURRENT_YEAR,
+  ENERGY_QUERY_REPORTED_MONTH,
+  getEnergyQueryMonthlyAmounts,
+} from '../../mocks/energyQuerySelector';
 import {
   buildBenchmarkDataset,
   type BenchmarkMetric,
@@ -231,7 +236,7 @@ function AnnualEnergyDetail({
       <div className={styles.drillStats}>
         <span><small>年度实物量</small><b>{format(row.physicalAmount)} {row.measurementUnit}</b></span>
         <span><small>年度折标量</small><b>{format(row.standardCoalAmount)} tce</b></span>
-        <span><small>月均折标量</small><b>{format(row.standardCoalAmount / 12, 1)} tce</b></span>
+        <span><small>{details.length < 12 ? '已报月份月均折标量' : '月均折标量'}</small><b>{format(row.standardCoalAmount / details.length, 1)} tce</b></span>
         <span><small>峰值月份</small><b>{peak.month}｜{format(peak.standardCoalAmount)} tce</b></span>
       </div>
       <div className={styles.drillSectionTitle}>
@@ -338,13 +343,19 @@ function ConsumptionQueryPage() {
   });
   const [dialog, setDialog] = useState<DialogState>(null);
   const { toast, notify } = useFeedback();
-  const data = energyQueryData[applied.scope][applied.period];
+  const scopeUnitIds: Partial<Record<EnergyAnalysisScope, string>> = {
+    prodA: 'eu-clinker-line-1',
+    prodB: 'eu-cement-grinding-line',
+    utilities: 'eu-utilities',
+  };
+  const queryYear = Number(applied.time.slice(0, 4));
+  const queryMonth = applied.period === 'month' ? Number(applied.time.slice(5, 7)) : 12;
+  const data = buildEnergyQueryDataset({ year: queryYear, period: applied.period, month: queryMonth, energyUnitId: scopeUnitIds[applied.scope] });
   const monthMode = applied.period === 'month';
+  const currentYearYtd = !monthMode && queryYear === ENERGY_QUERY_CURRENT_YEAR;
   const titleUnit = applied.scope === 'all' ? '全厂' : energyAnalysisUnitLabels[applied.scope];
-  const maxTrend = Math.max(...data.trend) * 1.15;
-  const rows = data.rows.length
-    ? data.rows
-    : energyQueryData.all[applied.period].rows.filter((row) => row.energyUnitName === titleUnit);
+  const maxTrend = Math.max(...data.trend, 1) * 1.15;
+  const rows = data.rows;
   const conicGradient = data.structure
     .map((item, index) => {
       const start = data.structure.slice(0, index).reduce((sum, current) => sum + current.share, 0);
@@ -365,7 +376,15 @@ function ConsumptionQueryPage() {
           <span>当前月份仅维护月度汇总数据，暂未接入日度计量数据，因此无法展示日度明细。</span>
           <small>月度能耗数据仍可正常使用，后续接入日度数据后将支持下钻查看。</small>
         </div>
-      : <AnnualEnergyDetail row={row} details={createEnergyQueryAnnualDetails(row)} period={appliedPeriodLabel} />;
+      : <AnnualEnergyDetail
+        row={row}
+        details={createEnergyQueryAnnualDetails({
+          ...row,
+          monthlyPhysicalAmounts: getEnergyQueryMonthlyAmounts(row).physical,
+          monthlyStandardCoalAmounts: getEnergyQueryMonthlyAmounts(row).standardCoal,
+        })}
+        period={appliedPeriodLabel}
+      />;
     setDialog({
       title: `${monthMode && !dailyDetails?.length ? '暂无日度数据｜' : `${monthMode ? '月度' : '年度'}能源消费明细｜`}${row.energyTypeName}`,
       body,
@@ -430,7 +449,7 @@ function ConsumptionQueryPage() {
 
       <div className={styles.queryCharts}>
         <section className={`${styles.card} ${styles.chartCard}`}>
-          <div className={styles.chartTitle}>能源消费趋势（{monthMode ? '2026年1—6月' : '2022—2026年'}）</div>
+          <div className={styles.chartTitle}>能源消费趋势（{monthMode ? '2026年1—6月' : currentYearYtd ? `2022—2026年｜2026年截至${ENERGY_QUERY_REPORTED_MONTH}月` : '2022—2026年'}）</div>
           <div className={styles.chartSub}>{titleUnit}｜折标煤（tce），仅展示实际数据</div>
           <div className={styles.barChart}>
             {data.trend.map((value, index) => (
@@ -598,16 +617,55 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
   const openDetail = (row: ReturnType<typeof buildDeviceIntensityRows>[number]) => {
     const boiler = row.metricCode === 'boiler-standard-coal';
     const generator = row.metricCode === 'waste-heat-power-efficiency';
-    const basisItems: Array<[string, ReactNode]> = generator
-      ? [['能源输入', '能源转换与输出：回收余热'], ['能源输出', `发电量：${format(row.annualEnergy)} kWh`], ['数据边界', '余热发电转换记录']]
+    const numerator = generator
+      ? `回收余热｜发电量 ${format(row.annualEnergy)} kWh`
       : boiler
-      ? [['能源消耗', `天然气消费量：${format(row.annualEnergy)} Nm³`], ['产出参数', `蒸汽产量：${format(row.parameter?.value)} t`], ['能源折算参数', `天然气折标系数：${row.standardCoalFactor} ${row.standardCoalFactorUnit}`]]
-      : [['能源消耗', `电力消费量：${format(row.annualEnergy)} kWh`], ['产出参数', `供气量：${format(row.parameter?.value)} Nm³`]];
-    setDialog({ title: '设备指标详情', body: <>
-      <section className={styles.modalSection}><h3>指标结果</h3><DetailGrid items={[['设备名称', row.deviceName], ['所属用能单元', row.energyUnitName], ['指标名称', row.metricName], ['指标结果', `${format(row.value, 3)} ${row.metricUnit}`], ['统计期间', `${applied.year}年度`]]} /></section>
-      <section className={styles.modalSection}><h3>计算依据</h3><DetailGrid items={basisItems} /></section>
-      <section className={styles.modalSection}><h3>计算公式</h3><div className={styles.formulaBox}>{row.formula}</div></section>
-    </>, cancelText: '关闭', submitText: generator ? '关闭' : '编辑参数', onSubmit: generator ? undefined : () => window.setTimeout(() => openParameterDialog(row), 0) });
+        ? `年度折标综合能耗 ${format(row.annualEnergy * row.standardCoalFactor, 3)} tce`
+        : `年度电耗 ${format(row.annualEnergy)} kWh`;
+    const denominator = generator
+      ? `发电量 ${format(row.parameter?.value)} kWh`
+      : boiler
+        ? `年度蒸汽产量 ${format(row.parameter?.value)} t`
+        : `年度供气量 ${format(row.parameter?.value)} Nm³`;
+    const formula = generator
+      ? row.formula
+      : boiler
+        ? '年度折标综合能耗 × 1000 ÷ 年度蒸汽产量'
+        : '年度电耗 ÷ 年度供气量';
+    setDialog({
+      title: '设备指标详情',
+      body: (
+        <div className={styles.basisDialog}>
+          <section className={styles.basisSection}>
+            <h4>基本信息</h4>
+            <div className={styles.basisInfoGrid}>
+              <div><span>设备名称</span><strong>{row.deviceName}</strong></div>
+              <div><span>所属用能单元</span><strong>{row.energyUnitName}</strong></div>
+              <div><span>指标名称</span><strong>{row.metricName}</strong></div>
+              <div><span>统计期间</span><strong>{applied.year}年度</strong></div>
+              <div><span>指标结果</span><strong>{format(row.value, 3)} {row.metricUnit}</strong></div>
+              <div><span>指标单位</span><strong>{row.metricUnit}</strong></div>
+            </div>
+          </section>
+
+          <section className={styles.basisSection}>
+            <h4>参与计算值</h4>
+            <div className={styles.basisValueGrid}>
+              <div><span>{generator ? '能源输入' : boiler ? '年度折标综合能耗' : '年度能源消耗'}</span><strong>{numerator}</strong><small>{generator ? '能源转换与输出—余热发电' : boiler ? `${row.standardCoalFactor} ${row.standardCoalFactorUnit}｜能源品种参数` : '能源数据—重点设备'}</small></div>
+              <div><span>{generator ? '能源输出' : boiler ? '年度蒸汽产量' : '年度供气量'}</span><strong>{denominator}</strong><small>{generator ? '余热发电转换记录' : '重点设备指标计算参数'}</small></div>
+            </div>
+          </section>
+
+          <section className={`${styles.basisSection} ${styles.basisFormula}`}>
+            <h4>计算公式</h4>
+            <strong>{formula}</strong>
+          </section>
+        </div>
+      ),
+      cancelText: '关闭',
+      submitText: generator ? undefined : '编辑参数',
+      onSubmit: generator ? undefined : () => window.setTimeout(() => openParameterDialog(row), 0),
+    });
   };
   const openDeviceAction = (row: ReturnType<typeof buildDeviceIntensityRows>[number]) => {
     if (row.resultStatus === '已计算') return openDetail(row);
@@ -693,7 +751,52 @@ function ProductMetricDetail({ metric, objectName }: { metric: CalculatedIntensi
     const label = row.metricCode === 'compressed-air-electricity' ? '年度供气量（Nm³）' : '年度蒸汽产量（t）';
     setDialog({ title: '数据待完善', body: <><DetailGrid items={[['重点设备', row.deviceName], ['分析年度', `${year}年度`], ['典型指标', row.metricName], ['具体原因', row.resultReason ?? '缺少计算参数']]} /><label className={styles.modalField}><span className={styles.required}>{label}</span><input aria-label={label} type="number" min="0" step="0.001" defaultValue={value} onChange={(event) => { value = event.target.value; }} /></label></>, submitText: '补充计算参数', onSubmit: () => { const parsed = Number(value); if (Number.isFinite(parsed) && parsed > 0) saveDeviceIntensityParameter({ deviceId: row.deviceId, year: Number(year), metricCode: row.metricCode as DeviceIntensityMetricCode, value: parsed, unit: row.metricCode === 'compressed-air-electricity' ? 'Nm³' : 't' }); } });
   };
-  const openDetail = (row: ReturnType<typeof buildDeviceIntensityRows>[number]) => setDialog({ title: '指标计算详情', body: <><section className={styles.modalSection}><h3>指标结果</h3><DetailGrid items={[['分析对象', `${row.deviceName}｜重点设备`], ['指标名称', row.metricName], ['计算结果', `${format(row.value, 3)} ${row.metricUnit}`], ['统计期间', `${year}年度`]]} /></section><section className={styles.modalSection}><h3>计算依据</h3><DetailGrid items={row.metricCode === 'boiler-standard-coal' ? [['原始天然气消费量', `${format(row.annualEnergy)} Nm³`], ['天然气折标系数及来源', `${row.standardCoalFactor} ${row.standardCoalFactorUnit}｜能源品种参数`], ['年度折标综合能耗', `${format(row.annualEnergy * row.standardCoalFactor, 3)} tce`], ['年度蒸汽产量', `${format(row.parameter?.value)} t`], ['计算公式', '年度折标综合能耗 ×1000 ÷ 年度蒸汽产量']] : [['年度电耗', `${format(row.annualEnergy)} kWh`], ['年度供气量', `${format(row.parameter?.value)} Nm³`], ['计算公式', '年度电耗 ÷ 年度供气量']]} /></section><section className={styles.modalSection}><h3>数据来源</h3><DetailGrid items={[['能源数据来源', '数据管理—能源数据—重点设备'], ['参数来源', '重点设备指标计算参数'], ['最近计算时间', '2026-08-04']]} /></section></>, cancelText: '关闭', submitText: '编辑参数', onSubmit: () => openParameter(row) });
+  const openDetail = (row: ReturnType<typeof buildDeviceIntensityRows>[number]) => {
+    const isBoiler = row.metricCode === 'boiler-standard-coal';
+    const numerator = isBoiler
+      ? `年度折标综合能耗 ${format(row.annualEnergy * row.standardCoalFactor, 3)} tce`
+      : `年度电耗 ${format(row.annualEnergy)} kWh`;
+    const denominator = isBoiler
+      ? `年度蒸汽产量 ${format(row.parameter?.value)} t`
+      : `年度供气量 ${format(row.parameter?.value)} Nm³`;
+    const formula = isBoiler
+      ? '年度折标综合能耗 × 1000 ÷ 年度蒸汽产量'
+      : '年度电耗 ÷ 年度供气量';
+    setDialog({
+      title: '设备指标详情',
+      body: (
+        <div className={styles.basisDialog}>
+          <section className={styles.basisSection}>
+            <h4>基本信息</h4>
+            <div className={styles.basisInfoGrid}>
+              <div><span>设备名称</span><strong>{row.deviceName}</strong></div>
+              <div><span>所属用能单元</span><strong>{row.energyUnitName}</strong></div>
+              <div><span>指标名称</span><strong>{row.metricName}</strong></div>
+              <div><span>统计期间</span><strong>{year}年度</strong></div>
+              <div><span>指标结果</span><strong>{format(row.value, 3)} {row.metricUnit}</strong></div>
+              <div><span>指标单位</span><strong>{row.metricUnit}</strong></div>
+            </div>
+          </section>
+
+          <section className={styles.basisSection}>
+            <h4>参与计算值</h4>
+            <div className={styles.basisValueGrid}>
+              <div><span>{isBoiler ? '年度折标综合能耗' : '年度能源消耗'}</span><strong>{numerator}</strong><small>{isBoiler ? `${row.standardCoalFactor} ${row.standardCoalFactorUnit}｜能源品种参数` : '能源数据—重点设备'}</small></div>
+              <div><span>{isBoiler ? '年度蒸汽产量' : '年度供气量'}</span><strong>{denominator}</strong><small>{isBoiler ? '重点设备指标计算参数' : '重点设备指标计算参数'}</small></div>
+            </div>
+          </section>
+
+          <section className={`${styles.basisSection} ${styles.basisFormula}`}>
+            <h4>计算公式</h4>
+            <strong>{formula}</strong>
+          </section>
+        </div>
+      ),
+      cancelText: '关闭',
+      submitText: '编辑参数',
+      onSubmit: () => openParameter(row),
+    });
+  };
   };
   const openUnavailable = (row: ReturnType<typeof buildDeviceIntensityRows>[number]) => setDialog({ title: '指标暂不可计算', body: <DetailGrid items={[['重点设备', row.deviceName], ['典型指标', row.metricName], ['当前状态', row.resultStatus], ['具体原因', row.resultReason ?? '当前设备暂无可用指标模板']]} />, cancelText: '关闭' });
   const deviceTypes = [...new Set(devices.map((row) => row.deviceType))];
@@ -1833,7 +1936,6 @@ function FlowAnalysisPage() {
               厂内可供分配能源表示外购能源或转换产出进入厂内后的可分配能源量，不代表已经实际使用；实际使用需查看后续用能单元的分配/利用数据。
               缺少专线计量或明确分配规则时，系统不推断能源来源比例；未分配量是厂内能源尚未完整分配到一级用能单元的管理口径差额，不等同于物理损失。
             </div>
-            <ClosedLoopFlowRank data={data} />
           </>
         )}
         {tab === 'balance' && (
@@ -1892,35 +1994,6 @@ function ClosedLoopFlowStat({
         {note && <small className={styles.flowStatNote}>{note}</small>}
       </div>
     </div>
-  );
-}
-
-function ClosedLoopFlowRank({ data }: { data: FlowAnalysisDataset }) {
-  const max = Math.max(...data.rankRows.map((row) => row.standardCoalAmount), 1);
-  return (
-    <section className={styles.rankCard}>
-      <div className={styles.rankHead}>
-        <div>
-          <div className={styles.chartTitle}>{data.viewLevel === 'level1' ? '重点用能单元 TOP5' : '二级能源利用对象 TOP5'}</div>
-          <div className={styles.chartSub}>
-            {data.viewLevel === 'level1'
-              ? '按一级用能单元能源分配量排序｜折标量口径'
-              : '按二级能源利用量排序｜折标量口径'}
-          </div>
-        </div>
-        <StatusTag tone="check">{data.rankRows.length} 个对象</StatusTag>
-      </div>
-      <div className={styles.rankList}>
-        {data.rankRows.map((row, index) => (
-          <div key={row.energyUnitId}>
-            <b>{index + 1}</b><span title={row.name}>{row.name}</span>
-            <i><em style={{ width: `${Math.max(row.standardCoalAmount / max * 100, 3)}%` }} /></i>
-            <span>{format(row.standardCoalAmount, 1)} tce</span><span>{format(row.share, 1)}%</span>
-          </div>
-        ))}
-        {data.rankRows.length === 0 && <div className={styles.rankEmpty}>当前范围尚无可排名的下级能源利用记录。</div>}
-      </div>
-    </section>
   );
 }
 

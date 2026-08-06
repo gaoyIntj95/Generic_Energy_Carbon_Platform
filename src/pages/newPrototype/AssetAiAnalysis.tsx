@@ -12,6 +12,13 @@ export interface AssetAiEvidence {
   note: string;
 }
 
+export interface AssetAiDeepAnalysis {
+  evidenceChain: string[];
+  hypotheses: Array<{ level: '较高可能' | '待核实'; text: string }>;
+  verificationSteps: string[];
+  limitation: string;
+}
+
 export interface AssetAiConfig {
   tone: 'aiBalance' | 'aiAnalysis' | 'aiBudget' | 'aiAsset';
   title: string;
@@ -23,10 +30,12 @@ export interface AssetAiConfig {
   reasoningType: string;
   judgement: string;
   logic: string;
+  logicSteps?: string[];
   evidence: AssetAiEvidence[];
   priorityAction: string;
   uncertainty: string;
   inputs: string[];
+  deepAnalysis?: AssetAiDeepAnalysis;
 }
 
 interface AiResultState {
@@ -41,7 +50,7 @@ const generatedAt = '2026-07-29 10:20';
 const aiConfigs: Record<AssetAiKey, AssetAiConfig> = {
   balance: {
     tone: 'aiBalance',
-    title: 'AI平衡研判',
+    title: 'AI辅助分析',
     description: '关联能流平衡、重点用能单元和层级差额，提示优先核查与优化对象。',
     period: '2026年6月',
     scope: '全企业',
@@ -50,6 +59,7 @@ const aiConfigs: Record<AssetAiKey, AssetAiConfig> = {
     reasoningType: '能流勾稽与优化优先级研判',
     judgement: '当前能源分配与利用数据已形成统一管理口径，建议优先核查待细分量和层级异常量较高的用能单元。',
     logic: '企业能源输入、一级分配和二级利用读取同一能流聚合结果；一级与二级数据仅作层级勾稽，不重复计入企业总量。',
+    logicSteps: ['读取能源分配完整性结果', '结合能效指标、趋势与对标结果', '生成重点对象辅助解读'],
     evidence: [
       { label: '能源输入量', value: '—', note: '来自能流分析统一聚合结果' },
       { label: '一级未分配量', value: '—', note: '厂内可分配量与一级分配、外部输出的管理差额' },
@@ -226,12 +236,12 @@ export function AssetAiAnalysis({
           <div className={styles.aiCompact}>
             <div className={styles.aiCompactTop}>
               <div className={styles.aiCompactCopy}>
-                <div className={styles.aiKicker}><b>AI辅助研判</b><span>{config.level}</span></div>
+                <div className={styles.aiKicker}><b>AI辅助分析</b><span>{config.level}</span></div>
                 <div className={styles.aiJudgement}>{config.judgement}</div>
-                <div className={styles.aiPriority}><b>优先建议</b>{config.priorityAction}</div>
+                <div className={styles.aiPriority}><b>优化建议</b>{config.priorityAction}</div>
               </div>
               <div className={styles.aiCompactActions}>
-                <Button onClick={() => setDrawer('evidence')}>查看研判依据</Button>
+                <Button onClick={() => setDrawer('evidence')}>{config.deepAnalysis ? '查看深度诊断' : '查看研判依据'}</Button>
                 <Button primary onClick={() => setReportOpen(true)}>导出分析报告</Button>
               </div>
             </div>
@@ -254,6 +264,14 @@ export function AssetAiAnalysis({
   </>;
 }
 
+function AiDeepAnalysis({ analysis }: { analysis: AssetAiDeepAnalysis }) {
+  return <div className={styles.aiDeepAnalysis}>
+    <article><b>证据链</b><ul>{analysis.evidenceChain.map((item) => <li key={item}>{item}</li>)}</ul></article>
+    <article><b>可能原因</b><ul>{analysis.hypotheses.map((item) => <li key={item.text}><span className={item.level === '较高可能' ? styles.aiLikelihoodHigh : styles.aiLikelihoodPending}>{item.level}</span>{item.text}</li>)}</ul></article>
+    <article className={styles.aiVerification}><b>建议核查顺序</b><ol>{analysis.verificationSteps.map((item) => <li key={item}>{item}</li>)}</ol><small>数据限制：{analysis.limitation}</small></article>
+  </div>;
+}
+
 function AiStatusLabel({ status }: { status: AiStatus }) {
   const text = status === 'loading' ? '生成中' : status === 'stale' ? '需更新' : '已生成';
   return <span className={`${styles.aiStatus} ${styles[`aiStatus${status}`]}`}>{text}</span>;
@@ -267,13 +285,26 @@ function AiLoading() {
 }
 
 function EvidenceDrawer({ config, onClose, notify }: { config: AssetAiConfig; onClose: () => void; notify: (message: string) => void }) {
-  return <Drawer title={`${config.title}｜研判依据`} width={540} onClose={onClose} footer={<Button primary onClick={() => { onClose(); notify('研判依据已标记为已阅'); }}>标记已阅</Button>}>
+  return <Drawer title={`${config.title}｜${config.deepAnalysis ? '深度诊断' : '研判依据'}`} width={620} onClose={onClose} footer={<Button primary onClick={() => { onClose(); notify('研判依据已标记为已阅'); }}>标记已阅</Button>}>
+    <AiDrawerSection title="本次研判范围">
+      <div className={styles.aiScopeSummary}>
+        <div><span>分析周期</span><b>{config.period}</b></div>
+        <div><span>组织范围</span><b>{config.scope}</b></div>
+      </div>
+    </AiDrawerSection>
     <AiDrawerSection title="页面引用的系统事实">
       <table className={styles.aiBasisTable}><thead><tr><th>指标</th><th>当前值</th><th>说明</th></tr></thead><tbody>{config.evidence.map((item) => <tr key={item.label}><td>{item.label}</td><td><b>{item.value}</b></td><td>{item.note}</td></tr>)}</tbody></table>
     </AiDrawerSection>
-    <AiDrawerSection title="跨指标关联逻辑"><p className={styles.aiDrawerText}>{config.logic}</p></AiDrawerSection>
+    {config.deepAnalysis && <AiDrawerSection title="AI深度诊断"><AiDeepAnalysis analysis={config.deepAnalysis} /></AiDrawerSection>}
+    <AiDrawerSection title="跨指标关联逻辑">
+      {config.logicSteps ? <div className={styles.aiLogicFlow}>{config.logicSteps.map((step, index) => <div key={step}><span>{index + 1}</span><b>{step}</b>{index < config.logicSteps!.length - 1 && <i>→</i>}</div>)}</div> : <p className={styles.aiDrawerText}>{config.logic}</p>}
+      {config.logicSteps && <p className={styles.aiLogicNote}>{config.logic}</p>}
+    </AiDrawerSection>
     <AiDrawerSection title="待核实与适用边界"><div className={styles.aiBoundary}>{config.uncertainty}</div></AiDrawerSection>
-    <AiDrawerSection title="数据来源范围"><div className={styles.aiInputTags}>{config.inputs.map((item) => <span key={item}>{item}</span>)}</div></AiDrawerSection>
+    <AiDrawerSection title="数据来源范围">
+      <p className={styles.aiSourceHint}>以下字段均来自本次数据快照，标签用于说明研判实际读取范围。</p>
+      <div className={styles.aiInputTags}>{config.inputs.map((item) => <span key={item}>{item}</span>)}</div>
+    </AiDrawerSection>
   </Drawer>;
 }
 
