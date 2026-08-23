@@ -59,7 +59,8 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
     expect(container.textContent).toContain('本次核算排放汇总');
     expect(container.textContent).toContain('正式核算清单｜确认人：管理员');
     expect(container.textContent).toContain('确认人：管理员');
-    expect(container.textContent).toContain('正式核算清单数据完整，共8项排放源');
+    expect(container.textContent).not.toContain('草稿');
+    expect(container.textContent).toContain('依据标准：GB/T 32150—2025');
     expect(container.textContent).toContain('化石燃料燃烧排放');
     expect(container.textContent).toContain('购入电力与热力产生的排放');
     expect(container.textContent).toContain('交通运输产生的排放');
@@ -100,6 +101,8 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
 
   it('filters, creates and deletes inventory records with real mock-state changes', async () => {
     await render('/carbon-accounting/inventory');
+    expect(container.querySelector('[class*="inventoryTask"]')?.textContent).toContain('新增排放源');
+    expect(container.querySelector('[class*="filterbar"]')?.textContent).not.toContain('新增排放源');
     const gasRow = [...container.querySelectorAll('tr')].find((item) => item.textContent?.includes('天然气燃烧（锅炉房）'))!;
     expect(gasRow.querySelector('[data-column="source-type"]')?.textContent).toContain('固定燃烧源');
     expect(gasRow.querySelector('[data-column="source"]')?.textContent).toContain('天然气燃烧（锅炉房）');
@@ -117,7 +120,7 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
 
     await click(button('新增排放源'));
     const sourceDialog = container.querySelector('[role="dialog"]')!;
-    await setSelect(sourceDialog.querySelectorAll('select')[1] as HTMLSelectElement, '其他/自定义');
+    await setSelect(sourceDialog.querySelectorAll('select')[2] as HTMLSelectElement, '其他/自定义');
     await setInput(container.querySelector('input[placeholder="请输入具体排放源名称"]')!, '测试制冷剂补充');
     await setInput(container.querySelector('input[type="number"]')!, '10');
     await setInput(container.querySelector('input[placeholder="例如：kg、t、MWh"]')!, 'kg');
@@ -129,6 +132,73 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
     expect(container.textContent).toContain('关联的上游能源或运营数据不会被删除');
     await click(button('确认删除'));
     expect(container.textContent).not.toContain('测试制冷剂补充');
+  });
+
+  it('groups inventory categories by emission scope and cascades scope choices in the new-source dialog', async () => {
+    await render('/carbon-accounting/inventory');
+
+    const directScope = container.querySelector('[data-scope-title="范围一：直接排放"]')!;
+    expect(directScope).not.toBeNull();
+    const directScopeToggle = directScope.querySelector('button[aria-expanded]') as HTMLButtonElement;
+    expect(directScopeToggle.getAttribute('aria-expanded')).toBe('true');
+    expect(directScope.textContent).not.toContain('包含 4 个排放类别');
+    expect(directScope.querySelector('[data-category-title="化石燃料燃烧排放"]')).not.toBeNull();
+    await click(directScopeToggle);
+    expect(directScopeToggle.getAttribute('aria-expanded')).toBe('false');
+    expect(directScope.querySelector('[data-category-title="化石燃料燃烧排放"]')).toBeNull();
+    await click(directScopeToggle);
+    expect(directScope.querySelector('[data-category-title="化石燃料燃烧排放"]')).not.toBeNull();
+    expect(container.querySelector('[data-scope-title="范围二：间接排放"] [data-category-title="购入的电力与热力产生的排放"]')).not.toBeNull();
+    expect(container.querySelector('[data-scope-title="范围三：其他间接排放"] [data-category-title="交通运输产生的排放"]')).not.toBeNull();
+
+    await click(button('新增排放源'));
+    const sourceDialog = container.querySelector('[role="dialog"]')!;
+    const sourceNameField = [...sourceDialog.querySelectorAll('label')].find((label) => label.textContent?.includes('排放源名称'));
+    expect(sourceNameField?.className).not.toContain('fieldFull');
+    const scopeSelect = sourceDialog.querySelector('select[aria-label="排放范围"]') as HTMLSelectElement;
+    const categorySelect = sourceDialog.querySelector('select[aria-label="排放类别"]') as HTMLSelectElement;
+    expect([...scopeSelect.options].map((option) => option.textContent)).toEqual(['范围一：直接排放', '范围二：间接排放', '范围三：其他间接排放', '其他排放', '特殊排放']);
+
+    await setSelect(scopeSelect, 'scope-2');
+    expect([...categorySelect.options].map((option) => option.textContent)).toEqual(['购入的电力与热力产生的排放']);
+    await setSelect(scopeSelect, 'scope-3');
+    expect([...categorySelect.options].map((option) => option.textContent)).toEqual(['交通运输产生的排放', '所使用的产品和服务隐含的排放', '所生产的产品和服务的排放']);
+    await setSelect(scopeSelect, 'other');
+    expect([...categorySelect.options].map((option) => option.textContent)).toEqual(['其他排放']);
+    await setSelect(scopeSelect, 'special');
+    expect([...categorySelect.options].map((option) => option.textContent)).toEqual(['特殊排放']);
+  });
+
+  it('keeps the three carbon pages focused on formal-list context without repeated organization details', async () => {
+    await render('/carbon-accounting/preview');
+    const previewHeader = container.querySelector('[class*="previewTask"]')!;
+    expect(previewHeader.textContent).toContain('依据标准：GB/T 32150—2025');
+    expect(previewHeader.textContent).not.toContain('草稿');
+    expect(previewHeader.textContent).not.toContain('XX科技有限公司');
+    expect(previewHeader.textContent).not.toContain('企业法人边界');
+
+    await render('/carbon-accounting/inventory');
+    const inventoryHeader = container.querySelector('[class*="inventoryTask"]')!;
+    expect(inventoryHeader.textContent).toContain('依据标准：GB/T 32150—2025');
+    expect(inventoryHeader.textContent).not.toContain('XX科技有限公司');
+    expect(inventoryHeader.textContent).not.toContain('企业法人边界');
+
+    await render('/carbon-accounting/support');
+    const supportHeader = container.querySelector('[class*="supportHead"]')!;
+    expect(supportHeader.textContent).toContain('依据标准：GB/T 32150—2025');
+    expect(supportHeader.textContent).not.toContain('2026年度核算任务');
+    expect(supportHeader.textContent).not.toContain('数据来源：当前正式核算清单');
+    expect(supportHeader.textContent).not.toContain('XX科技有限公司');
+    expect(supportHeader.textContent).not.toContain('2026-01-01');
+  });
+
+  it('combines trend totals and scope composition while keeping small non-zero scopes visible', async () => {
+    await render('/carbon-accounting/preview');
+    expect(container.querySelector('[role="group"][aria-label="趋势口径"]')).toBeNull();
+    expect(container.textContent).toContain('柱顶为排放总量，柱体按范围构成');
+    const currentYear = container.querySelector('[data-trend-year="2026"]')!;
+    expect(currentYear.querySelectorAll('[data-scope-segment]')).toHaveLength(3);
+    expect(currentYear.querySelector('[data-scope-segment="scope-3"]')?.getAttribute('title')).toContain('范围三：297.50');
   });
 
   it('previews an energy-only draft without replacing the current inventory until confirmed', async () => {
@@ -202,19 +272,40 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
     expect(container.textContent).toContain('导出核算结果');
   });
 
-  it('keeps support tabs and the enterprise-factor write flow separate', async () => {
+  it('shows basic and emission-source support in one page and keeps the enterprise-factor write flow separate', async () => {
     await render('/carbon-accounting/support');
-    expect(container.textContent).toContain('报告主体信息');
-    expect(container.querySelectorAll('[data-support-table] col')).toHaveLength(7);
-    expect(container.querySelector('[data-group-title="核算主体与边界"]')?.textContent).toContain('核算主体与边界');
-    await click(button('排放源支撑材料'));
-    expect(container.querySelectorAll('[data-support-table] col')).toHaveLength(7);
-    expect(container.querySelector('[data-group-title="化石燃料燃烧排放"]')?.textContent).toContain('化石燃料燃烧排放');
+    expect(container.textContent).toContain('核算主体与组织边界');
+    expect(container.textContent).not.toContain('报告主体信息');
+    expect(container.textContent).not.toContain('核算方法说明');
+    expect(container.querySelectorAll('[data-support-table="basic"] col')).toHaveLength(4);
+    expect(container.querySelectorAll('[data-support-table="basic"] tbody tr')).toHaveLength(2);
+    expect(container.querySelectorAll('[data-support-table="source"] col')).toHaveLength(6);
+    expect(container.querySelector('[data-group-title="核算主体与边界"]')).toBeNull();
+    const directSupportScopeTitle = container.querySelector('[data-support-scope-title="范围一：直接排放"]');
+    expect(directSupportScopeTitle).not.toBeNull();
+    expect(directSupportScopeTitle?.getAttribute('aria-expanded')).toBe('true');
+    expect(directSupportScopeTitle?.closest('tr')?.nextElementSibling?.querySelector('[data-group-title="化石燃料燃烧排放"]')).not.toBeNull();
+    const fossilFuelGroup = container.querySelector('[data-group-title="化石燃料燃烧排放"]') as HTMLButtonElement;
+    expect(fossilFuelGroup.getAttribute('aria-expanded')).toBe('true');
+    expect(container.textContent).toContain('天然气燃烧（锅炉房）');
+    await click(fossilFuelGroup);
+    expect(fossilFuelGroup.getAttribute('aria-expanded')).toBe('false');
+    expect(container.textContent).not.toContain('天然气燃烧（锅炉房）');
+    await click(fossilFuelGroup);
+    expect(container.textContent).toContain('天然气燃烧（锅炉房）');
+    await click(directSupportScopeTitle as HTMLButtonElement);
+    expect(directSupportScopeTitle?.getAttribute('aria-expanded')).toBe('false');
+    expect(container.textContent).not.toContain('天然气燃烧（锅炉房）');
+    await click(directSupportScopeTitle as HTMLButtonElement);
+    expect(container.textContent).toContain('天然气燃烧（锅炉房）');
+    expect(container.querySelector('[data-support-scope-title="范围二：间接排放"]')).not.toBeNull();
+    expect(container.querySelector('[data-support-scope-title="范围三：其他间接排放"]')).not.toBeNull();
     expect(container.textContent).toContain('外购电力（企业整体）');
-    expect(container.textContent).toContain('用户可根据企业实际台账、报表和凭证进行确认、调整或补充');
+    expect(container.textContent).not.toContain('暂无符合条件的排放源支撑材料');
+    expect(container.textContent).toContain('用户仅需维护对应的支撑材料');
     expect(container.textContent).toContain('查看');
     await click(button('查看'));
-    expect(container.textContent).toContain('支撑管理');
+    expect(container.textContent).toContain('查看核查材料');
     await click(button('关闭'));
 
     await render('/carbon-accounting/factors');

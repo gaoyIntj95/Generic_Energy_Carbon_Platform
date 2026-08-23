@@ -287,6 +287,42 @@
   background: #d9ebe4;
 }
 
+.inlineSection {
+  margin: 2px 0;
+}
+
+.inlineSectionButton {
+  width: 100%;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.topLevelSectionButton {
+  padding-left: 38px;
+}
+
+.topLevelSectionButton .sectionIcon {
+  width: 30px;
+  height: 30px;
+  flex-basis: 30px;
+}
+
+.inlineSectionItems {
+  position: relative;
+  padding: 0 5px 4px;
+}
+
+.inlineSectionItems::before {
+  position: absolute;
+  top: 0;
+  bottom: 20px;
+  left: 29px;
+  width: 1px;
+  content: '';
+  background: #d9ebe4;
+}
+
 .nestedItem {
   padding-left: 42px;
 }

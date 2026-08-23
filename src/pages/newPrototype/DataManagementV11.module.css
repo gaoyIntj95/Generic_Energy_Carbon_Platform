@@ -105,37 +105,44 @@
   white-space: nowrap;
 }
 
-.topTabs {
+.energySubmenu {
   display: flex;
-  height: 50px;
-  gap: 28px;
+  min-height: 48px;
   align-items: stretch;
   padding: 0 16px;
-  border-bottom: 1px solid #e4e9ef;
+  background: #f7fbf9;
+  border-bottom: 1px solid #dce8e4;
 }
 
-.topTabs button {
+.energySubmenuLabel {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 20px;
+  color: #172033;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.energySubmenu button {
   position: relative;
-  padding: 0 2px;
+  min-width: 92px;
+  padding: 0 16px;
   color: #5f6b7a;
   background: transparent;
   border: 0;
   cursor: pointer;
 }
 
-.topTabs .activeTab {
-  color: #00a870;
-  font-weight: 600;
+.energySubmenu button:hover {
+  color: #00875a;
+  background: #edf8f3;
 }
 
-.topTabs .activeTab::after {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 2px;
-  content: "";
-  background: #00a870;
+.energySubmenu .activeSubmenuItem {
+  color: #00a870;
+  background: #fff;
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 #00a870;
 }
 
 .roleTabs {
@@ -240,18 +247,125 @@
 }
 
 .deviceLevelOneRow td {
-  height: 42px;
+  height: 46px;
   padding: 0 14px;
-  background: #fff;
+  background: #f2faf7;
   border-top: 1px solid #edf0f4;
   border-bottom: 1px solid #edf0f4;
+  box-shadow: inset 4px 0 0 #00875a;
+}
+
+.deviceCategoryCard {
+  margin: 0 0 18px;
+  overflow: hidden;
+  border: 1px solid #dce8e4;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.deviceCategoryHeader {
+  padding: 18px 20px;
+  background: #f3faf7;
+  border-bottom: 1px solid #dce8e4;
+}
+
+.deviceCategoryHeader h3 {
+  display: inline;
+  margin: 0 16px 0 0;
+  color: #102d49;
+  font-size: 18px;
+}
+
+.deviceCategoryHeader span {
+  color: #71849a;
+  font-size: 13px;
+}
+
+.deviceCategoryCard .tableWrap {
+  margin: 0;
+}
+
+.deviceCategoryCard table {
+  min-width: 980px;
+  table-layout: fixed;
+}
+
+.deviceCategoryCard table th:nth-child(1),
+.deviceCategoryCard table td:nth-child(1) {
+  width: 25%;
+}
+
+.deviceCategoryCard table th:nth-child(2),
+.deviceCategoryCard table td:nth-child(2) {
+  width: 22%;
+}
+
+.deviceCategoryCard table th:nth-child(3),
+.deviceCategoryCard table td:nth-child(3) {
+  width: 12%;
+}
+
+.deviceCategoryCard table th:nth-child(4),
+.deviceCategoryCard table td:nth-child(4) {
+  width: 14%;
+}
+
+.deviceCategoryCard table th:nth-child(5),
+.deviceCategoryCard table td:nth-child(5) {
+  width: 13%;
+}
+
+.deviceCategoryCard table th:nth-child(6),
+.deviceCategoryCard table td:nth-child(6) {
+  width: 14%;
+}
+
+.deviceCategoryCard .deviceOwnership {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.deviceScopeTag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.deviceScopeDirect {
+  color: #55708f;
+  background: #f0f4fa;
+}
+
+.deviceScopeDevice {
+  color: #3569b8;
+  background: #e8f0ff;
 }
 
 .deviceLevelOneNode {
   display: flex;
   height: 42px;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+}
+
+.deviceLevelBadge {
+  display: inline-flex;
+  height: 21px;
+  align-items: center;
+  padding: 0 7px;
+  color: #007b55;
+  background: #d9f2e7;
+  border: 1px solid #b8e4d2;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  white-space: nowrap;
 }
 
 .deviceToggle {
@@ -273,53 +387,63 @@
   font-size: 14px;
 }
 
-.deviceCount {
-  display: inline-flex;
-  height: 22px;
-  align-items: center;
-  padding: 0 7px;
+.deviceAddButton {
+  margin-left: auto;
+  padding: 3px 10px;
   color: #00875a;
-  background: #eaf8f3;
-  border-radius: 11px;
+  background: #f1fbf7;
+  border: 1px solid #bfe7d6;
+  border-radius: 4px;
+  cursor: pointer;
   font-size: 12px;
-  font-weight: 400;
 }
 
-.deviceDirectRow td,
-.deviceLevelTwoRow td {
-  height: 34px;
-  padding: 0 14px;
+.deviceAddButton:hover {
+  background: #e2f6ed;
+}
+
+.deviceLevelOneAddButton {
+  padding: 4px 11px;
+}
+
+.deviceLevelTwoAddButton {
+  padding: 2px 8px;
+  color: #16966e;
   background: #fff;
-  font-size: 13px;
-  font-weight: 500;
+  border-color: #d5ece2;
 }
 
-.deviceTreeChild {
-  position: relative;
-  display: flex;
-  height: 34px;
-  align-items: center;
-  gap: 8px;
-  padding-left: 62px;
+.deviceRow td {
+  height: 36px;
+  padding: 0 14px;
   color: #344054;
+  background: #fff;
+  border-top: 1px solid #f0f2f5;
+  font-size: 13px;
 }
 
-.deviceTreeChild::before {
-  position: absolute;
-  top: 50%;
-  left: 29px;
-  width: 13px;
-  height: 16px;
-  border-bottom: 1px solid #c9d4cf;
-  border-left: 1px solid #c9d4cf;
-  content: '';
-  transform: translateY(-10px);
+.deviceRow td:first-child {
+  padding-left: 14px;
 }
 
-.deviceTreeChild small {
-  color: #8a94a3;
+.deviceOwnership {
+  color: #52677d;
   font-size: 12px;
-  font-weight: 400;
+}
+
+.deviceNameCell {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+}
+
+.deviceLevelLabel {
+  display: none;
+}
+
+.deviceName {
+  color: #172033;
+  font-weight: 450;
 }
 
 .scopeGroupStart td {
@@ -336,6 +460,37 @@
 
 .scopeGroupRow td:first-child {
   background: #f7fbf9;
+}
+
+.functionalGroupRow td {
+  padding: 0;
+  background: #eef8f4;
+  border-top: 1px solid #cfe9dd;
+}
+
+.functionalGroupTitle {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  column-gap: 12px;
+  padding: 14px 16px;
+}
+
+.functionalGroupTitle strong {
+  color: #173b31;
+  font-size: 16px;
+}
+
+.functionalGroupTitle span {
+  color: #00875a;
+  font-size: 12px;
+}
+
+.functionalGroupTitle small {
+  grid-column: 1 / -1;
+  margin-top: 3px;
+  color: #6b857b;
+  font-size: 12px;
 }
 
 .scopeRecordRow td:first-child {
@@ -381,6 +536,24 @@
   font-size: 12px;
   font-style: normal;
   font-weight: 400;
+}
+
+.scopeAddButton {
+  padding: 4px 9px;
+  color: #00875a;
+  background: #f3faf7;
+  border: 1px solid #bfe7d6;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.scopeGroupActionCell {
+  text-align: left;
+}
+
+.scopeAddButton:hover {
+  background: #e2f6ed;
 }
 
 .scopeChild {
@@ -570,6 +743,50 @@
   gap: 17px 18px;
 }
 
+.deviceEnergySelectors {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(300px, 1.6fr);
+  gap: 18px;
+}
+
+.operationFormGrid {
+  grid-template-columns: 150px 190px 230px minmax(0, 1fr);
+}
+
+.linkedOperationForm {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 24px;
+}
+
+.linkedOperationForm .linkedMetricName {
+  min-height: 40px;
+  padding: 0 12px;
+  background: #f7f9fb;
+  border: 1px solid #d8dee7;
+  border-radius: 6px;
+}
+
+.linkedOperationForm > .contextStrip,
+.linkedOperationForm > .helpText,
+.linkedOperationForm > .full {
+  grid-column: 1 / -1;
+}
+
+.linkedOperationForm > .helpText {
+  margin-top: -4px;
+  padding: 10px 12px;
+  background: #f7f9fb;
+  border: 1px solid #e4e9ef;
+  border-radius: 6px;
+  line-height: 1.6;
+  white-space: normal;
+}
+
+.operationFormGrid > .helpText {
+  white-space: nowrap;
+}
+
 .full {
   grid-column: 1 / -1;
 }
@@ -602,6 +819,23 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 17px;
+}
+
+.deviceRootOwnership {
+  grid-template-columns: 220px 280px;
+  max-width: 520px;
+}
+
+.readonlyField {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  padding: 0 12px;
+  color: #344054;
+  background: #f7f9fb;
+  border: 1px solid #d8dee7;
+  border-radius: 6px;
+  line-height: 1.4;
 }
 
 .deviceFormSection textarea {
@@ -700,6 +934,24 @@
 .blockedAction:hover {
   background: #f3faf7;
   border-color: #00a870;
+}
+
+.referenceList {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.referenceList li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e4e8ef;
+  border-radius: 6px;
 }
 
 .stagePill {
@@ -968,6 +1220,117 @@
   line-height: 1.55;
 }
 
+.flowLedgerGuide {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 16px 16px;
+}
+
+.flowLedgerGuide > div {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid #dfe7ed;
+  border-radius: 8px;
+}
+
+.flowLedgerGuide b {
+  flex: 0 0 auto;
+}
+
+.flowLedgerGuide > div > b {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  color: #fff;
+  background: #0a9b6c;
+  border-radius: 50%;
+  font-size: 12px;
+}
+
+.flowLedgerGuide span {
+  color: #7b8794;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.flowLedgerGuide span strong {
+  display: block;
+  color: #344054;
+}
+
+.flowLedgerActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.flowRelation {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #172033;
+}
+
+.flowRelation span {
+  color: #0a9b6c;
+  font-size: 16px;
+}
+
+.monthConversionTableWrap {
+  overflow-x: auto;
+  border: 1px solid #e4e9ef;
+  border-radius: 8px;
+}
+
+.monthConversionTable {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+
+.monthConversionTable th,
+.monthConversionTable td {
+  height: 42px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #edf0f4;
+  text-align: left;
+}
+
+.monthConversionTable th {
+  color: #667085;
+  background: #f8fafc;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.monthConversionTable td:first-child {
+  width: 70px;
+  color: #475467;
+  font-weight: 500;
+}
+
+.monthConversionTable tr:last-child td {
+  border-bottom: 0;
+}
+
+.monthConversionTable input {
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid #d9e2ec;
+  border-radius: 4px;
+  outline: none;
+}
+
+.monthConversionTable input:focus {
+  border-color: #0a9b6c;
+  box-shadow: 0 0 0 2px rgb(10 155 108 / 12%);
+}
+
 .sectionToolbar {
   display: flex;
   min-height: 58px;
@@ -995,7 +1358,104 @@
 }
 
 .conversionTable {
-  min-width: 1180px !important;
+  min-width: 1260px !important;
+  table-layout: fixed !important;
+}
+
+/* 上下两张转换台账使用同一套列网格，保证字段和操作区垂直对齐。 */
+.conversionTable th:nth-child(1),
+.conversionTable td:nth-child(1) {
+  width: 175px;
+}
+
+.conversionTable th:nth-child(2),
+.conversionTable td:nth-child(2) {
+  width: 220px;
+}
+
+.conversionTable th:nth-child(3),
+.conversionTable td:nth-child(3) {
+  width: 145px;
+}
+
+.conversionTable th:nth-child(4),
+.conversionTable td:nth-child(4) {
+  width: 180px;
+}
+
+.conversionTable th:nth-child(5),
+.conversionTable td:nth-child(5) {
+  width: 220px;
+}
+
+.conversionTable th:nth-child(6),
+.conversionTable td:nth-child(6) {
+  width: 160px;
+}
+
+.conversionTable th:nth-child(7),
+.conversionTable td:nth-child(7) {
+  width: 160px;
+}
+
+.conversionTable td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conversionTable th:last-child,
+.conversionTable td:last-child {
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.recoverySourceTable {
+  width: 100%;
+  min-width: 0 !important;
+  table-layout: fixed !important;
+}
+
+.recoverySourceTable th:nth-child(1),
+.recoverySourceTable td:nth-child(1) {
+  width: 24%;
+}
+
+.recoverySourceTable th:nth-child(2),
+.recoverySourceTable td:nth-child(2),
+.recoverySourceTable th:nth-child(3),
+.recoverySourceTable td:nth-child(3) {
+  width: 15%;
+}
+
+.recoverySourceTable th:nth-child(4),
+.recoverySourceTable td:nth-child(4) {
+  width: 10%;
+}
+
+.recoverySourceTable th:nth-child(5),
+.recoverySourceTable td:nth-child(5) {
+  width: 13%;
+}
+
+.recoverySourceTable th:nth-child(6),
+.recoverySourceTable td:nth-child(6) {
+  width: 12%;
+}
+
+.recoverySourceTable th:nth-child(7),
+.recoverySourceTable td:nth-child(7) {
+  width: 11%;
+  padding-right: 10px;
+  padding-left: 10px;
+}
+
+.recoverySourceTable .actions {
+  gap: 3px;
+}
+
+.recoverySourceTable .actions button {
+  padding-right: 2px;
+  padding-left: 2px;
 }
 
 .conversionSourceMain {
@@ -1037,17 +1497,135 @@
   place-items: center;
 }
 
+.conversionPath {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  color: #526173;
+  background: #f7f9fb;
+  border: 1px solid #e4e9ef;
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+.conversionPath span {
+  padding: 5px 9px;
+  color: #344054;
+  background: #fff;
+  border: 1px solid #d8dee7;
+  border-radius: 5px;
+}
+
+.conversionPath b {
+  color: #00a870;
+  font-size: 16px;
+  font-weight: 500;
+}
+
 .sceneDescription {
   margin: 8px 0 0;
   color: #6c7788;
   font-size: 13px;
 }
 
+.conversionSummary {
+  padding: 11px 13px;
+  margin: 12px 0 13px;
+  color: #467565;
+  background: #f3faf7;
+  border: 1px solid #d5efe5;
+  border-radius: 7px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.conversionContextBar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  padding: 2px 1px 8px;
+  color: #667085;
+}
+
+.conversionContextBar > span {
+  display: flex;
+  min-height: 38px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.conversionContextBar small {
+  color: #8a94a3;
+  font-size: 12px;
+}
+
+.conversionContextBar strong {
+  color: #344054;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.contextSelect {
+  width: fit-content;
+  min-width: 180px;
+  padding: 2px 20px 2px 0;
+  color: #344054;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #b9c7d5;
+  border-radius: 0;
+  font-size: 15px;
+}
+
+.conversionSummaryMain,
+.conversionSummaryMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: baseline;
+}
+
+.conversionSummaryMain strong {
+  color: #00875a;
+  font-size: 13px;
+}
+
+.conversionSummaryMeta {
+  margin-top: 3px;
+  color: #667d75;
+}
+
 .conversionSceneGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
+}
+
+.conversionSceneGroup {
+  margin-bottom: 10px;
+}
+
+.conversionSceneGroupHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 12px 0 8px;
+}
+
+.conversionSceneGroupHeader strong {
+  color: #172033;
+  font-size: 14px;
+}
+
+.conversionSceneGroupHeader span {
+  color: #738194;
+  font-size: 12px;
 }
 
 .conversionSceneGrid button {
@@ -1120,6 +1698,60 @@
   margin-bottom: 13px;
   color: #5f6b7a;
 }
+
+.entryModeInlineHint {
+  color: #8a94a3;
+  font-size: 12px;
+}
+
+.missingDataAction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-top: 16px;
+  color: #8a5b13;
+  background: #fffaf0;
+  border: 1px solid #f4dfb4;
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+.missingDataAction button {
+  padding: 5px 10px;
+  color: #1677ff;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.modeHint {
+  padding: 9px 12px;
+  margin: -4px 0 12px;
+  color: #467565;
+  background: #f3faf7;
+  border: 1px solid #d5efe5;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.scopeContext {
+  padding: 8px 12px;
+  margin: 8px 0 2px;
+  color: #667085;
+  background: #f8fafc;
+  border: 1px solid #e4e9ef;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.scopeContext strong {
+  color: #344054;
+  font-weight: 600;
+}
+
 
 .conversionRadio label {
   display: flex;
@@ -1215,6 +1847,198 @@
   font-size: 12px;
 }
 
+.readonlyInfo {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 10px;
+  color: #8a94a3;
+  font-size: 13px;
+}
+
+.readonlyInfo strong {
+  color: #172033;
+  font-weight: 600;
+}
+
+.readonlyControl {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  padding: 0 12px;
+  color: #172033;
+  background: #f7f9fb;
+  border: 1px solid #d8dee7;
+  border-radius: 6px;
+}
+
+.readonlyControl strong {
+  font-weight: 600;
+}
+
+.conversionFormSection .conversionFormBody > .helpText {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .operationFormGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .operationFormGrid > .helpText {
+    white-space: normal;
+  }
+}
+
+.flowResultGroup,
+.flowConfirmGroup {
+  padding: 13px;
+  border-radius: 8px;
+}
+
+.flowResultGroup {
+  background: #f5f8fb;
+  border: 1px solid #dce5ee;
+}
+
+.flowConfirmGroup {
+  margin-top: 12px;
+  background: #fffaf0;
+  border: 1px solid #f2dfb5;
+}
+
+.flowResultGroupTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  color: #344054;
+  font-size: 13px;
+}
+
+.flowResultGroupTitle span {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.flowResultGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.flowResultCard {
+  position: relative;
+  min-height: 92px;
+  padding: 12px 14px;
+  background: #eef3f7;
+  border: 1px solid #d6e0e9;
+  border-radius: 7px;
+}
+
+.flowResultLabel {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #5f6b7a;
+  font-size: 13px;
+}
+
+.flowResultLabel em,
+.requiredHint {
+  padding: 2px 6px;
+  color: #526273;
+  background: #dce7f0;
+  border-radius: 10px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.flowResultCard > strong {
+  display: block;
+  margin-top: 9px;
+  color: #172033;
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.flowResultCard small,
+.flowInputHint {
+  display: block;
+  margin-top: 7px;
+  color: #8a94a3;
+  font-size: 12px;
+}
+
+.flowConfirmGroup .field {
+  max-width: 420px;
+}
+
+.flowConfirmGroup label {
+  color: #7b5c1c;
+}
+
+.flowConfirmGroup .requiredHint {
+  margin-left: 7px;
+  color: #8c5b11;
+  background: #f8e5b8;
+}
+
+.flowEditableInput {
+  background: #fff !important;
+  border-color: #e6b75b !important;
+  box-shadow: 0 0 0 1px rgb(230 183 91 / 12%);
+}
+
+.flowEditableInput::placeholder {
+  color: #b3a17b;
+}
+
+.flowCheckGroup {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 15px;
+  align-items: center;
+  padding: 12px 14px;
+  margin-top: 12px;
+  border-radius: 7px;
+}
+
+.flowCheckGroup > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.flowCheckGroup > div span {
+  font-size: 12px;
+}
+
+.flowCheckGroup > strong {
+  font-size: 16px;
+}
+
+.flowCheckGroup small {
+  grid-column: 1 / -1;
+  color: inherit;
+  font-size: 12px;
+}
+
+.flowCheckOk {
+  color: #087443;
+  background: #effaf5;
+  border: 1px solid #bfe8d4;
+}
+
+.flowCheckWarning {
+  color: #9a5b13;
+  background: #fff7e8;
+  border: 1px solid #f3d19a;
+}
+
 .monthlyHint {
   grid-column: 1 / -1;
   margin-bottom: 10px;
@@ -1266,6 +2090,13 @@
   margin-top: 16px;
 }
 
+.readOnlyFieldset {
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
 @media (max-width: 1100px) {
   .toolbar {
     align-items: stretch;
@@ -1288,8 +2119,164 @@
   .monthGrid,
   .sceneGrid,
   .conversionGuide,
+  .flowLedgerGuide,
   .conversionSceneGrid,
-  .compactGrid {
+  .compactGrid,
+  .deviceEnergySelectors {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* Device ledger visual hierarchy: make the device and annual energy the primary scan targets. */
+.deviceTable {
+  min-width: 1120px;
+  table-layout: fixed;
+}
+
+.deviceTable th:nth-child(1),
+.deviceTable td:nth-child(1) { width: 25%; }
+
+.deviceTable th:nth-child(2),
+.deviceTable td:nth-child(2) { width: 18%; }
+
+.deviceTable th:nth-child(3),
+.deviceTable td:nth-child(3) { width: 16%; }
+
+.deviceTable th:nth-child(4),
+.deviceTable td:nth-child(4) { width: 14%; }
+
+.deviceTable th:nth-child(5),
+.deviceTable td:nth-child(5) { width: 17%; }
+
+.deviceTable th:nth-child(6),
+.deviceTable td:nth-child(6) { width: 10%; }
+
+.deviceTable thead th {
+  height: 48px;
+  color: #52666b;
+  background: #f4f8f7;
+  border-bottom: 1px solid #dce9e4;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+
+.deviceLevelOneRow td {
+  height: 54px;
+  padding-inline: 18px;
+  background: linear-gradient(90deg, #eaf8f2 0%, #f5fbf8 68%, #f9fcfb 100%);
+  border-top: 1px solid #cfe8dd;
+  border-bottom: 1px solid #dceee7;
+  box-shadow: inset 5px 0 0 #079b6d;
+}
+
+.deviceLevelOneNode {
+  height: 54px;
+  gap: 12px;
+}
+
+.deviceLevelOneNode b {
+  color: #12382f;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: .01em;
+}
+
+.deviceToggle {
+  width: 26px;
+  height: 26px;
+  color: #087e5d;
+  background: #fff;
+  border-color: #bfe4d5;
+  border-radius: 8px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.deviceAddButton {
+  padding: 5px 12px;
+  color: #087e5d;
+  background: rgb(255 255 255 / 72%);
+  border-color: #a9ddca;
+  border-radius: 7px;
+  font-weight: 600;
+}
+
+.deviceRow td {
+  height: 50px;
+  padding-inline: 16px;
+  color: #40545a;
+  border-top-color: #e8efed;
+  transition: background-color .18s ease, box-shadow .18s ease;
+}
+
+.deviceRow:hover td {
+  background: #f6fcf9;
+}
+
+.deviceRow:hover td:first-child {
+  box-shadow: inset 3px 0 0 #8fd6bd;
+}
+
+.deviceNameCell {
+}
+
+.deviceName {
+  color: #172f38;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.deviceTypeText {
+  color: #536870;
+  font-size: 13px;
+}
+
+.deviceTable .number {
+  color: #1a4238;
+  font-weight: 400;
+}
+
+.deviceEnergyValue {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 132px;
+}
+
+.deviceEnergyValue strong {
+  color: #123e33;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: .01em;
+}
+
+.deviceEnergyValue small {
+  color: #6b817c;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.deviceTable .tag {
+  padding-inline: 9px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.deviceTable .actions {
+  gap: 10px;
+}
+
+.deviceTable .actions button {
+  padding: 4px 5px;
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.deviceTable .actions button:hover {
+  background: #eaf4ff;
+}
+
+.deviceTable .actions .danger:hover {
+  background: #fff0ef;
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
+  navItemMatches,
   navigation,
   type NavDisplayEntry,
   type NavItem,
@@ -41,6 +42,9 @@ const iconNames: Record<string, string> = {
   用能单元: 'units',
   能源品种: 'energyType',
   能源数据: 'energyData',
+  能源消费: 'energyConsumption',
+  能源成本: 'energyCost',
+  能源流转: 'energyFlow',
   运营数据: 'operation',
   重点设备: 'device',
 };
@@ -70,6 +74,9 @@ function MenuIcon({ name }: { name: string }) {
       {type === 'units' && <><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></>}
       {type === 'energyType' && <><path d="M13 2L5 14h7l-1 8 8-12h-7z" /></>}
       {type === 'energyData' && <><path d="M4 19V9m5 10V5m5 14v-7m5 7V3" /><path d="M3 21h18" /></>}
+      {type === 'energyConsumption' && <><path d="M13 2L5 14h7l-1 8 8-12h-7z" /><path d="M4 20h16" /></>}
+      {type === 'energyCost' && <><circle cx="12" cy="12" r="8" /><path d="M12 7v10M15 9.5c-.5-.8-1.6-1.3-3-1.3-1.7 0-3 .8-3 2.1 0 3.2 6 1.2 6 4.4 0 1.3-1.3 2.1-3 2.1-1.4 0-2.5-.5-3-1.3" /></>}
+      {type === 'energyFlow' && <><path d="M4 7h11M15 4l3 3-3 3M20 17H9M9 14l-3 3 3 3" /></>}
       {type === 'operation' && <><circle cx="12" cy="12" r="9" /><path d="M12 3v9h9" /></>}
       {type === 'device' && <><rect x="3" y="6" width="14" height="12" rx="2" /><path d="M17 10h4v4h-4M7 10h6v4H7z" /></>}
       {type === 'default' && <><circle cx="12" cy="12" r="8" /><path d="M8 12h8" /></>}
@@ -78,10 +85,14 @@ function MenuIcon({ name }: { name: string }) {
 }
 
 function MenuLink({ item, nested = false }: { item: NavItem; nested?: boolean }) {
+  const location = useLocation();
+  const isItemActive = navItemMatches(item, location.pathname, location.search);
+
   return (
     <NavLink
       to={item.path}
-      className={({ isActive }) => `${styles.item} ${nested ? styles.nestedItem : ''} ${isActive ? styles.active : ''}`}
+      className={`${styles.item} ${nested ? styles.nestedItem : ''} ${isItemActive ? styles.active : ''}`}
+      aria-current={isItemActive ? 'page' : undefined}
       title={item.label}
     >
       <span className={styles.branchDot} />
@@ -105,8 +116,8 @@ function PlannedMenuItem({ item, nested = false }: { item: NavPlaceholder; neste
 export function Sidebar() {
   const location = useLocation();
   const activeGroupKey = useMemo(
-    () => navigation.find((group) => group.items.some((item) => item.path === location.pathname))?.key,
-    [location.pathname],
+    () => navigation.find((group) => group.items.some((item) => item.path.split('?')[0] === location.pathname))?.key,
+    [location.pathname, location.search],
   );
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [sectionCollapsed, setSectionCollapsed] = useState<Record<string, boolean>>({});
@@ -148,21 +159,26 @@ export function Sidebar() {
                     if (isPlaceholder(entry)) return <PlannedMenuItem key={entry.key} item={entry} />;
                     if (!isSection(entry)) return <MenuLink key={entry.path} item={entry} />;
                     const sectionClosed = sectionCollapsed[entry.key] ?? false;
-                    const sectionActive = entry.items.some((item) => !isPlaceholder(item) && item.path === location.pathname);
+                    const sectionActive = entry.items.some((item) => !isPlaceholder(item) && navItemMatches(item, location.pathname, location.search));
+                    const isInlineSection = entry.key === 'energy-data-submenu';
+                    const isTopLevelSection = entry.key === 'carbon-calculation';
                     return (
-                      <div className={`${styles.section} ${sectionClosed ? '' : styles.sectionOpen}`} key={entry.key}>
+                      <div className={isInlineSection ? styles.inlineSection : `${styles.section} ${sectionClosed ? '' : styles.sectionOpen}`} key={entry.key}>
                         <button
-                          className={`${styles.sectionButton} ${sectionActive ? styles.sectionActive : ''}`}
+                          className={isInlineSection
+                            ? `${styles.item} ${styles.inlineSectionButton} ${sectionActive ? styles.active : ''}`
+                            : `${styles.sectionButton} ${isTopLevelSection ? styles.topLevelSectionButton : ''} ${sectionActive ? styles.sectionActive : ''}`}
                           type="button"
                           onClick={() => setSectionCollapsed((value) => ({ ...value, [entry.key]: !sectionClosed }))}
                           aria-expanded={!sectionClosed}
                         >
-                          <span className={styles.sectionIcon}><MenuIcon name={entry.label} /></span>
-                          <span className={styles.sectionLabel}>{entry.label}</span>
+                          {(isInlineSection || isTopLevelSection) && <span className={styles.branchDot} />}
+                          <span className={isInlineSection ? styles.itemIcon : styles.sectionIcon}><MenuIcon name={entry.label} /></span>
+                          <span className={isInlineSection ? styles.itemLabel : styles.sectionLabel}>{entry.label}</span>
                           <span className={styles.sectionChevron}>{sectionClosed ? '⌄' : '⌃'}</span>
                         </button>
                         {!sectionClosed && (
-                          <div className={styles.sectionItems}>
+                          <div className={isInlineSection ? styles.inlineSectionItems : styles.sectionItems}>
                             {entry.items.map((item) => isPlaceholder(item)
                               ? <PlannedMenuItem nested key={item.key} item={item} />
                               : <MenuLink nested key={item.path} item={item} />)}

@@ -1,3 +1,28 @@
-.breadcrumb { display: flex; align-items: center; gap: 9px; min-height: 25px; color: #687482; font-size: 12px; }
-.separator { color: #b4bdc5; }
-.breadcrumb strong { color: #334155; font-weight: 600; }
+.breadcrumb {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-height: 24px;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+  color: #5f7c70;
+  font-size: 12px;
+  line-height: 24px;
+  white-space: nowrap;
+}
+
+.item {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.item:last-child {
+  overflow: hidden;
+  color: inherit;
+  font-weight: 400;
+  text-overflow: ellipsis;
+}
+
+.separator { color: #b3bdc1; }

@@ -1,5 +1,5 @@
 /* eslint-disable no-irregular-whitespace, react-refresh/only-export-components */
-import { type FormEvent, type ReactNode } from 'react';
+import { type FormEvent, type HTMLAttributes, type ReactNode } from 'react';
 import s from './Prototype.module.css';
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
@@ -25,7 +25,7 @@ export function FilterBar({ children, onSearch, onReset, actions }: { children: 
   return <Card className={s.filters}><div className={s.filterFields}>{children}</div><div className={s.filterButtons}>{onSearch && <Button primary onClick={onSearch}>查询</Button>}{onReset && <Button onClick={onReset}>重置</Button>}{actions}</div></Card>;
 }
 
-export function Field({ label, children, required }: { label: string; children: ReactNode; required?: boolean }) {
+export function Field({ label, children, required }: { label: ReactNode; children: ReactNode; required?: boolean }) {
   return <label className={s.field}><span>{required && <i>*</i>}{label}</span>{children}</label>;
 }
 
@@ -40,28 +40,29 @@ export interface TableColumn<T> {
   render?: (record: T, index: number) => ReactNode;
 }
 
-export function DataTable<T>({ columns, data, rowKey, rowClassName, emptyText = '暂无数据' }: {
+export function DataTable<T>({ columns, data, rowKey, rowClassName, rowProps, emptyText = '暂无数据' }: {
   columns: TableColumn<T>[];
   data: T[];
   rowKey: (record: T, index: number) => string;
   rowClassName?: (record: T, index: number) => string;
+  rowProps?: (record: T, index: number) => HTMLAttributes<HTMLTableRowElement>;
   emptyText?: string;
 }) {
-  return <div className={s.tableWrap}><table><colgroup>{columns.map((column) => <col key={String(column.key)} style={column.width ? { width: column.width } : undefined} />)}</colgroup><thead><tr>{columns.map((column) => <th key={String(column.key)}>{column.title}</th>)}</tr></thead><tbody>{data.length ? data.map((record, index) => <tr key={rowKey(record, index)} className={rowClassName?.(record, index)}>{columns.map((column) => <td key={String(column.key)}>{column.render ? column.render(record, index) : String((record as Record<string, unknown>)[String(column.key)] ?? '')}</td>)}</tr>) : <tr><td className={s.tableEmpty} colSpan={columns.length}>{emptyText}</td></tr>}</tbody></table></div>;
+  return <div className={s.tableWrap}><table><colgroup>{columns.map((column) => <col key={String(column.key)} style={column.width ? { width: column.width } : undefined} />)}</colgroup><thead><tr>{columns.map((column) => <th key={String(column.key)}>{column.title}</th>)}</tr></thead><tbody>{data.length ? data.map((record, index) => <tr key={rowKey(record, index)} className={rowClassName?.(record, index)} {...rowProps?.(record, index)}>{columns.map((column) => <td key={String(column.key)}>{column.render ? column.render(record, index) : String((record as Record<string, unknown>)[String(column.key)] ?? '')}</td>)}</tr>) : <tr><td className={s.tableEmpty} colSpan={columns.length}>{emptyText}</td></tr>}</tbody></table></div>;
 }
 
-export function Modal({ title, children, onClose, onSubmit, width = 680, submitText = '保存', cancelText = '取消' }: {
-  title: string; children: ReactNode; onClose: () => void; onSubmit?: () => void; width?: number; submitText?: string; cancelText?: string;
+export function Modal({ title, description, children, onClose, onSubmit, footer, width = 680, submitText = '保存', cancelText = '取消', dataEntryMode }: {
+  title: string; description?: ReactNode; children: ReactNode; onClose: () => void; onSubmit?: () => void; footer?: ReactNode; width?: number; submitText?: string; cancelText?: string; dataEntryMode?: string;
 }) {
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (e.currentTarget.reportValidity()) onSubmit?.();
   };
   return <div className={s.overlay} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-    <form className={s.modal} style={{ width }} onSubmit={submit}>
-      <header><h2>{title}</h2><button type="button" onClick={onClose}>×</button></header>
+    <form className={s.modal} role="dialog" aria-modal="true" data-entry-mode={dataEntryMode} style={{ width }} onSubmit={submit}>
+      <header><div className={s.modalHeaderContent}><h2>{title}</h2>{description && <p>{description}</p>}</div><button type="button" onClick={onClose}>×</button></header>
       <div className={s.modalBody}>{children}</div>
-      <footer><Button onClick={onClose}>{cancelText}</Button>{onSubmit && <Button primary type="submit">{submitText}</Button>}</footer>
+      <footer>{footer ?? <><Button onClick={onClose}>{cancelText}</Button>{onSubmit && <Button primary type="submit">{submitText}</Button>}</>}</footer>
     </form>
   </div>;
 }

@@ -121,7 +121,6 @@ function toBenchmarkMonthlyMetric(item: IntensityMonthlyMetric): BenchmarkMonthl
 function intensityMetricCode(metric: CalculatedIntensityMetric) {
   if (metric.name.includes('单位增加值综合能耗')) return 'energy_per_added_value';
   if (metric.name.includes('单位产值综合能耗')) return 'energy_per_output_value';
-  if (metric.name.includes('单位营业收入电耗')) return 'electricity_per_revenue';
   if (metric.name.includes('单位产品电耗')) return 'electricity_per_product';
   return 'energy_per_product';
 }
@@ -166,6 +165,7 @@ function intensityBenchmarkMetric(
     allocationDescription: metric.allocationDescription ?? '按能耗强度指标口径计算',
     formulaDescription: metric.formula,
     periodDescription: metric.period,
+    monthlyTargets: target?.monthlyTargets ? [...target.monthlyTargets] : undefined,
     trendBasisLabel: metric.trendBasis === 'annual-allocated'
       ? '年度运营数据按月平均分摊'
       : metric.trendBasis === 'actual-monthly'
@@ -185,8 +185,8 @@ function deviceIntensityBenchmarkMetrics(year: number): BenchmarkMetric[] {
       month: index + 1,
       actual: value,
       status: value === null
-        ? row.reportedMonths[index] ? '鏁版嵁涓嶅畬鏁?' : '鏆傛棤鏈堝害鏁版嵁'
-        : '宸茶绠?',
+        ? row.reportedMonths[index] ? '数据不完整' : '暂无月度数据'
+        : '已计算',
     })) as unknown as BenchmarkMonthlyMetric[];
     const monthlyDataStatus: IntensityMonthlyDataStatus = row.completeEnergy ? 'complete' : row.reportedMonths.some(Boolean) ? 'incomplete' : 'unavailable';
     return {

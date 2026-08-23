@@ -9,6 +9,12 @@ import {
   reorderEnergyUnits,
   updateEnergyUnit,
 } from '../../mocks/energyUnitMockStore';
+import {
+  listV11ConversionOutputs,
+  listV11EnergyRecords,
+  listV11KeyDevices,
+  listV11OperationMetrics,
+} from '../../mocks/dataManagementV11Store';
 import type {
   EnergyUnit,
   EnergyUnitLevel,
@@ -56,6 +62,7 @@ type DialogState =
   | null;
 
 interface FilterState {
+  year: string;
   keyword: string;
   unitType: EnergyUnitType | '';
 }
@@ -66,7 +73,9 @@ interface DisplayRow {
   childCount: number;
 }
 
-const emptyFilter: FilterState = { keyword: '', unitType: '' };
+const currentYear = new Date().getFullYear();
+const yearOptions = [currentYear, currentYear - 1, currentYear - 2].map(String);
+const emptyFilter: FilterState = { year: String(currentYear), keyword: '', unitType: '' };
 
 function formUnitTypes(level: EnergyUnitLevel) {
   return level === 'level1' ? rootUnitTypeOptions : childUnitTypeOptions;
@@ -104,7 +113,7 @@ function makeDisplayRows(
       .filter(
         (unit) =>
           (!filter.keyword || unit.energyUnitName.includes(filter.keyword)) &&
-          (!filter.unitType || unit.unitType === filter.unitType),
+          (!filter.unitType || unit.unitType === filter.unitType)
       )
       .map((unit) => unit.energyUnitId),
   );
@@ -140,6 +149,8 @@ export function EnergyUnitsPage() {
   const [expanded, setExpanded] = useState(() => initialExpanded(listEnergyUnits()));
   const [dialog, setDialog] = useState<DialogState>(null);
   const [toast, setToast] = useState('');
+  const [draggingUnitId, setDraggingUnitId] = useState<string | null>(null);
+  const [dropTargetUnitId, setDropTargetUnitId] = useState<string | null>(null);
 
   const rows = useMemo(
     () => makeDisplayRows(units, activeFilter, expanded),
@@ -152,9 +163,48 @@ export function EnergyUnitsPage() {
   };
 
   const refreshUnits = () => setUnits(listEnergyUnits());
+  const canReorder = !activeFilter.keyword && !activeFilter.unitType;
+  const groupedRows = [
+    { category: '生产类', rows: rows.filter(({ unit }) => unitCategory(unit) === '生产类') },
+    { category: '非生产类', rows: rows.filter(({ unit }) => unitCategory(unit) === '非生产类') },
+  ].filter((group) => group.rows.length > 0);
+
+  const reorderFromDrop = (sourceId: string, targetId: string) => {
+    const source = units.find((unit) => unit.energyUnitId === sourceId);
+    const target = units.find((unit) => unit.energyUnitId === targetId);
+    if (!source || !target || sourceId === targetId) return;
+    if (source.parentEnergyUnitId !== target.parentEnergyUnitId) {
+      notify('只能在同级用能单元之间调整顺序');
+      return;
+    }
+    const siblings = units
+      .filter((unit) => unit.parentEnergyUnitId === source.parentEnergyUnitId)
+      .sort((left, right) => left.displayOrder - right.displayOrder);
+    const nextIds = siblings.map((unit) => unit.energyUnitId);
+    const sourceIndex = nextIds.indexOf(sourceId);
+    const targetIndex = nextIds.indexOf(targetId);
+    const [moved] = nextIds.splice(sourceIndex, 1);
+    nextIds.splice(targetIndex, 0, moved);
+    const result = reorderEnergyUnits(source.parentEnergyUnitId, nextIds);
+    if (result.ok) {
+      refreshUnits();
+      notify('用能单元顺序已更新');
+    }
+  };
 
   const openDelete = (unit: EnergyUnit) => {
-    const references = inspectEnergyUnitDeletion(unit.energyUnitId);
+    const baseReferences = inspectEnergyUnitDeletion(unit.energyUnitId);
+    const references: EnergyUnitReferenceSummary = {
+      ...baseReferences,
+      energyRecordCount: baseReferences.energyRecordCount + listV11EnergyRecords().filter((record) => record.energyUnitId === unit.energyUnitId).length,
+      operationRecordCount: baseReferences.operationRecordCount + listV11OperationMetrics().filter((record) => record.energyUnitId === unit.energyUnitId).length,
+      deviceCount: baseReferences.deviceCount + listV11KeyDevices().filter((device) => device.energyUnitId === unit.energyUnitId).length,
+      conversionRelationCount: baseReferences.conversionRelationCount + listV11ConversionOutputs().filter((record) =>
+        record.conversionEnergyUnitId === unit.energyUnitId
+        || record.recoverySourceEnergyUnitId === unit.energyUnitId
+        || record.outputTargetEnergyUnitId === unit.energyUnitId,
+      ).length,
+    };
     if (Object.values(references).some((count) => count > 0)) {
       setDialog({ type: 'deleteBlocked', unit, references });
       return;
@@ -193,7 +243,6 @@ export function EnergyUnitsPage() {
             depth === 0 && <span className={styles.togglePlaceholder} />
           )}
           <span className={depth === 0 ? styles.unitName : ''}>{unit.energyUnitName}</span>
-          {childCount > 0 && <span className={styles.childCount}>{childCount}个下级</span>}
         </div>
       ),
     },
@@ -225,13 +274,6 @@ export function EnergyUnitsPage() {
             >
               添加下级
             </button>}
-          {unit.unitLevel === 'level1' && childCount > 1 && <button
-              className={styles.action}
-              type="button"
-              onClick={() => setDialog({ type: 'reorder', parentEnergyUnitId: unit.energyUnitId })}
-            >
-              调整下级顺序
-            </button>}
           <button
             className={styles.action}
             type="button"
@@ -257,9 +299,6 @@ export function EnergyUnitsPage() {
         }}
         actions={
           <>
-            <Button onClick={() => setDialog({ type: 'reorder', parentEnergyUnitId: null })}>
-              调整一级顺序
-            </Button>
             <Button primary onClick={() => setDialog({ type: 'addRoot' })}>
               ＋ 新增一级用能单元
             </Button>
@@ -276,6 +315,15 @@ export function EnergyUnitsPage() {
               setDraftFilter((current) => ({ ...current, keyword: event.target.value }))
             }
           />
+        </Field>
+        <Field label="年度">
+          <select
+            aria-label="用能单元年度"
+            value={draftFilter.year}
+            onChange={(event) => setDraftFilter((current) => ({ ...current, year: event.target.value }))}
+          >
+            {yearOptions.map((year) => <option key={year}>{year}</option>)}
+          </select>
         </Field>
         <Field label="单元类型">
           <select
@@ -301,16 +349,47 @@ export function EnergyUnitsPage() {
 
       <Card className={styles.tableCard}>
         <div className={styles.notice}>
-          一期采用两级结构。能源转换、回收利用和外供在“能源数据 &gt; 能源转换与输出”中按实际系统维护；用能单元仅维护组织与归属关系。
+          用能单元按一级、二级层级管理，能源数据统一归属于具体用能单元。能源回收、转换和外供在“能源数据 &gt; 能源回收、转换与外供”中按实际系统维护；用能单元用于维护组织与归属关系。未筛选时，可直接拖拽用能单元行调整同级顺序；一级与一级、同一一级下的二级与二级可以互换位置。
         </div>
         <div className={styles.tableArea}>
-          <DataTable
+          {groupedRows.map(({ category, rows: categoryRows }) => <section key={category} className={styles.categorySection}>
+            <div className={styles.categoryHeader}><strong>{category}用能单元</strong><span>{category === '生产类' ? '按产品产量等生产运营指标进行能耗分析。' : '按运行、建筑或物流等运营指标进行能耗分析。'}</span></div>
+            <DataTable
             columns={columns}
-            data={rows}
+            data={categoryRows}
             rowKey={({ unit }) => unit.energyUnitId}
-            rowClassName={({ childCount }) => (childCount ? styles.parentRow : '')}
+            rowClassName={({ unit, childCount }) => `${childCount ? styles.parentRow : ''} ${draggingUnitId === unit.energyUnitId ? styles.unitRowDragging : ''} ${dropTargetUnitId === unit.energyUnitId ? styles.unitRowDropTarget : ''}`}
+            rowProps={({ unit }) => ({
+              draggable: canReorder,
+              onDragStart: (event) => {
+                if (!canReorder) return;
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', unit.energyUnitId);
+                setDraggingUnitId(unit.energyUnitId);
+              },
+              onDragOver: (event) => {
+                if (!canReorder || !draggingUnitId || draggingUnitId === unit.energyUnitId) return;
+                const source = units.find((item) => item.energyUnitId === draggingUnitId);
+                if (!source || source.parentEnergyUnitId !== unit.parentEnergyUnitId) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+                setDropTargetUnitId(unit.energyUnitId);
+              },
+              onDrop: (event) => {
+                event.preventDefault();
+                const sourceId = event.dataTransfer.getData('text/plain') || draggingUnitId;
+                if (sourceId) reorderFromDrop(sourceId, unit.energyUnitId);
+                setDraggingUnitId(null);
+                setDropTargetUnitId(null);
+              },
+              onDragEnd: () => {
+                setDraggingUnitId(null);
+                setDropTargetUnitId(null);
+              },
+            })}
             emptyText="暂无匹配数据"
-          />
+            />
+          </section>)}
         </div>
         <div className={styles.pagination}>
           <span>共 {rows.length} 条</span>
@@ -335,17 +414,6 @@ export function EnergyUnitsPage() {
         />
       )}
 
-      {dialog?.type === 'reorder' && (
-        <ReorderEnergyUnitsDialog
-          parentEnergyUnitId={dialog.parentEnergyUnitId}
-          onClose={() => setDialog(null)}
-          onSaved={() => {
-            refreshUnits();
-            setDialog(null);
-            notify('用能单元顺序已更新');
-          }}
-        />
-      )}
 
       {dialog?.type === 'deleteBlocked' && (
         <DeleteBlockedDialog
@@ -396,12 +464,16 @@ function ReorderEnergyUnitsDialog({
   const [orderedUnits, setOrderedUnits] = useState(() =>
     listEnergyUnits().filter((unit) => unit.parentEnergyUnitId === parentEnergyUnitId),
   );
-  const move = (index: number, offset: -1 | 1) => {
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const moveTo = (draggedId: string, targetId: string) => {
     setOrderedUnits((current) => {
-      const target = index + offset;
-      if (target < 0 || target >= current.length) return current;
+      const sourceIndex = current.findIndex((unit) => unit.energyUnitId === draggedId);
+      const targetIndex = current.findIndex((unit) => unit.energyUnitId === targetId);
+      if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return current;
       const next = [...current];
-      [next[index], next[target]] = [next[target], next[index]];
+      const [moved] = next.splice(sourceIndex, 1);
+      next.splice(targetIndex, 0, moved);
       return next;
     });
   };
@@ -417,17 +489,39 @@ function ReorderEnergyUnitsDialog({
       }}
     >
       <div className={styles.reorderIntro}>
-        调整同级用能单元的展示顺序，不改变父子关系、能源数据归属或能流计算结果。
+        按住用能单元整行拖动到目标位置即可调整同级展示顺序，不改变父子关系、能源数据归属或能流计算结果。
       </div>
       <div className={styles.reorderList}>
         {orderedUnits.map((unit, index) => (
-          <div className={styles.reorderItem} key={unit.energyUnitId}>
+          <div
+            className={`${styles.reorderItem} ${draggingId === unit.energyUnitId ? styles.reorderItemDragging : ''} ${dropTargetId === unit.energyUnitId ? styles.reorderItemDropTarget : ''}`}
+            key={unit.energyUnitId}
+            draggable
+            onDragStart={(event) => {
+              event.dataTransfer.effectAllowed = 'move';
+              event.dataTransfer.setData('text/plain', unit.energyUnitId);
+              setDraggingId(unit.energyUnitId);
+            }}
+            onDragOver={(event) => {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = 'move';
+              if (draggingId !== unit.energyUnitId) setDropTargetId(unit.energyUnitId);
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              const sourceId = event.dataTransfer.getData('text/plain') || draggingId;
+              if (sourceId) moveTo(sourceId, unit.energyUnitId);
+              setDraggingId(null);
+              setDropTargetId(null);
+            }}
+            onDragEnd={() => {
+              setDraggingId(null);
+              setDropTargetId(null);
+            }}
+          >
+            <span className={styles.reorderDragHandle} aria-hidden="true">⋮⋮</span>
             <span className={styles.reorderIndex}>{index + 1}</span>
             <div><strong>{unit.energyUnitName}</strong><small>{unit.unitType}</small></div>
-            <div className={styles.reorderActions}>
-              <button type="button" disabled={index === 0} onClick={() => move(index, -1)}>上移</button>
-              <button type="button" disabled={index === orderedUnits.length - 1} onClick={() => move(index, 1)}>下移</button>
-            </div>
           </div>
         ))}
       </div>
@@ -493,7 +587,7 @@ function EnergyUnitFormDialog({
         result.error === 'duplicateName'
           ? '同一所属单元下已存在该名称，请使用其他名称。'
           : result.error === 'maxLevel'
-            ? '一期仅支持两级用能单元，二级单元不能继续添加下级。'
+            ? '用能单元最多设置为两级，二级单元不能继续添加下级。'
             : '保存失败，请检查当前记录是否仍然存在。',
       );
       return;
@@ -622,15 +716,27 @@ function DeleteBlockedDialog({
   references: EnergyUnitReferenceSummary;
   onClose: () => void;
 }) {
-  const hasChildren = references.childCount > 0;
+  const referenceItems = [
+    ['下级用能单元', references.childCount],
+    ['能源消费数据', references.energyRecordCount],
+    ['运营数据', references.operationRecordCount],
+    ['重点设备档案', references.deviceCount],
+    ['能源流转关系', references.conversionRelationCount],
+  ].filter(([, count]) => Number(count) > 0);
 
   return (
     <Modal title="无法删除用能单元" width={560} cancelText="我知道了" onClose={onClose}>
       <p className={styles.blockerIntro}>
-        {hasChildren
-          ? `用能单元“${unit.energyUnitName}”包含下级用能单元，请先处理下级用能单元后再删除。`
-          : `用能单元“${unit.energyUnitName}”已被业务数据使用。为保证历史数据和分析结果完整，暂不支持删除。`}
+        用能单元“{unit.energyUnitName}”存在以下关联内容。为保证历史数据和分析结果完整，暂不支持删除。
       </p>
+      <ul className={styles.blockerList}>
+        {referenceItems.map(([label, count]) => <li key={label}><span>{label}</span><strong>{count} 项</strong></li>)}
+      </ul>
+      <p className={styles.blockerHint}>请先处理上述关联内容后再删除该用能单元。</p>
     </Modal>
   );
+}
+
+function unitCategory(unit: EnergyUnit) {
+  return unit.unitType === '生产单元' || unit.unitType === '工序/环节' ? '生产类' : '非生产类';
 }

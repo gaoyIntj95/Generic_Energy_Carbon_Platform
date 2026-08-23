@@ -31,6 +31,32 @@
   padding: 0 16px;
 }
 
+.categorySection {
+  margin-bottom: 18px;
+  border: 1px solid #e1ebe8;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.categoryHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 15px 18px;
+  background: #f3f9f7;
+  border-bottom: 1px solid #e1ebe8;
+}
+
+.categoryHeader strong {
+  color: #102d49;
+  font-size: 18px;
+}
+
+.categoryHeader span {
+  color: #71849a;
+  font-size: 13px;
+}
+
 .tableArea :global(th:nth-child(n + 2)),
 .tableArea :global(td:nth-child(n + 2)) {
   text-align: center;
@@ -119,6 +145,28 @@
   border-color: #cfe3ff;
 }
 
+.categoryTagProduction,
+.categoryTagNonProduction {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.categoryTagProduction {
+  color: #8a5a00;
+  background: #fff7df;
+  border: 1px solid #f3df9e;
+}
+
+.categoryTagNonProduction {
+  color: #5b4aa8;
+  background: #f2efff;
+  border: 1px solid #dcd5ff;
+}
+
 .actions {
   display: flex;
   align-items: center;
@@ -148,6 +196,24 @@
 
 .parentRow td {
   background: #fafcfb;
+}
+
+.unitRowDragging td {
+  opacity: .55;
+  background: #f3faf7 !important;
+}
+
+.unitRowDropTarget td {
+  background: #eef8f4 !important;
+  box-shadow: inset 0 2px 0 #0a9667;
+}
+
+.tableArea :global(tbody tr[draggable='true']) {
+  cursor: grab;
+}
+
+.tableArea :global(tbody tr[draggable='true']:active) {
+  cursor: grabbing;
 }
 
 .pagination {
@@ -265,6 +331,34 @@
   line-height: 1.7;
 }
 
+.blockerList {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.blockerList li {
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 12px;
+  color: #475467;
+  background: #f8fafc;
+  border: 1px solid #eaecf0;
+  border-radius: 6px;
+}
+
+.blockerList strong {
+  color: #d92d20;
+}
+
+.blockerHint {
+  margin: 0;
+  color: #7b8794;
+  font-size: 13px;
+}
+
 .confirmBox {
   padding: 14px;
   color: #5f6b7a;
@@ -302,6 +396,22 @@
   gap: 12px;
   padding: 0 14px;
   border-bottom: 1px solid #edf0f3;
+  cursor: grab;
+  transition: background .15s ease, opacity .15s ease, box-shadow .15s ease;
+}
+
+.reorderItem:active {
+  cursor: grabbing;
+}
+
+.reorderItemDragging {
+  opacity: .55;
+  background: #f3faf7;
+}
+
+.reorderItemDropTarget {
+  background: #eef8f4;
+  box-shadow: inset 0 2px 0 #0a9667;
 }
 
 .reorderItem:last-child {
@@ -320,6 +430,15 @@
   font-size: 12px;
 }
 
+.reorderDragHandle {
+  width: 14px;
+  color: #9aa7b3;
+  font-size: 17px;
+  letter-spacing: -4px;
+  line-height: 1;
+  user-select: none;
+}
+
 .reorderItem > div:nth-child(2) {
   display: grid;
   gap: 3px;
@@ -331,20 +450,3 @@
   font-size: 12px;
 }
 
-.reorderActions {
-  display: flex;
-  gap: 8px;
-}
-
-.reorderActions button {
-  padding: 3px 7px;
-  color: #1677ff;
-  background: transparent;
-  border: 0;
-  font-size: 13px;
-}
-
-.reorderActions button:disabled {
-  color: #b7c0cc;
-  cursor: not-allowed;
-}

@@ -55,7 +55,6 @@ let energyRecords = seedEnergyRecords.map((item) => ({ ...item, monthlyStandardC
 const seedEnergyConversionRelations: EnergyConversionRelation[] = [
   { conversionRelationId: 'ecr-waste-heat-power', conversionScene: '余热发电', conversionEnergyUnitId: 'eu-waste-heat-power', inputEnergyRecordIds: ['er-recovered-heat'], outputEnergyRecordIds: ['er-output-power'], conversionEfficiency: 0.857, calculationState: '可计算' },
   { conversionRelationId: 'ecr-gas-boiler', conversionScene: '锅炉产汽/产热', conversionEnergyUnitId: 'eu-gas-boiler', inputEnergyRecordIds: ['er-utilities-gas'], outputEnergyRecordIds: ['er-utilities-steam'], conversionEfficiency: 0.887, calculationState: '可计算' },
-  { conversionRelationId: 'ecr-distributed-pv', conversionScene: '自发电', conversionEnergyUnitId: 'eu-distributed-pv', inputEnergyRecordIds: [], outputEnergyRecordIds: [], conversionEfficiency: null, calculationState: '待补充输入' },
 ];
 let energyConversionRelations = seedEnergyConversionRelations.map((item) => ({ ...item, inputEnergyRecordIds: [...item.inputEnergyRecordIds], outputEnergyRecordIds: [...item.outputEnergyRecordIds] }));
 
@@ -98,7 +97,6 @@ let energyCosts = seedEnergyCosts.map((item) => ({ ...item, monthlyCosts: [...it
 const seedOperationMetrics: OperationMetric[] = [
   { operationMetricId: 'om-product-a', energyUnitId: 'eu-clinker-line-1', year: 2026, metricCategory: '产量', entryMode: 'monthly', metricName: '产品A产量', metricUnit: 't', annualValue: 1_365_000 },
   { operationMetricId: 'om-product-b', energyUnitId: 'eu-cement-grinding-line', year: 2026, metricCategory: '产量', entryMode: 'monthly', metricName: '产品B产量', metricUnit: 't', annualValue: 1_920_000 },
-  { operationMetricId: 'om-revenue', energyUnitId: null, year: 2026, metricCategory: '经济指标', entryMode: 'annual', metricName: '营业收入', metricUnit: '万元', annualValue: 86_420 },
   { operationMetricId: 'om-added-value', energyUnitId: null, year: 2026, metricCategory: '经济指标', entryMode: 'annual', metricName: '工业增加值', metricUnit: '万元', annualValue: 31_680 },
 ];
 let operationMetrics = seedOperationMetrics.map((item) => ({ ...item }));
@@ -198,8 +196,8 @@ const seedStrategies: OptimizationStrategy[] = [
 let strategies = seedStrategies.map((item) => ({ ...item }));
 
 const seedCarbonAssets: CarbonAsset[] = [
-  { carbonAssetId: 'ca-quota-2026', complianceCycle: '2026年度', assetType: '碳配额', assetSource: '政府分配', totalAmount: 95_000, eligibleAmount: 39_000, lockedAmount: 0, usedAmount: 56_000, voucherNumber: 'QUOTA-2026-001', bookedAt: '2026-03-15', assetState: '部分使用', remark: '2026年度政府分配配额' },
-  { carbonAssetId: 'ca-ccer-2026', complianceCycle: '2026年度', assetType: 'CCER', assetSource: '市场购买', totalAmount: 5_000, eligibleAmount: 5_000, lockedAmount: 0, usedAmount: 0, voucherNumber: 'CCER-2026-018', bookedAt: '2026-06-30', assetState: '可用', remark: '履约储备' },
+  { carbonAssetId: 'ca-quota-2026', complianceCycle: '2026年度', assetType: '碳配额', assetSource: '政府分配', totalAmount: 15_000, eligibleAmount: 6_500, carryoverEligibleAmount: 200, lockedAmount: 0, usedAmount: 8_500, voucherNumber: 'QUOTA-2026-001', bookedAt: '2026-03-15', assetState: '部分使用', remark: '2026年度政府分配配额' },
+  { carbonAssetId: 'ca-ccer-2026', complianceCycle: '2026年度', assetType: 'CCER', assetSource: '市场购买', totalAmount: 2_000, eligibleAmount: 1_000, carryoverEligibleAmount: 0, lockedAmount: 0, usedAmount: 0, voucherNumber: 'CCER-2026-018', bookedAt: '2026-06-30', assetState: '可用', remark: '履约储备' },
   { carbonAssetId: 'ca-green-2026', complianceCycle: '2026年度', assetType: '绿证折算减排量', assetSource: '内部转化', totalAmount: 1_200, eligibleAmount: 0, lockedAmount: 0, usedAmount: 0, voucherNumber: 'GEC-2026-003', bookedAt: '2026-07-01', assetState: '待核验', remark: '待确认是否纳入本履约周期可用资产' },
   { carbonAssetId: 'ca-quota-2025', complianceCycle: '2025年度', assetType: '碳配额', assetSource: '政府分配', totalAmount: 14_000, eligibleAmount: 709.9, lockedAmount: 0, usedAmount: 13_290.1, voucherNumber: 'QUOTA-2025-001', bookedAt: '2025-03-10', assetState: '部分使用', remark: '历史履约周期' },
 ];
@@ -430,6 +428,7 @@ export function saveEmissionSource(input: Omit<EmissionSource, 'emissionSourceId
 export function deleteEmissionSource(emissionSourceId: string) {
   const source = emissionSources.find((item) => item.emissionSourceId === emissionSourceId);
   if (!source) return { ok: false as const, error: '排放源记录不存在。' };
+  if (source.entryMode === 'system' && source.emissionCategory !== '废弃物处理处置排放') return { ok: false as const, error: '能源关联排放源不提供删除操作。' };
   emissionSources = emissionSources.filter((item) => item.emissionSourceId !== emissionSourceId);
   carbonActivityRecords = carbonActivityRecords.filter((item) => item.emissionSourceId !== emissionSourceId);
   return { ok: true as const };
@@ -467,17 +466,17 @@ export function publishCarbonSnapshot(carbonTaskId = 'ct-2026', year = 2026) {
   return { ...snapshot, monthlyEmissions: [...snapshot.monthlyEmissions], activityRecords: snapshot.activityRecords?.map((record) => ({ ...record, evidenceFileIds: [...record.evidenceFileIds] })) };
 }
 export function listBudgetTargets() { return clone(budgetTargets); }
-export function getBudgetTarget(type: BudgetType, year = 2026) {
-  const target = budgetTargets.filter((item) => item.budgetType === type && item.year === year).sort((a, b) => b.version - a.version).find((item) => item.versionState === '生效');
+export function getBudgetTarget(type: BudgetType, year = 2026, energyUnitId: string | null = null) {
+  const target = budgetTargets.filter((item) => item.budgetType === type && item.year === year && (item.energyUnitId ?? null) === energyUnitId).sort((a, b) => b.version - a.version).find((item) => item.versionState === '生效');
   return target ? { ...target } : undefined;
 }
 export function saveBudgetTarget(target: BudgetTarget) {
   budgetTargets = budgetTargets.map((item) =>
-    item.budgetType === target.budgetType && item.year === target.year && item.versionState === '生效'
+    item.budgetType === target.budgetType && item.year === target.year && (item.energyUnitId ?? null) === (target.energyUnitId ?? null) && item.versionState === '生效'
       ? { ...item, versionState: '历史版本' }
       : item,
   );
-  const latestVersion = Math.max(0, ...budgetTargets.filter((item) => item.budgetType === target.budgetType && item.year === target.year).map((item) => item.version));
+  const latestVersion = Math.max(0, ...budgetTargets.filter((item) => item.budgetType === target.budgetType && item.year === target.year && (item.energyUnitId ?? null) === (target.energyUnitId ?? null)).map((item) => item.version));
   const saved = { ...target, version: latestVersion + 1, versionState: '生效' as const };
   budgetTargets.push(saved);
   return { ...saved };

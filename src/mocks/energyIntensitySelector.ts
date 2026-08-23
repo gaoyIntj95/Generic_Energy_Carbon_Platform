@@ -9,18 +9,18 @@ import {
   type V11EnergyRecord,
   type V11OperationMetric,
 } from './dataManagementV11Store';
-import { getProduct, listProducts } from './productMasterStore';
+import { getProduct, listProducts, resolveProductEnergyAllocation } from './productMasterStore';
 import { listEnergyUnits } from './energyUnitMockStore';
 import {
   getDeviceIntensityParameter,
-  getDeviceIntensityTemplate,
   getDeviceIntensityTemplateConfig,
   type DeviceIntensityMetricCode,
+  type DeviceIntensityTemplateConfig,
 } from './deviceIntensityParameterStore';
 
 export type IntensityObjectType = 'factory' | 'unit' | 'product' | 'device';
 export type IntensityResultStatus = '已计算' | '待完善' | '暂不可计算';
-export type IntensityIssue = '能源数据未录入' | '能源数据部分录入' | '缺少能源数据' | '缺少产品产量' | '缺少供气量' | '缺少蒸汽产量' | '缺少余热发电转换数据' | '当前产品无法直接汇总' | '未关联生产用能单元' | '缺少必要关联关系' | '暂无适用典型指标模板';
+export type IntensityIssue = '能源数据未录入' | '能源数据部分录入' | '缺少能源数据' | '缺少产品产量' | '缺少工业增加值' | '缺少供气量' | '缺少蒸汽产量' | '缺少余热发电转换数据' | '当前产品无法直接汇总' | '未关联生产用能单元' | '缺少必要关联关系' | '缺少适用运营分母' | '暂无适用典型指标模板' | '数据缺失';
 export type IntensityMonthlyDataStatus = 'complete' | 'incomplete' | 'unavailable';
 export type IntensityMonthlyValueStatus = '已计算' | '数据不完整' | '暂无月度数据';
 
@@ -111,13 +111,33 @@ export interface DeviceIntensityRow {
   standardCoalFactorUnit: string;
   reportedMonths: boolean[];
   monthlyEnergy: number[];
+  monthlyDenominator: Array<number | null>;
+  denominatorUnit: string;
   monthlyMetricValues: Array<number | null>;
+  calculationInputs?: {
+    conversionOutputId?: string;
+    denominatorEnergyRecordId?: string;
+    numerator: number;
+    denominator: number;
+    unit: string;
+    numeratorRaw?: number;
+    numeratorRawUnit?: string;
+    numeratorFactor?: number;
+    numeratorFactorUnit?: string;
+    denominatorRaw?: number;
+    denominatorRawUnit?: string;
+    denominatorFactor?: number;
+    denominatorFactorUnit?: string;
+  };
+  templateConfig?: DeviceIntensityTemplateConfig;
 }
 
 const factoryOption: IntensityObjectOption = { objectId: 'factory', objectName: '全厂', objectType: 'factory', energyUnitId: null };
 const annualAmount = (record: V11EnergyRecord | V11OperationMetric) =>
   'monthlyValues' in record && record.entryMode === 'monthly'
-    ? record.monthlyValues.reduce((sum, value) => sum + value, 0)
+    ? (record.monthlyReportedMonths?.every(Boolean) ?? record.monthlyValues.length === 12)
+      ? record.monthlyValues.reduce((sum, value) => sum + value, 0)
+      : record.annualValue > 0 ? record.annualValue : record.monthlyValues.reduce((sum, value) => sum + value, 0)
     : 'annualValue' in record ? record.annualValue : v11EnergyRecordAnnualAmount(record as V11EnergyRecord);
 const energyTypeName = (id: string) => listV11EnergyTypes().find((item) => item.energyTypeId === id)?.energyTypeName ?? '';
 const standardCoalFactor = (id: string) => {
@@ -126,6 +146,63 @@ const standardCoalFactor = (id: string) => {
 };
 const standardCoalTotal = (records: V11EnergyRecord[]) => records.reduce((sum, record) => sum + annualAmount(record) * standardCoalFactor(record.energyTypeId), 0);
 const operationByName = (records: V11OperationMetric[], names: string[]) => records.find((record) => names.some((name) => record.metricName.includes(name)));
+
+function allocatedProductEnergy(productId: string, records: V11EnergyRecord[]) {
+  return records.flatMap((record) => {
+    if (!record.energyUnitId) return [];
+    const allocation = resolveProductEnergyAllocation(productId, record.energyUnitId);
+    if (!allocation.ok || allocation.share <= 0) return [];
+    const share = allocation.share;
+    return [{
+      ...record,
+      annualAmount: record.annualAmount * share,
+      monthlyAmounts: record.monthlyAmounts.map((amount) => amount * share),
+    }];
+  });
+}
+
+function conversionAmountToGJ(amount: number, unit?: string) {
+  if (!Number.isFinite(amount)) return null;
+  if (unit === 'GJ') return amount;
+  if (unit === 'MJ') return amount / 1000;
+  if (unit === 'kWh') return amount * 0.0036;
+  if (unit === 'MWh') return amount * 3.6;
+  return null;
+}
+
+function derivedUtilitySupplyOperation(year: number, utilityId: string): V11OperationMetric | null {
+  const units = listEnergyUnits();
+  const utilityChildren = new Set(units.filter((unit) => unit.parentEnergyUnitId === utilityId).map((unit) => unit.energyUnitId));
+  const conversions = listV11ConversionOutputs().filter((record) => record.year === year && record.conversionEnergyUnitId !== null && utilityChildren.has(record.conversionEnergyUnitId));
+  if (!conversions.length) return null;
+  const hasMonthlyValues = conversions.every((record) => record.monthlyInternalAmounts?.length === 12);
+
+  const monthlyValues = Array.from({ length: 12 }, (_, month) => conversions.reduce<number>((sum, record) => {
+    const amount = record.monthlyInternalAmounts?.[month];
+    const converted = amount === undefined ? 0 : conversionAmountToGJ(amount, record.outputUnit);
+    return sum + (converted ?? NaN);
+  }, 0));
+  const annualValues = conversions.map((record) => conversionAmountToGJ(
+    record.internalAmount ?? record.monthlyInternalAmounts?.reduce((sum, value) => sum + value, 0) ?? 0,
+    record.outputUnit,
+  ));
+  if (annualValues.some((value) => value === null) || monthlyValues.some((value) => !Number.isFinite(value))) return null;
+  return {
+    operationMetricId: `derived-energy-conversion-supply-${utilityId}-${year}`,
+    metricCode: 'energy_supply_derived',
+    productId: null,
+    year,
+    scopeLevel: '一级用能单元',
+    energyUnitId: utilityId,
+    metricCategory: '运行指标',
+    aggregationMethod: '月度求和',
+    metricName: '动力中心有效供能量',
+    metricUnit: 'GJ',
+    entryMode: hasMonthlyValues ? 'monthly' : 'annual',
+    annualValue: annualValues.reduce<number>((sum, value) => sum + (value ?? 0), 0),
+    monthlyValues: hasMonthlyValues ? monthlyValues : [],
+  };
+}
 
 function monthlyRecordAmounts(record: V11EnergyRecord) {
   return record.entryMode === 'monthly' ? [...record.monthlyAmounts] : [];
@@ -168,16 +245,13 @@ function calculateMonthlyMetrics(metric: CalculatedIntensityMetric, energyRecord
   const isProduct = metric.intensityMetricId.includes('product-energy') || metric.intensityMetricId.includes('product-electricity');
   const isAddedValue = metric.intensityMetricId.includes('added-value');
   const isOutputValue = metric.intensityMetricId.includes('output-value');
-  const isRevenue = metric.intensityMetricId.includes('revenue-electricity');
   return Array.from({ length: 12 }, (_, index) => {
-    const numerator = isRevenue || isElectricity ? electricity[index] : standardCoal[index];
+    const numerator = isElectricity ? electricity[index] : standardCoal[index];
     const hasData = energyReported[index] && operationReported[index] && denominator[index] > 0;
     const value = hasData
-      ? isRevenue
-        ? electricity[index] / denominator[index]
-        : isOutputValue || isAddedValue
-          ? standardCoal[index] / denominator[index]
-          : (isElectricity ? electricity[index] : standardCoal[index] * 1000) / denominator[index]
+      ? isOutputValue || isAddedValue
+        ? standardCoal[index] / denominator[index]
+        : (isElectricity ? electricity[index] : standardCoal[index] * 1000) / denominator[index]
       : null;
     return {
       month: index + 1,
@@ -228,7 +302,7 @@ function attachTrend(
   const monthlyMetrics = calculateMonthlyMetrics(metric, energyRecords, operationRecords);
   const priorEnergyRecords = previousEnergy.filter((record) => energyRecords.some((current) => current.energyTypeId === record.energyTypeId && current.energyUnitId === record.energyUnitId && current.scopeId === record.scopeId));
   const priorOperationRecords = previousOperations.filter((record) => operationRecords.some((current) => current.metricCode === record.metricCode && current.productId === record.productId && current.energyUnitId === record.energyUnitId && current.metricName === record.metricName));
-  const priorMetrics = hasActualMonthlyData(priorEnergyRecords, priorOperationRecords)
+  const priorMetrics = priorEnergyRecords.length > 0 && priorOperationRecords.length > 0
     ? calculateMonthlyMetrics(metric, priorEnergyRecords, priorOperationRecords)
     : [];
   const monthlyMetricsWithYoy = monthlyMetrics.map((item, index) => {
@@ -245,10 +319,9 @@ function attachTrend(
   const isProduct = metric.intensityMetricId.includes('product-energy') || metric.intensityMetricId.includes('product-electricity');
   const isAddedValue = metric.intensityMetricId.includes('added-value');
   const isOutputValue = metric.intensityMetricId.includes('output-value');
-  const isRevenue = metric.intensityMetricId.includes('revenue-electricity');
   return {
     ...metric,
-    trend: complete && (isProduct || isAddedValue || isOutputValue || isRevenue)
+    trend: complete && (isProduct || isAddedValue || isOutputValue)
       ? monthlyMetricsWithYoy.map((item) => item.value ?? 0)
       : [],
     trendBasis: 'actual-monthly' as const,
@@ -269,52 +342,148 @@ export function listIntensityObjects(objectType: IntensityObjectType): Intensity
 }
 
 function utilityMetrics(object: IntensityObjectOption, year: number, energy: V11EnergyRecord[], operations: V11OperationMetric[]) {
-  const isBoiler = object.objectName.includes('锅炉');
-  const output = operations.find((record) => isBoiler
+  const isBoiler = object.objectId === 'eu-gas-boiler' || object.objectName.includes('锅炉');
+  const isWasteHeatPower = object.objectId === 'eu-waste-heat-power' || object.objectName.includes('能源回收');
+  if (object.objectId === 'eu-compressed-air') {
+    const electricity = energy.filter((record) => energyTypeName(record.energyTypeId) === '电力');
+    return [baseMetric(
+      `${object.objectId}-supply-electricity`,
+      '单位供气电耗',
+      'kWh/Nm³',
+      '空压系统电力消费量 ÷ 供气量',
+      null,
+      `${electricity.reduce((sum, record) => sum + annualAmount(record), 0).toLocaleString('zh-CN')} kWh`,
+      '缺少供气量',
+      year,
+      electricity.map((record) => record.energyRecordId),
+      [],
+      '缺少供气量',
+    )];
+  }
+  if (isWasteHeatPower) {
+    const conversion = listV11ConversionOutputs().find((item) => item.year === year && item.recordType === '余热发电' && item.conversionEnergyUnitId === object.energyUnitId);
+    const input = conversion?.recoveryAmount && conversion.recoveryUnit === 'GJ'
+      ? standardCoalAmount(conversion.recoveryAmount, 'v11-energy-waste-heat')
+      : 0;
+    const output = conversion?.outputAmount && conversion.outputEnergyTypeId
+      ? standardCoalAmount(conversion.outputAmount, conversion.outputEnergyTypeId)
+      : 0;
+    const missing: IntensityIssue | undefined = input <= 0 || output <= 0 ? '缺少余热发电转换数据' : undefined;
+    return [baseMetric(
+      `${object.objectId}-conversion-efficiency`,
+      '余热发电转换效率',
+      '%',
+      '发电量折标值 ÷ 回收余热折标值 × 100%',
+      missing ? null : output / input * 100,
+      `回收余热折标量 ${input.toLocaleString('zh-CN')} tce`,
+      `发电量折标量 ${output.toLocaleString('zh-CN')} tce`,
+      year,
+      [],
+      [],
+      missing,
+    )];
+  }
+  const outputCandidates = operations.filter((record) => isBoiler
     ? record.metricCode === 'steam_output' || record.metricName.includes('蒸汽产量')
-    : record.metricCode === 'business_volume' || record.metricName.includes('业务量') || record.metricName.includes('运行量'));
-  const typeName = isBoiler ? '单位蒸汽综合能耗' : '单位运行能耗';
-  const unit = isBoiler ? 'kgce/t' : 'tce/业务量';
-  const missing: IntensityIssue | undefined = isBoiler && !output ? '缺少蒸汽产量' : !output ? '缺少必要关联关系' : undefined;
+    : record.energyUnitId === object.energyUnitId && (record.metricCode === 'energy_supply_derived' || record.metricCode === 'energy_supply' || record.metricCode === 'building_area' || record.metricCode === 'logistics_throughput' || record.metricCode === 'business_volume' || record.metricName.includes('业务量') || record.metricName.includes('运行量')));
+  // 月度分析优先使用月度运营记录；年度单值只作为年度模式的回退来源。
+  const output = outputCandidates.find((record) => record.entryMode === 'monthly') ?? outputCandidates[0];
+  const expectedDenominator = object.objectId === 'eu-utilities'
+    ? { name: '动力中心供能量', unit: 'GJ' }
+    : object.objectId === 'eu-office'
+      ? { name: '办公建筑面积', unit: 'm²' }
+      : object.objectId === 'eu-public-support'
+        ? { name: '货物吞吐量', unit: 't' }
+        : { name: '运营量', unit: '运营量' };
+  const typeName = isBoiler
+    ? '单位蒸汽综合能耗'
+    : object.objectId === 'eu-utilities'
+      ? '单位供能量综合能耗'
+      : object.objectId === 'eu-office'
+        ? '单位建筑面积综合能耗'
+        : object.objectId === 'eu-public-support'
+          ? '单位物流作业量综合能耗'
+          : output ? `单位运行能耗（按${output.metricName}）` : '单位运行能耗';
+  const unit = isBoiler ? 'kgce/t' : `kgce/${output?.metricUnit ?? expectedDenominator.unit}`;
+  const annualOutputAmount = output?.metricCode === 'building_area' && output.annualValue > 0
+    ? output.annualValue
+    : output ? annualAmount(output) : 0;
+  const denominatorLabel = output?.metricName ?? (isBoiler ? '蒸汽产量' : expectedDenominator.name);
+  const missing: IntensityIssue | undefined = isBoiler && !output ? '缺少蒸汽产量' : !output ? '缺少适用运营分母' : undefined;
   const coal = standardCoalTotal(energy);
-  return [baseMetric(`${object.objectId}-utility`, typeName, unit, isBoiler ? '年度折标综合能耗 ÷ 蒸汽产量' : '年度综合能耗 ÷ 运营业务量', missing ? null : coal * 1000 / annualAmount(output!), `${object.objectName}综合能耗 ${coal.toLocaleString('zh-CN')} tce`, output ? `${output.metricName} ${annualAmount(output).toLocaleString('zh-CN')} ${output.metricUnit}` : isBoiler ? '未匹配到当前对象的运营数据' : '未匹配到当前对象的运营数据', year, energy.map((record) => record.energyRecordId), output ? [output.operationMetricId] : [], missing)];
+  const result = baseMetric(`${object.objectId}-utility`, typeName, unit, isBoiler ? '年度折标综合能耗 ÷ 蒸汽产量' : `年度综合能耗 ÷ ${denominatorLabel}`, missing ? null : coal * 1000 / annualOutputAmount, `${object.objectName}综合能耗 ${coal.toLocaleString('zh-CN')} tce`, output ? `${output.metricName} ${annualOutputAmount.toLocaleString('zh-CN')} ${output.metricUnit}` : '未匹配到当前对象的运营数据', year, energy.map((record) => record.energyRecordId), output ? [output.operationMetricId] : [], missing);
+  return [{
+    ...result,
+    denominatorSource: output?.metricCode === 'energy_supply_derived' ? '能源回收、转换与外供—动力中心下属二级系统有效内部供能汇总' : '运营数据',
+    source: output?.metricCode === 'energy_supply_derived' ? '能源数据与能源回收、转换与外供（按动力中心及年度匹配）' : result.source,
+  }];
 }
 
 function productMetrics(object: IntensityObjectOption, year: number, enterpriseEnergy: V11EnergyRecord[], operations: V11OperationMetric[]) {
-  // 一期产品口径：产品默认绑定一个生产用能单元，直接使用该单元能源消费，暂不做公共能源分摊。
-  const outputRecords = operations.filter((record) => record.metricCode === 'product_output' && record.productId === object.objectId && record.energyUnitId === object.energyUnitId && annualAmount(record) > 0);
-  const scopedOutputRecords = operations.filter((record) => record.metricCode === 'product_output' && record.productId === object.objectId && record.energyUnitId === object.energyUnitId && annualAmount(record) > 0);
-  const monthlyOutputs = scopedOutputRecords.filter((record) => record.entryMode === 'monthly');
-  const output = monthlyOutputs[0] ?? scopedOutputRecords[0];
-  const outputAmount = monthlyOutputs.length
-    ? monthlyOutputs.reduce((sum, record) => sum + annualAmount(record), 0)
-    : output ? annualAmount(output) : 0;
-  const coal = standardCoalTotal(enterpriseEnergy);
-  const electricity = enterpriseEnergy.filter((record) => energyTypeName(record.energyTypeId) === '电力').reduce((sum, record) => sum + annualAmount(record), 0);
+  // 企业级产品口径：同一产品在所有关联生产单元中的产量都要汇总。
+  // 同一生产单元同时存在年度和月度记录时，月度记录优先，避免重复计入。
+  const scopedOutputRecords = operations.filter((record) => record.metricCode === 'product_output' && record.productId === object.objectId && annualAmount(record) > 0);
+  const outputByUnit = new Map<string, V11OperationMetric[]>();
+  scopedOutputRecords.forEach((record) => {
+    const key = record.energyUnitId ?? record.operationMetricId;
+    outputByUnit.set(key, [...(outputByUnit.get(key) ?? []), record]);
+  });
+  const selectedOutputs = [...outputByUnit.values()].flatMap((records) => {
+    const monthly = records.filter((record) => record.entryMode === 'monthly');
+    return monthly.length ? monthly : records;
+  });
+  const output = selectedOutputs[0];
+  const outputAmount = selectedOutputs.reduce((sum, record) => sum + annualAmount(record), 0);
+  const allocatedEnergy = allocatedProductEnergy(object.objectId, enterpriseEnergy);
+  const coal = standardCoalTotal(allocatedEnergy);
   const productUnit = output?.metricUnit ?? 't';
-  const missing: IntensityIssue | undefined = !enterpriseEnergy.length
+  const missing: IntensityIssue | undefined = !allocatedEnergy.length
     ? '缺少能源数据'
     : !object.energyUnitId
       ? '未关联生产用能单元'
       : !output || outputAmount <= 0 ? '缺少产品产量' : undefined;
-  const operationIds = (monthlyOutputs.length ? monthlyOutputs : scopedOutputRecords).map((record) => record.operationMetricId);
+  const operationIds = selectedOutputs.map((record) => record.operationMetricId);
   const denominator = output ? `${object.objectName}产量 ${outputAmount.toLocaleString('zh-CN')} ${productUnit}` : '缺少当前产品产量';
+  const relatedUnits = [...new Set(allocatedEnergy.map((record) => record.energyUnitId).filter((id): id is string => Boolean(id)))];
   return [
-    baseMetric(`${object.objectId}-product-energy`, '单位产品综合能耗', `kgce/${productUnit}`, '产品所属生产车间综合能耗（tce）×1000 ÷ 当前产品产量', !missing ? coal * 1000 / outputAmount : null, `产品所属生产车间综合能耗 ${coal.toLocaleString('zh-CN')} tce`, denominator, year, enterpriseEnergy.map((record) => record.energyRecordId), operationIds, missing),
-    baseMetric(`${object.objectId}-product-electricity`, '单位产品电耗', `kWh/${productUnit}`, '产品所属生产车间电力消费量 ÷ 当前产品产量', !missing && electricity > 0 ? electricity / outputAmount : null, `产品所属生产车间电力消费量 ${electricity.toLocaleString('zh-CN')} kWh`, denominator, year, enterpriseEnergy.filter((record) => energyTypeName(record.energyTypeId) === '电力').map((record) => record.energyRecordId), operationIds, missing ?? (!electricity ? '缺少能源数据' : undefined)),
+    { ...baseMetric(`${object.objectId}-product-energy`, '单位产品综合能耗', `kgce/${productUnit}`, '产品归属生产单元综合能耗（tce）×1000 ÷ 企业级产品产量合计', !missing ? coal * 1000 / outputAmount : null, `产品归属生产单元综合能耗 ${coal.toLocaleString('zh-CN')} tce`, denominator, year, allocatedEnergy.map((record) => record.energyRecordId), operationIds, missing), relatedEnergyUnitNames: relatedUnits.map((id) => listEnergyUnits().find((unit) => unit.energyUnitId === id)?.energyUnitName ?? id) },
   ];
 }
 
-function deviceTemplate(device: ReturnType<typeof listV11KeyDevices>[number], year: number) {
+function deviceTemplate(device: ReturnType<typeof listV11KeyDevices>[number], year: number): DeviceIntensityTemplateConfig | null {
   const customConfig = getDeviceIntensityTemplateConfig(device.deviceId, year);
-  if (customConfig?.metricCode === 'custom-device-work') return { ...customConfig, parameterUnit: customConfig.denominatorUnit as 't' };
-  const assignedMetricCode = getDeviceIntensityTemplate(device.deviceId, year);
-  if (assignedMetricCode === 'compressed-air-electricity') return { metricCode: assignedMetricCode, metricName: '单位供气电耗', metricUnit: 'kWh/Nm³' as const, formula: '年度电耗 ÷ 年度供气量', parameterUnit: 'Nm³' as const };
-  if (assignedMetricCode === 'boiler-standard-coal') return { metricCode: assignedMetricCode, metricName: '单位蒸汽综合能耗', metricUnit: 'kgce/t' as const, formula: '年度折标综合能耗 ÷ 年度蒸汽产量', parameterUnit: 't' as const };
-  if (device.deviceType === '空压设备') return { metricCode: 'compressed-air-electricity' as const, metricName: '单位供气电耗', metricUnit: 'kWh/Nm³' as const, formula: '年度电耗 ÷ 年度供气量', parameterUnit: 'Nm³' as const };
-  if (device.deviceId === 'v11-device-82' || device.deviceName.includes('蒸汽锅炉')) return { metricCode: 'boiler-standard-coal' as const, metricName: '单位蒸汽综合能耗', metricUnit: 'kgce/t' as const, formula: '年度折标综合能耗 ÷ 年度蒸汽产量', parameterUnit: 't' as const };
-  if (device.deviceType === '能源转换设备' || device.deviceName.includes('余热发电')) return { metricCode: 'waste-heat-power-efficiency' as const, metricName: '余热发电转换效率', metricUnit: '%' as const, formula: '发电量折标值 ÷ 回收余热折标值 × 100%', parameterUnit: '—' as const };
-  return null;
+  const outputBasis = device.outputBasis?.trim();
+  if (!outputBasis) return customConfig ?? null;
+  if (!customConfig) {
+    const energyType = listV11EnergyTypes().find((item) => item.energyTypeId === device.mainEnergyTypeId);
+    const numeratorUnit = device.mainEnergyTypeId === 'v11-energy-electricity' ? 'kWh' : 'kgce';
+    const numeratorName = device.mainEnergyTypeId === 'v11-energy-electricity' ? '电力消耗' : `${energyType?.energyTypeName ?? '能源'}折标综合能耗`;
+    return {
+      templateId: 'unit-output-energy',
+      metricCode: 'custom-device-work',
+      metricName: '单位产出能耗',
+      calculationMethod: 'ratio',
+      numerator: { source: 'device-energy', energyTypeId: device.mainEnergyTypeId, name: numeratorName, unit: numeratorUnit },
+      denominator: { source: 'operation-data', name: outputBasis, unit: '' },
+      resultUnit: '',
+      factor: 1,
+      formula: `${numeratorName} ÷ ${outputBasis}`,
+    };
+  }
+  const formula = customConfig.factor && customConfig.factor !== 1
+    ? `${customConfig.numerator.name} × ${customConfig.factor} ÷ ${outputBasis}`
+    : `${customConfig.numerator.name} ÷ ${outputBasis}`;
+  return {
+    ...customConfig,
+    denominator: { ...customConfig.denominator, name: outputBasis },
+    denominatorName: outputBasis,
+    formula,
+  };
+}
+
+export function calculateDeviceMetric({ numerator, denominator, method, factor = 1 }: { numerator: number; denominator: number; method: 'ratio' | 'percentage'; factor?: number }) {
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) return null;
+  return numerator / denominator * (method === 'percentage' ? factor : 1);
 }
 
 function standardCoalAmount(amount: number, energyTypeId: string) {
@@ -325,16 +494,17 @@ function standardCoalAmount(amount: number, energyTypeId: string) {
 }
 
 function deviceMonthlyMetricValues(
-  metricCode: DeviceIntensityMetricCode | null,
   value: number | null,
   monthlyEnergy: number[],
-  parameter: ReturnType<typeof getDeviceIntensityParameter>,
   reportedMonths: boolean[],
+  monthlyDenominator: Array<number | null>,
+  denominatorReportedMonths: boolean[],
+  numeratorFactor = 1,
 ) {
   if (value === null) return Array(12).fill(null) as Array<number | null>;
-  if (metricCode === 'waste-heat-power-efficiency') return monthlyEnergy.map((_, index) => reportedMonths[index] ? value : null);
-  if (!parameter || parameter.value <= 0) return Array(12).fill(null) as Array<number | null>;
-  return monthlyEnergy.map((energy, index) => reportedMonths[index] ? energy / (parameter.value / 12) : null);
+  return monthlyEnergy.map((energy, index) => reportedMonths[index] && denominatorReportedMonths[index] && (monthlyDenominator[index] ?? 0) > 0
+    ? energy * numeratorFactor / monthlyDenominator[index]!
+    : null);
 }
 
 export function buildDeviceIntensityRows(year: number, deviceType = 'all', energyUnitId = 'all', deviceId = 'all'): DeviceIntensityRow[] {
@@ -345,38 +515,6 @@ export function buildDeviceIntensityRows(year: number, deviceType = 'all', energ
   const records = listV11EnergyRecords().filter((record) => record.year === year && record.energyRole === '能源消费' && record.scopeType === 'device');
   return devices.map((device) => {
     const template = deviceTemplate(device, year);
-    if (template?.metricCode === 'waste-heat-power-efficiency') {
-      const conversion = listV11ConversionOutputs().find((item) => item.year === year && item.recordType === '余热发电' && item.conversionEnergyUnitId === device.energyUnitId);
-      const input = conversion?.recoveryAmount && conversion.recoveryUnit === 'GJ' ? standardCoalAmount(conversion.recoveryAmount, 'v11-energy-waste-heat') : 0;
-      const output = conversion?.outputAmount && conversion.outputEnergyTypeId ? standardCoalAmount(conversion.outputAmount, conversion.outputEnergyTypeId) : 0;
-      const value = input > 0 && output > 0 ? output / input * 100 : null;
-      return {
-        deviceId: device.deviceId,
-        deviceName: device.deviceName,
-        energyUnitName: listEnergyUnits().find((unit) => unit.energyUnitId === device.energyUnitId)?.energyUnitName ?? '未知用能单元',
-        energyUnitId: device.energyUnitId,
-        deviceType: device.deviceType,
-        metricCode: template.metricCode,
-        metricName: template.metricName,
-        metricUnit: template.metricUnit,
-        formula: template.formula,
-        annualEnergy: conversion?.outputAmount ?? 0,
-        energyUnit: 'kWh' as const,
-        dataProgress: conversion ? '年度转换数据已录入' : '未录入',
-        completeEnergy: Boolean(conversion),
-        parameter: undefined,
-        value,
-        resultStatus: value === null ? '待完善' as const : '已计算' as const,
-        resultReason: value === null ? '缺少余热发电转换数据' as const : null,
-        energyRecordId: null,
-        energyTypeName: '电力',
-        standardCoalFactor: 0.1229,
-        standardCoalFactorUnit: 'kgce/kWh',
-        reportedMonths: conversion ? Array(12).fill(true) : Array(12).fill(false),
-        monthlyEnergy: conversion ? Array(12).fill((conversion.outputAmount ?? 0) / 12) : Array(12).fill(0),
-        monthlyMetricValues: conversion ? Array(12).fill(value) : Array(12).fill(null),
-      };
-    }
     if (!template) {
       const record = records.find((item) => item.scopeId === device.deviceId);
       const months = record?.monthlyReportedMonths ?? record?.monthlyAmounts.map((value) => value > 0);
@@ -407,31 +545,60 @@ export function buildDeviceIntensityRows(year: number, deviceType = 'all', energ
         standardCoalFactorUnit: energyType?.standardCoalFactorUnit ?? '',
         reportedMonths,
         monthlyEnergy: record?.monthlyAmounts ?? Array(12).fill(0),
+        monthlyDenominator: Array(12).fill(null),
+        denominatorUnit: '—',
         monthlyMetricValues: Array(12).fill(null),
+        templateConfig: undefined,
       };
     }
-    const record = records.find((item) => item.scopeId === device.deviceId && item.energyTypeId === (template.metricCode === 'custom-device-work' ? (template as { energyTypeId: string }).energyTypeId : template.metricCode === 'compressed-air-electricity' ? 'v11-energy-electricity' : 'v11-energy-natural-gas'));
+    const record = records.find((item) => item.scopeId === device.deviceId && item.energyTypeId === template.numerator.energyTypeId);
     const months = record?.monthlyReportedMonths ?? record?.monthlyAmounts.map((value) => value > 0);
     const reportedMonths = months ?? Array(12).fill(false);
     const reportedCount = reportedMonths.filter(Boolean).length;
     const completeEnergy = Boolean(record && reportedCount === 12);
     const annualEnergy = record ? annualAmount(record) : 0;
     const parameter = getDeviceIntensityParameter(device.deviceId, year, template.metricCode);
-    const customElectricity = template.metricCode === 'custom-device-work' && record?.energyTypeId === 'v11-energy-electricity';
-    const value = completeEnergy && parameter && parameter.value > 0
-      ? template.metricCode === 'compressed-air-electricity' || customElectricity ? annualEnergy / parameter.value : annualEnergy * standardCoalFactor(record!.energyTypeId) / parameter.value
+    const conversion = template.denominator.source === 'energy-conversion'
+      ? listV11ConversionOutputs().find((item) => item.year === year && item.recordType === template.denominator.recordType && item.conversionEnergyUnitId === device.energyUnitId)
+      : undefined;
+    const monthlyParameterValues = parameter?.monthlyValues ?? [];
+    const monthlyDenominator = conversion?.monthlyOutputAmounts
+      ? conversion.monthlyOutputAmounts.map((value) => value ?? null)
+      : monthlyParameterValues.length === 12
+        ? monthlyParameterValues
+        : Array(12).fill(null);
+    const denominatorReportedMonths = conversion
+      ? monthlyDenominator.map((value) => value !== null && value > 0)
+      : monthlyDenominator.map((value) => value !== null && Number.isFinite(value) && value > 0);
+    const hasCompleteMonthlyDenominator = denominatorReportedMonths.length === 12 && denominatorReportedMonths.every(Boolean);
+    const effectiveParameterValue = hasCompleteMonthlyDenominator
+      ? monthlyDenominator.reduce<number>((total, item) => total + (item ?? 0), 0)
+      : parameter?.entryMode === 'annual-fallback'
+        ? parameter.annualValue ?? parameter.value
+        : conversion?.outputAmount ?? parameter?.value;
+    const numerator = template.numerator.energyTypeId === 'v11-energy-electricity' ? annualEnergy : annualEnergy * standardCoalFactor(record?.energyTypeId ?? template.numerator.energyTypeId ?? '');
+    const value = completeEnergy && effectiveParameterValue && effectiveParameterValue > 0
+      ? calculateDeviceMetric({ numerator: numerator * (template.factor ?? 1), denominator: effectiveParameterValue, method: 'ratio' })
       : null;
+    const denominatorUnit = template.denominator.source === 'operation-data'
+      ? parameter?.unit?.trim() || template.denominator.unit
+      : template.denominator.unit;
+    const resultUnit = denominatorUnit ? `${template.numerator.unit}/${denominatorUnit}` : '—';
     const energyType = listV11EnergyTypes().find((item) => item.energyTypeId === record?.energyTypeId);
     const resultReason = reportedCount === 0
       ? '能源数据未录入'
       : reportedCount < 12
         ? '能源数据部分录入'
-        : !parameter
-          ? (template.metricCode === 'compressed-air-electricity' ? '缺少供气量' : template.metricCode === 'custom-device-work' ? `缺少${(template as { denominatorName: string }).denominatorName}` : '缺少蒸汽产量')
+        : !effectiveParameterValue
+          ? `缺少${template.denominator.name}`
           : null;
     const resultStatus = resultReason === null ? '已计算' : '待完善';
     const monthlyEnergy = record?.monthlyAmounts ?? Array(12).fill(0);
-    return { deviceId: device.deviceId, deviceName: device.deviceName, energyUnitName: listEnergyUnits().find((unit) => unit.energyUnitId === device.energyUnitId)?.energyUnitName ?? '未知用能单元', energyUnitId: device.energyUnitId, deviceType: device.deviceType, metricCode: template.metricCode, metricName: template.metricName, metricUnit: template.metricUnit, formula: template.metricCode === 'custom-device-work' ? `设备能源消费量 ÷ ${(template as { denominatorName: string }).denominatorName}` : template.formula, annualEnergy, energyUnit: template.metricCode === 'compressed-air-electricity' || customElectricity ? 'kWh' : 'Nm³', dataProgress: `${reportedCount}/12月`, completeEnergy, parameter, value, resultStatus, resultReason, energyRecordId: record?.energyRecordId ?? null, energyTypeName: energyType?.energyTypeName ?? (template.metricCode === 'compressed-air-electricity' ? '电力' : '天然气'), standardCoalFactor: energyType ? standardCoalFactor(energyType.energyTypeId) : 0, standardCoalFactorUnit: energyType?.standardCoalFactorUnit ?? '', reportedMonths, monthlyEnergy, monthlyMetricValues: deviceMonthlyMetricValues(template.metricCode, value, monthlyEnergy, parameter, reportedMonths) };
+    const denominatorReportedCount = denominatorReportedMonths.filter(Boolean).length;
+    const dataProgress = template.denominator.source === 'energy-conversion'
+      ? `${reportedCount}/12月｜产出${denominatorReportedCount}/12月`
+      : `${reportedCount}/12月`;
+    return { deviceId: device.deviceId, deviceName: device.deviceName, energyUnitName: listEnergyUnits().find((unit) => unit.energyUnitId === device.energyUnitId)?.energyUnitName ?? '未知用能单元', energyUnitId: device.energyUnitId, deviceType: device.deviceType, metricCode: template.metricCode, metricName: template.metricName, metricUnit: resultUnit, formula: template.formula ?? `${template.numerator.name} ÷ ${template.denominator.name}`, annualEnergy, energyUnit: template.numerator.unit, dataProgress, completeEnergy, parameter, value, resultStatus, resultReason, energyRecordId: record?.energyRecordId ?? null, energyTypeName: energyType?.energyTypeName ?? '—', standardCoalFactor: energyType ? standardCoalFactor(energyType.energyTypeId) : 0, standardCoalFactorUnit: energyType?.standardCoalFactorUnit ?? '', reportedMonths, monthlyEnergy, monthlyDenominator, denominatorUnit, monthlyMetricValues: deviceMonthlyMetricValues(value, monthlyEnergy, reportedMonths, monthlyDenominator, denominatorReportedMonths, template.factor ?? 1), calculationInputs: conversion ? { conversionOutputId: conversion.conversionOutputId, numerator, denominator: effectiveParameterValue ?? 0, unit: resultUnit, numeratorRaw: annualEnergy, numeratorRawUnit: template.numerator.unit, denominatorRaw: effectiveParameterValue, denominatorRawUnit: denominatorUnit } : undefined, templateConfig: template };
   });
 }
 
@@ -456,32 +623,39 @@ function baseMetric(id: string, name: string, unit: string, formula: string, val
 
 function factoryMetrics(year: number, energy: V11EnergyRecord[], operations: V11OperationMetric[]) {
   const coal = standardCoalTotal(energy);
-  const electricity = energy.filter((r) => energyTypeName(r.energyTypeId) === '电力').reduce((sum, r) => sum + annualAmount(r), 0);
   const ids = energy.map((r) => r.energyRecordId);
   const output = operationByName(operations, ['企业产品产量', '产品产量']);
   const value = operationByName(operations, ['工业总产值']);
-  const added = operationByName(operations, ['工业增加值']);
-  const revenue = operationByName(operations, ['营业收入']);
+  // 保留“单位增加值综合能耗”无分母的展示场景，验证页面对数据缺失的处理。
+  const added = undefined;
   const productUnit = output?.metricUnit ?? 't';
   return [
     baseMetric('factory-product-energy', '单位产品综合能耗', `kgce/${productUnit}`, '企业级综合能耗 ÷ 企业产品产量', output && coal > 0 ? coal * 1000 / annualAmount(output) : null, `企业级综合能耗 ${coal.toLocaleString('zh-CN')} tce`, output ? `企业产品产量 ${annualAmount(output).toLocaleString('zh-CN')} ${productUnit}` : '缺少企业产品产量', year, ids, output ? [output.operationMetricId] : [], output ? undefined : '缺少产品产量'),
     baseMetric('factory-output-value-energy', '单位产值综合能耗', 'tce/万元', '企业级综合能耗 ÷ 工业总产值', value && coal > 0 ? coal / annualAmount(value) : null, `企业级综合能耗 ${coal.toLocaleString('zh-CN')} tce`, value ? `工业总产值 ${annualAmount(value).toLocaleString('zh-CN')} 万元` : '缺少工业总产值', year, ids, value ? [value.operationMetricId] : []),
-    baseMetric('factory-added-value-energy', '单位增加值综合能耗', 'tce/万元', '企业级综合能耗 ÷ 工业增加值', added && coal > 0 ? coal / annualAmount(added) : null, `企业级综合能耗 ${coal.toLocaleString('zh-CN')} tce`, added ? `工业增加值 ${annualAmount(added).toLocaleString('zh-CN')} 万元` : '缺少工业增加值', year, ids, added ? [added.operationMetricId] : []),
-    baseMetric('factory-revenue-electricity', '单位营业收入电耗', 'kWh/万元', '企业级电力消费量 ÷ 营业收入', revenue && electricity > 0 ? electricity / annualAmount(revenue) : null, `企业级电力消费量 ${electricity.toLocaleString('zh-CN')} kWh`, revenue ? `营业收入 ${annualAmount(revenue).toLocaleString('zh-CN')} 万元` : '缺少营业收入', year, energy.filter((r) => energyTypeName(r.energyTypeId) === '电力').map((r) => r.energyRecordId), revenue ? [revenue.operationMetricId] : []),
+    baseMetric('factory-added-value-energy', '单位增加值综合能耗', 'tce/万元', '企业级综合能耗 ÷ 工业增加值', null, `企业级综合能耗 ${coal.toLocaleString('zh-CN')} tce`, '缺少工业增加值', year, ids, [], '缺少工业增加值'),
   ].map((item) => ({ ...item, energyTypeNames: [...new Set(energy.map((record) => energyTypeName(record.energyTypeId)))] }));
 }
 
 function unitMetrics(object: IntensityObjectOption, year: number, energy: V11EnergyRecord[], operations: V11OperationMetric[]) {
   const coal = standardCoalTotal(energy);
-  const electricity = energy.filter((r) => energyTypeName(r.energyTypeId) === '电力').reduce((sum, r) => sum + annualAmount(r), 0);
-  const outputs = operations.filter((r) => r.metricCode === 'product_output' && r.energyUnitId === object.energyUnitId);
-  const output = outputs.find((record) => record.entryMode === 'monthly') ?? outputs[0];
+  const outputGroups = new Map<string, V11OperationMetric[]>();
+  operations
+    .filter((record) => record.metricCode === 'product_output' && record.energyUnitId === object.energyUnitId && annualAmount(record) > 0)
+    .forEach((record) => {
+      const key = record.productId ?? record.operationMetricId;
+      outputGroups.set(key, [...(outputGroups.get(key) ?? []), record]);
+    });
+  const outputs = [...outputGroups.values()].map((records) => records.find((record) => record.entryMode === 'monthly') ?? records[0]);
+  const output = outputs[0];
+  const productUnit = output?.metricUnit ?? 't';
+  const sameUnit = outputs.every((record) => record.metricUnit === productUnit);
+  const outputAmount = outputs.reduce((sum, record) => sum + annualAmount(record), 0);
+  const outputNames = outputs.map((record) => record.productId ? getProduct(record.productId)?.productName ?? '关联产品' : '关联产品');
   const name = object.objectName;
-  const missing = !energy.length ? '缺少能源数据' : !output ? '缺少必要关联关系' : undefined;
+  const missing = !energy.length ? '缺少能源数据' : !outputs.length || !sameUnit ? '缺少产品产量' : undefined;
   return [
-    baseMetric(`${object.objectId}-product-energy`, '单位产品综合能耗', `kgce/${output?.metricUnit ?? 't'}`, `${name}综合能耗（tce）×1000 ÷ 关联产品产量`, missing ? null : coal * 1000 / annualAmount(output!), `${name}综合能耗 ${coal.toLocaleString('zh-CN')} tce`, output ? `${output.metricName} ${annualAmount(output).toLocaleString('zh-CN')} ${output.metricUnit}` : '未关联产品产量', year, energy.map((r) => r.energyRecordId), output ? [output.operationMetricId] : [], missing),
-    baseMetric(`${object.objectId}-product-electricity`, '单位产品电耗', `kWh/${output?.metricUnit ?? 't'}`, `${name}电力消费量 ÷ 关联产品产量`, missing || !electricity ? null : electricity / annualAmount(output!), `${name}电力消费量 ${electricity.toLocaleString('zh-CN')} kWh`, output ? `${output.metricName} ${annualAmount(output).toLocaleString('zh-CN')} ${output.metricUnit}` : '未关联产品产量', year, energy.filter((r) => energyTypeName(r.energyTypeId) === '电力').map((r) => r.energyRecordId), output ? [output.operationMetricId] : [], missing ?? (!electricity ? '缺少能源数据' : undefined)),
-  ].map((item) => ({ ...item, relatedProductName: output?.productId ? getProduct(output.productId)?.productName : undefined, allocationDescription: output?.productId ? `${getProduct(output.productId)?.productName ?? '关联产品'}按当前用能单元产量记录归属；多产品场景按已确认的能源分配结果计算。` : undefined, energyTypeNames: [...new Set(energy.map((record) => energyTypeName(record.energyTypeId)))] }));
+    baseMetric(`${object.objectId}-product-energy`, '单位产品综合能耗', `kgce/${productUnit}`, `${name}综合能耗（tce）×1000 ÷ 关联产品产量合计`, missing ? null : coal * 1000 / outputAmount, `${name}综合能耗 ${coal.toLocaleString('zh-CN')} tce`, outputs.length ? `关联产品产量合计 ${outputAmount.toLocaleString('zh-CN')} ${productUnit}` : '未关联产品产量', year, energy.map((r) => r.energyRecordId), outputs.map((record) => record.operationMetricId), missing),
+  ].map((item) => ({ ...item, relatedProductName: outputNames.length ? outputNames.join('、') : undefined, allocationDescription: outputNames.length ? `${outputNames.join('、')}按当前用能单元产量记录合计；仅汇总计量单位一致的产品产量。` : undefined, energyTypeNames: [...new Set(energy.map((record) => energyTypeName(record.energyTypeId)))] }));
 }
 
 function productSummaryMetrics(object: IntensityObjectOption, year: number, enterpriseEnergy: V11EnergyRecord[], operations: V11OperationMetric[]) {
@@ -493,8 +667,6 @@ function productSummaryMetrics(object: IntensityObjectOption, year: number, ente
   });
   const units = [...new Set(productOutputs.map((record) => record.metricUnit))];
   const coal = standardCoalTotal(enterpriseEnergy);
-  const electricityRecords = enterpriseEnergy.filter((record) => energyTypeName(record.energyTypeId) === '电力');
-  const electricity = electricityRecords.reduce((sum, record) => sum + annualAmount(record), 0);
   const totalOutput = productOutputs.reduce((sum, record) => sum + annualAmount(record), 0);
   const missing: IntensityIssue | undefined = !enterpriseEnergy.length ? '缺少能源数据' : !productOutputs.length || totalOutput <= 0 ? '缺少产品产量' : units.length !== 1 ? '当前产品无法直接汇总' : undefined;
   const productUnit = units[0] ?? products[0]?.unit ?? 't';
@@ -502,7 +674,6 @@ function productSummaryMetrics(object: IntensityObjectOption, year: number, ente
   const common = { energyTypeNames: [...new Set(enterpriseEnergy.map((record) => energyTypeName(record.energyTypeId)))], numeratorSource: '能源数据—企业层级—全厂', denominatorSource: '运营数据—产品产量' };
   return [
     { ...baseMetric(`${object.objectId}-product-energy`, '单位产品综合能耗', `kgce/${productUnit}`, '企业年度综合能耗（tce）×1000÷产品年度产量合计', !missing && coal > 0 ? coal * 1000 / totalOutput : null, `企业年度综合能耗 ${coal.toLocaleString('zh-CN', { maximumFractionDigits: 3 })} tce`, denominator, year, enterpriseEnergy.map((record) => record.energyRecordId), productOutputs.map((record) => record.operationMetricId), missing), ...common, energyBasis: '企业边界能源消费按能源品种折算为标准煤' },
-    { ...baseMetric(`${object.objectId}-product-electricity`, '单位产品电耗', `kWh/${productUnit}`, '企业年度电力消费量（kWh）÷产品年度产量合计', !missing && electricity > 0 ? electricity / totalOutput : null, `企业年度电力消费量 ${electricity.toLocaleString('zh-CN', { maximumFractionDigits: 3 })} kWh`, denominator, year, electricityRecords.map((record) => record.energyRecordId), productOutputs.map((record) => record.operationMetricId), missing ?? (!electricity ? '缺少能源数据' : undefined)), ...common },
   ];
 }
 
@@ -512,17 +683,27 @@ export function buildIntensityCalculationView(year: number, objectType: Intensit
   const previousAll = listV11EnergyRecords().filter((r) => r.year === year - 1 && r.energyRole === '能源消费');
   const energy = objectType === 'factory'
     ? all.filter((r) => v11RecordScopeType(r) === 'enterprise' || r.scopeLevel === '企业')
+    : objectType === 'product'
+      ? all.filter((r) => v11RecordScopeType(r) !== 'device' && object.energyUnitId !== null && getProduct(object.objectId)?.linkedEnergyUnitIds.includes(r.energyUnitId ?? ''))
     : all.filter((r) => v11RecordScopeType(r) !== 'device' && r.energyUnitId === object.energyUnitId);
   const previousEnergy = objectType === 'factory'
     ? previousAll.filter((r) => v11RecordScopeType(r) === 'enterprise' || r.scopeLevel === '企业')
+    : objectType === 'product'
+      ? previousAll.filter((r) => v11RecordScopeType(r) !== 'device' && object.energyUnitId !== null && getProduct(object.objectId)?.linkedEnergyUnitIds.includes(r.energyUnitId ?? ''))
     : previousAll.filter((r) => v11RecordScopeType(r) !== 'device' && r.energyUnitId === object.energyUnitId);
   const operations = listV11OperationMetrics().filter((r) => r.year === year && (objectType === 'factory' ? r.scopeLevel === '企业' : objectType === 'product' ? r.productId === object.objectId : r.energyUnitId === object.energyUnitId));
+  const derivedSupply = objectType === 'unit' && object.objectId === 'eu-utilities' ? derivedUtilitySupplyOperation(year, object.objectId) : null;
+  const effectiveOperations = derivedSupply ? [...operations.filter((record) => record.metricCode !== 'energy_supply'), derivedSupply] : operations;
   const previousOperations = listV11OperationMetrics().filter((r) => r.year === year - 1 && (objectType === 'factory' ? r.scopeLevel === '企业' : objectType === 'product' ? r.productId === object.objectId : r.energyUnitId === object.energyUnitId));
-  const metrics = (objectType === 'factory' ? factoryMetrics(year, energy, operations) : objectType === 'product' ? productMetrics(object, year, energy, operations) : object.unitKind === 'production' ? unitMetrics(object, year, energy, operations) : utilityMetrics(object, year, energy, operations))
-    .map((item) => attachTrend(item, energy, operations, previousEnergy, previousOperations));
+  const previousDerivedSupply = objectType === 'unit' && object.objectId === 'eu-utilities' ? derivedUtilitySupplyOperation(year - 1, object.objectId) : null;
+  const effectivePreviousOperations = previousDerivedSupply ? [...previousOperations.filter((record) => record.metricCode !== 'energy_supply'), previousDerivedSupply] : previousOperations;
+  const metricEnergy = objectType === 'product' ? allocatedProductEnergy(object.objectId, energy) : energy;
+  const metricPreviousEnergy = objectType === 'product' ? allocatedProductEnergy(object.objectId, previousEnergy) : previousEnergy;
+  const metrics = (objectType === 'factory' ? factoryMetrics(year, energy, effectiveOperations) : objectType === 'product' ? productMetrics(object, year, energy, effectiveOperations) : object.unitKind === 'production' ? unitMetrics(object, year, energy, effectiveOperations) : utilityMetrics(object, year, energy, effectiveOperations))
+    .map((item) => attachTrend(item, metricEnergy, effectiveOperations, metricPreviousEnergy, effectivePreviousOperations));
   const calculated = metrics.filter((item) => item.resultType === 'ok').length;
-  const operationNames = [...new Set(operations.map((record) => `${record.productId ? `${getProduct(record.productId)?.productName ?? '关联产品'}` : ''}${record.productId ? record.metricName.replace(/^产品/, '') : record.metricName}`))];
-  return { object, metrics, energyCondition: { linked: energy.length > 0, description: energy.length ? `已关联 ${energy.length} 条能源消费记录` : '未匹配到当前对象的能源消费记录', recordIds: energy.map((r) => r.energyRecordId) }, operationCondition: { linked: operations.length > 0, description: operations.length ? `已关联：${operationNames.join('、')}` : '未匹配到当前对象的运营数据', recordIds: operations.map((r) => r.operationMetricId) }, calculationStatus: calculated === metrics.length ? '可计算' : calculated > 0 ? '部分可计算' : '待补充', pendingReasons: [...new Set(metrics.filter((m) => m.issue).map((m) => m.issue!))] };
+  const operationNames = [...new Set(effectiveOperations.map((record) => `${record.productId ? `${getProduct(record.productId)?.productName ?? '关联产品'}` : ''}${record.productId ? record.metricName.replace(/^产品/, '') : record.metricName}`))];
+  return { object, metrics, energyCondition: { linked: energy.length > 0, description: energy.length ? `已关联 ${energy.length} 条能源消费记录` : '未匹配到当前对象的能源消费记录', recordIds: energy.map((r) => r.energyRecordId) }, operationCondition: { linked: effectiveOperations.length > 0, description: effectiveOperations.length ? `已关联：${operationNames.join('、')}` : '未匹配到当前对象的运营数据', recordIds: effectiveOperations.map((r) => r.operationMetricId) }, calculationStatus: calculated === metrics.length ? '可计算' : calculated > 0 ? '部分可计算' : '待补充', pendingReasons: [...new Set(metrics.filter((m) => m.issue).map((m) => m.issue!))] };
 }
 
 export function buildIntensityCalculationViews(year: number, objectType: IntensityObjectType, unitLevel: 'all' | 'level1' | 'level2' = 'all', objectId?: string) {

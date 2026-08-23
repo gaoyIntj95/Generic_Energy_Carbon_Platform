@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { resetDataManagementV11Store, saveV11EnergyRecord } from '../src/mocks/dataManagementV11Store';
 import { buildBenchmarkDataset } from '../src/mocks/energyBenchmarkSelector';
@@ -12,6 +12,7 @@ import { EnergyAnalysisV4 } from '../src/pages/newPrototype/EnergyAnalysisV4';
 
 let container: HTMLDivElement;
 let root: Root;
+let renderVersion = 0;
 
 function button(text: string, scope: ParentNode = container) {
   const result = [...scope.querySelectorAll('button')].find((item) => item.textContent?.includes(text));
@@ -39,16 +40,22 @@ async function setInput(element: HTMLInputElement, value: string) {
 }
 
 async function render(pathname: string) {
+  renderVersion += 1;
+  const routePath = pathname.split('?')[0];
   await act(async () => root.render(
-    <MemoryRouter initialEntries={[pathname]}>
-      <EnergyAnalysisV4 pathname={pathname} />
-    </MemoryRouter>,
+    <MemoryRouter key={renderVersion} initialEntries={[pathname]}><EnergyAnalysisV4 pathname={routePath} /><LocationProbe /></MemoryRouter>,
   ));
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location">{`${location.pathname}${location.search}`}</output>;
 }
 
 describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
   beforeEach(() => {
     resetDataManagementV11Store();
+    window.sessionStorage.clear();
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -61,24 +68,26 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
 
   it('applies and resets the consumption scope and exposes valuable monthly drilldown', async () => {
     await render('/energy-analysis/consumption-query');
-    expect(container.textContent).toContain('12,382');
+    expect(container.textContent).toContain('8,330');
     expect(container.textContent).not.toContain('余热回收');
     expect(container.textContent).toContain('能源消费趋势（2026年1—6月）');
 
     await setSelect(container.querySelector('select[aria-label="用能单元"]')!, 'prodA');
     await click(button('查询'));
     expect(container.textContent).toContain('综合能耗｜生产车间A');
-    expect(container.textContent).toContain('5,160');
+    expect(container.textContent).toContain('7,513');
     expect([...container.querySelectorAll('button')].filter((item) => item.textContent?.includes('导出明细台账'))).toHaveLength(1);
 
-    await click(button('查看明细'));
+    const electricityRow = [...container.querySelectorAll('table tbody tr')]
+      .find((row) => row.textContent?.includes('电力8,400,000'))!;
+    await click(electricityRow.querySelector('button')!);
     const dialog = container.querySelector('[role="dialog"]')!;
-    expect(dialog.textContent).toContain('月度能源消费明细｜外购电力');
+    expect(dialog.textContent).toContain('月度能源消费明细｜电力');
     expect(dialog.textContent).toContain('日度消费趋势');
     expect(dialog.textContent).toContain('峰值日');
     expect(dialog.querySelectorAll('table[aria-label="月度日明细"] tbody tr')).toHaveLength(30);
-    expect(dialog.textContent).toContain('5,380,000');
-    expect(dialog.textContent).toContain('3,199');
+    expect(dialog.textContent).toContain('8,400,000');
+    expect(dialog.textContent).toContain('1,032');
     await click(button('关闭'));
 
     await click(button('重置'));
@@ -101,11 +110,58 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(dialog.textContent).toContain('58,900');
   });
 
+  it('keeps flow query actions on the right without a balance-page shortcut', async () => {
+    await render('/energy-analysis/flow-analysis?year=2025&grain=year&month=4');
+
+    expect((container.querySelector('select[aria-label="分析年度"]') as HTMLSelectElement).value).toBe('2025');
+    expect((container.querySelector('select[aria-label="时间粒度"]') as HTMLSelectElement).value).toBe('year');
+    const filterCard = container.querySelector('section[class*="flowFilters"]')!;
+    expect([...filterCard.querySelectorAll('button')].map((item) => item.textContent)).toEqual(['查询', '重置']);
+    expect(filterCard.querySelector('div[class*="filterSpacer"]')).not.toBeNull();
+    expect(filterCard.textContent).not.toContain('进入能效平衡');
+  });
+
+  it('keeps benchmark query actions together without a balance-page shortcut', async () => {
+    await render('/energy-analysis/benchmarking');
+
+    const filterCard = container.querySelector('section[class*="benchmarkFilters"]')!;
+    const actions = filterCard.querySelector('div[class*="benchmarkFilterActions"]')!;
+    expect([...actions.querySelectorAll('button')].map((item) => item.textContent)).toEqual(['查询', '重置']);
+    expect(filterCard.querySelector('div[class*="filterSpacer"]')).not.toBeNull();
+    expect(filterCard.textContent).not.toContain('进入能效平衡');
+  });
+
+  it('opens daily records only for monthly energy rows connected to IoT', async () => {
+    await render('/energy-analysis/consumption-query');
+
+    const electricityRow = [...container.querySelectorAll('table tbody tr')]
+      .find((row) => row.querySelectorAll('td')[3]?.textContent === '电力')!;
+    await click(electricityRow.querySelector('button') as HTMLButtonElement);
+
+    let dialog = container.querySelector('[role="dialog"]')!;
+    expect(dialog.getAttribute('aria-label')).toContain('月度能源消费明细｜电力');
+    expect(dialog.textContent).toContain('日度消费趋势');
+    expect(dialog.querySelectorAll('table[aria-label="月度日明细"] tbody tr')).toHaveLength(30);
+    expect(dialog.textContent).toContain('正常 · 偏高 · 偏低');
+    expect([...dialog.querySelectorAll('table[aria-label="月度日明细"] tbody td:last-child')]
+      .some((cell) => cell.textContent?.includes('偏低'))).toBe(true);
+    await click(button('关闭'));
+
+    const steamRow = [...container.querySelectorAll('table tbody tr')]
+      .find((row) => row.querySelectorAll('td')[3]?.textContent === '蒸汽')!;
+    await click(steamRow.querySelector('button') as HTMLButtonElement);
+
+    dialog = container.querySelector('[role="dialog"]')!;
+    expect(dialog.getAttribute('aria-label')).toContain('暂无日度数据｜蒸汽');
+    expect(dialog.querySelector('table')).toBeNull();
+  });
+
   it('shows an explicit empty state when a monthly row has no daily data', async () => {
     await render('/energy-analysis/consumption-query');
 
-    const rows = container.querySelectorAll('table tbody tr');
-    await click(rows[3].querySelector('button') as HTMLButtonElement);
+    const steamRow = [...container.querySelectorAll('table tbody tr')]
+      .find((row) => row.textContent?.includes('蒸汽'))!;
+    await click(steamRow.querySelector('button') as HTMLButtonElement);
 
     const dialog = container.querySelector('[role="dialog"]')!;
     expect(dialog.getAttribute('aria-label')).toContain('暂无日度数据');
@@ -117,10 +173,11 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
   it('treats intensity scope as a calculation object and matches shared data by stable id', async () => {
     await render('/energy-analysis/intensity');
     expect(container.textContent).not.toContain('指标计算条件');
-    expect(container.textContent).toContain('全厂已生成 4 项指标');
     expect(container.textContent).toContain('单位产品综合能耗');
     expect(container.textContent).toContain('单位产值综合能耗');
-    expect(container.textContent).toContain('单位营业收入电耗');
+    expect(container.textContent).toContain('单位增加值综合能耗数据缺失');
+    expect(container.textContent).not.toContain('全厂已生成');
+    expect(container.textContent).not.toContain('单位营业收入电耗');
     expect(container.textContent).toContain('单位产品综合能耗｜月度趋势与明细');
     expect(container.textContent).toContain('查看明细');
     await click(button('查看明细'));
@@ -151,7 +208,9 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(container.textContent).toContain('生产车间A（2026年）');
     expect(container.textContent).toContain('已关联 4 条能源消费记录');
     expect(container.textContent).toContain('已关联：产品A产量、产品B产量');
-    expect(container.textContent).toContain('已生成 2 项指标，其中 2 项已计算、0 项数据不完整');
+    expect(container.textContent).not.toContain('当前展示');
+    expect(container.textContent).not.toContain('单位产品电耗');
+    expect(container.textContent).not.toContain('综合状态');
 
     await click(button('查看详情'));
     expect(container.textContent).toContain('指标计算详情');
@@ -172,15 +231,14 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     const objectSelect = container.querySelector('select[aria-label="具体分析对象"]')!;
     expect(objectSelect.textContent).toContain('空压系统');
     expect(objectSelect.textContent).toContain('锅炉系统');
-    expect(objectSelect.textContent).toContain('能源回收系统');
+    expect(objectSelect.textContent).toContain('余热发电机组');
+    expect(objectSelect.textContent).toContain('余热回收利用系统');
 
     await setSelect(objectSelect, 'eu-gas-boiler');
     await click(button('查询'));
-    expect(container.textContent).toContain('锅炉系统（2026年）');
-    expect(container.textContent).toContain('已关联 1 条能源消费记录');
-    expect(container.textContent).toContain('未匹配到当前对象的运营数据');
-    expect(container.textContent).toContain('缺少蒸汽产量');
-    expect(container.textContent).toContain('单位蒸汽综合能耗');
+    expect(container.textContent).not.toContain('当前展示');
+    expect(container.textContent).toContain('当前筛选对象暂无已计算的能耗指标结果');
+    expect(container.textContent).not.toContain('综合状态');
   });
 
   it('switches intensity results across product and device objects', async () => {
@@ -191,25 +249,63 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(productSelect.options.length).toBeGreaterThan(1);
     await click(button('查询'));
     expect(container.textContent).toContain('单位产品综合能耗');
-    expect(container.textContent).toContain('单位产品电耗');
+    expect(container.textContent).not.toContain('单位产品电耗');
 
     await click(button('设备'));
     const deviceSelect = container.querySelector('select[aria-label="具体设备"]') as HTMLSelectElement;
     expect(deviceSelect.options.length).toBeGreaterThan(1);
     await click(button('查询'));
-    expect(container.textContent).toContain('重点设备典型能耗指标');
-    expect(container.textContent).toContain('单位供气电耗');
+    expect(container.textContent).toContain('重点设备指标结果');
+    expect(container.textContent).toContain('单位产出能耗');
   });
 
-  it('calculates waste heat power efficiency from conversion output records', () => {
+  it('uses the same action semantics across factory, product, and key-device metrics', async () => {
+    await render('/energy-analysis/intensity');
+    expect([...container.querySelectorAll('button')].map((item) => item.textContent)).toEqual(expect.arrayContaining(['查看详情', '补充数据']));
+
+    const missingFactoryMetric = [...container.querySelectorAll('tr')].find((row) => row.textContent?.includes('单位增加值综合能耗'))!;
+    await click(missingFactoryMetric.querySelector('button')!);
+    expect(container.querySelector('[data-testid="location"]')?.textContent).toContain('/data-management/operations');
+    expect(decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '')).toContain('returnTo=/energy-analysis/intensity?objectType=factory');
+
+    await render('/energy-analysis/intensity');
+    await click(button('产品'));
+    await click(button('查看详情'));
+    let dialog = container.querySelector('[role="dialog"]')!;
+    expect(dialog.getAttribute('aria-label')).toBe('指标计算详情');
+    expect(dialog.textContent).toContain('修改能源数据');
+    expect(dialog.textContent).toContain('修改运营数据');
+    await click(button('取消', dialog));
+
+    await click(button('重点设备'));
+    await click(button('查看详情'));
+    dialog = container.querySelector('[role="dialog"]')!;
+    expect(dialog.getAttribute('aria-label')).toBe('设备指标详情');
+    expect(dialog.textContent).toContain('修改能源消耗数据');
+    expect(dialog.textContent).toContain('修改设备产出数据');
+    await click(button('关闭', dialog));
+
+    await click(button('展开'));
+    await click(button('补充数据'));
+    dialog = container.querySelector('[role="dialog"]')!;
+    expect(dialog.getAttribute('aria-label')).toBe('完善设备指标数据');
+    expect(dialog.textContent).toContain('补充能源消耗数据');
+    expect(dialog.textContent).toContain('补充设备产出数据');
+  });
+
+  it('calculates waste heat generator unit electricity consumption from conversion output records', () => {
     const row = buildDeviceIntensityRows(2026).find((item) => item.deviceName === '余热发电机组');
     expect(row).toMatchObject({
-      metricCode: 'waste-heat-power-efficiency',
-      metricName: '余热发电转换效率',
-      metricUnit: '%',
+      metricCode: 'device-output-energy',
+      metricName: '单位产出能耗',
+      metricUnit: 'kWh/kWh',
       resultStatus: '已计算',
+      formula: '设备耗电量 ÷ 发电量',
     });
-    expect(row?.value).toBeCloseTo(77.6, 1);
+    expect(row?.value).toBeCloseTo(0.0377, 3);
+
+    const pendingDevice = buildDeviceIntensityRows(2026).find((item) => item.deviceName === '1#数控加工中心');
+    expect(pendingDevice).toMatchObject({ metricName: '单位产出能耗', resultStatus: '待完善', resultReason: '缺少加工件产量' });
   });
 
   it('closes benchmark data through units, products, devices and shared energy records', async () => {
@@ -217,25 +313,30 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(container.textContent).toContain('实际值与目标值对标（单位产品综合能耗）');
     expect(container.textContent).not.toContain('差距分析');
     expect(container.querySelector('[aria-label="指标摘要"]')?.textContent).toContain('相对偏差');
-    expect(container.textContent).toContain('查看计算口径');
+    expect(container.textContent).not.toContain('查看计算口径');
     expect(container.querySelector('[aria-label="指标摘要"]')).not.toBeNull();
-    expect(container.querySelector('select[aria-label="时间粒度"]')?.textContent).toBe('月度季度年度');
+    expect(container.querySelector('select[aria-label="时间粒度"]')).toBeNull();
+    expect(container.querySelector('select[aria-label="对标对象"]')).toBeNull();
+    expect(container.querySelector('select[aria-label="指标"]')).toBeNull();
+    expect(container.querySelector('select[aria-label="趋势指标"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="月度对标摘要"]')).toBeNull();
     expect(container.querySelector('[aria-label="月度达标状态"]')).toBeNull();
+    expect(container.textContent).toContain('达标规则：能耗强度类指标实际值不高于目标值');
 
     await click(button('用能单元'));
     expect(container.textContent).toContain('生产车间A');
-    expect(container.textContent).toContain('当前指标按生产车间A中归属于生产车间A的综合能耗');
+    expect(container.querySelector('select[aria-label="指标分类"]')).not.toBeNull();
+    expect(container.querySelector('select[aria-label="一级用能单元"]')).not.toBeNull();
+    expect(container.textContent).toContain('配置目标');
     expect(container.textContent).not.toContain('记录ID');
 
     await click(button('产品'));
-    const productSelect = container.querySelector('select[aria-label="对标对象"]') as HTMLSelectElement;
+    const productSelect = container.querySelector('select[aria-label="趋势指标"]') as HTMLSelectElement;
     expect([...productSelect.options].map((option) => option.textContent)).toEqual([
-      '产品A｜可对标',
-      '产品B｜可对标',
-      '产品C｜待完善：未关联生产用能单元',
+      '产品A｜单位产品综合能耗',
+      '产品B｜单位产品综合能耗',
     ]);
-    await setSelect(productSelect, 'product-b');
+    await setSelect(productSelect, productSelect.options[1].value);
     expect(container.textContent).toContain('产品B');
     expect(container.textContent).toContain('实际值与目标值对标（单位产品综合能耗）');
     const productSummary = container.querySelector('[aria-label="指标摘要"]');
@@ -243,41 +344,43 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(productSummary?.textContent).toContain('目标值26.0kgce/t');
     expect(container.textContent).toContain('按能耗强度指标口径计算');
     expect(container.textContent).toContain('全部产品指标对标明细');
-    expect(container.textContent).toContain('待完善');
+    expect(container.textContent).not.toContain('待完善');
     expect(container.textContent).not.toContain('v11-er-');
     expect(container.textContent).not.toContain('v11-operation-');
 
-    await setSelect(productSelect, 'product-c');
-    expect(container.textContent).toContain('当前产品暂无法计算单位产品综合能耗');
-    expect(container.textContent).toContain('原因：未关联生产用能单元');
-
     await click(button('设备'));
-    const deviceSelect = container.querySelector('select[aria-label="对标对象"]') as HTMLSelectElement;
+    const deviceSelect = container.querySelector('select[aria-label="趋势指标"]') as HTMLSelectElement;
     expect([...deviceSelect.options].map((option) => option.textContent)).toEqual(expect.arrayContaining([
-      '1#数控加工中心｜待完善',
-      '连续式热处理炉｜待完善',
-      '1#螺杆空压机｜待完善：尚未录入设备级能源数据。',
+      '余热发电机组｜设备能源数据',
     ]));
+    expect([...deviceSelect.options].every((option) => !option.textContent?.includes('待完善'))).toBe(true);
+    expect(container.textContent).not.toContain('待完善设备');
     expect(container.textContent).toContain('实际值与目标值对标（电力消费量）');
     expect(container.textContent).toContain('当前指标读取1#数控加工中心独立设备能源记录');
     expect(container.textContent).toContain('未配置目标');
     expect(container.querySelector('[aria-label="指标趋势图"]')?.textContent).not.toContain('年度目标');
 
-    await click(button('指标目标配置'));
+    await click(button('配置目标'));
+    expect(container.textContent).not.toContain('评价方向');
+    expect(container.textContent).not.toContain('越低越好');
+    expect(container.textContent).not.toContain('越高越好');
     const deviceTarget = container.querySelector('input[aria-label="目标值"]') as HTMLInputElement;
+    expect(deviceTarget.value).toMatch(/^\d+\.\d{2}$/);
     await setInput(deviceTarget, '3300000');
     await click(button('保存配置'));
     expect(container.querySelector('[aria-label="指标摘要"]')?.textContent).toContain('目标值3,300,000kWh');
 
-    await setSelect(container.querySelector('select[aria-label="时间粒度"]')!, 'year');
-    expect(container.querySelector('[aria-label="指标趋势图"]')?.textContent).toContain('年度目标 3,300,000');
+    await click(button('调整目标'));
+    expect(container.querySelectorAll('[data-monthly-target]')).toHaveLength(12);
+    expect(container.textContent).toContain('按年度目标填充');
+    await click(button('按年度目标填充'));
+    await click(button('保存配置'));
+    expect(container.querySelector('[aria-label="月度达标状态"]')).not.toBeNull();
 
-    await setSelect(deviceSelect, 'v11-device-62');
-    expect(container.textContent).toContain('已维护重点设备，但尚未录入设备级能源数据');
-    expect(container.textContent).toContain('录入设备能源数据');
+    expect(container.querySelector('[aria-label="指标趋势图"]')).not.toBeNull();
 
     await click(button('全厂'));
-    await click(button('指标目标配置'));
+    await click(button('调整目标'));
     const target = container.querySelector('input[aria-label="目标值"]') as HTMLInputElement;
     await setInput(target, '0.330');
     await click(button('保存配置'));
@@ -291,7 +394,6 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(benchmark.rows.filter((row) => row.objectTypeKey !== 'enterprise').length).toBeGreaterThan(0);
     const pairs = [
       ['单位产品综合能耗', 'energy_per_product'],
-      ['单位增加值综合能耗', 'energy_per_added_value'],
     ] as const;
 
     pairs.forEach(([metricName, metricCode]) => {
@@ -305,6 +407,9 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
       expect([0, 12]).toContain(target?.trend.length);
       expect(target?.trend.every((value) => Number.isFinite(value))).toBe(true);
     });
+
+    const missing = intensity.metrics.find((metric) => metric.name === '单位增加值综合能耗');
+    expect(missing).toMatchObject({ value: null, issue: '缺少工业增加值', resultType: 'warn' });
   });
 
   it('uses the intensity selector as the shared source for product benchmark rows', () => {
@@ -370,6 +475,10 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(container.innerHTML).toContain('全厂一级能源分配视图');
     expect(container.textContent).not.toContain('重点用能单元 TOP5');
     expect(container.textContent).toContain('转换损失');
+    expect(container.textContent).toContain('能流口径说明');
+    expect(container.textContent).toContain('未分配能源');
+    expect(container.textContent).toContain('可供分配能源 − 一级分配 − 外部输出');
+    expect(container.textContent).toContain('由系统根据平衡关系计算');
     expect(container.textContent).not.toContain('加工工段');
 
     const productionNode = container.querySelector('g[data-key="distribution:eu-clinker-line-1"]')!;
@@ -395,6 +504,9 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     await click(button('流向明细'));
     expect(container.textContent).toContain('来源');
     expect(container.textContent).toContain('去向');
+    expect(container.textContent).toContain('输出流');
+    expect(container.textContent).toContain('未归属');
+    expect(container.querySelector('th')?.parentElement?.textContent).not.toContain('状态');
     expect(container.textContent).not.toContain('数据性质');
     expect(container.textContent).toContain('全部能流阶段');
     await click(button('查看追溯'));

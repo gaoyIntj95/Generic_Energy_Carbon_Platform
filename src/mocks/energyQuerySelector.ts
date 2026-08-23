@@ -6,11 +6,13 @@ import {
 } from './dataManagementV11Store';
 import { listEnergyUnits } from './energyUnitMockStore';
 import type { EnergyQueryDataset, EnergyQueryRow } from './energyAnalysisV4Mock';
+import { ENERGY_ANALYSIS_CURRENT_YEAR, ENERGY_ANALYSIS_REPORTED_MONTH, effectiveAnalysisMonth } from './energyAnalysisPeriod';
 
 const colors = ['#2878FF', '#14AA72', '#FF8A00', '#7657F6', '#8D98A8'];
 const ENERGY_CONSUMPTION_ROLE = listV11EnergyRecords()[0]?.energyRole;
-export const ENERGY_QUERY_CURRENT_YEAR = 2026;
-export const ENERGY_QUERY_REPORTED_MONTH = 6;
+const IOT_DAILY_ENERGY_TYPE_IDS = new Set(['v11-energy-electricity', 'v11-energy-natural-gas']);
+export const ENERGY_QUERY_CURRENT_YEAR = ENERGY_ANALYSIS_CURRENT_YEAR;
+export const ENERGY_QUERY_REPORTED_MONTH = ENERGY_ANALYSIS_REPORTED_MONTH;
 
 function standardCoalAmount(amount: number, energyTypeId: string) {
   const type = listV11EnergyTypes().find((item) => item.energyTypeId === energyTypeId);
@@ -26,9 +28,7 @@ function amountAt(record: ReturnType<typeof listV11EnergyRecords>[number], perio
 }
 
 function datasetForPeriod(year: number, period: 'month' | 'year', month: number, energyUnitId?: string) {
-  const effectiveMonth = period === 'year' && year === ENERGY_QUERY_CURRENT_YEAR
-    ? ENERGY_QUERY_REPORTED_MONTH
-    : month;
+  const effectiveMonth = period === 'year' ? effectiveAnalysisMonth(year, month) : month;
   const types = listV11EnergyTypes();
   const units = listEnergyUnits();
   const records = listV11EnergyRecords().filter((record) => (
@@ -65,7 +65,8 @@ function datasetForPeriod(year: number, period: 'month' | 'year', month: number,
       share: total ? item.standardCoal / total * 100 : 0,
       yearOnYear: 0,
       ...(period === 'month' ? { monthOnMonth: 0 } : {}),
-      dailyDataAvailable: false,
+      // 原煤、RDF、蒸汽仍只有月度台账；电力和天然气已接入 IoT 日度计量。
+      dailyDataAvailable: period === 'month' && IOT_DAILY_ENERGY_TYPE_IDS.has(energyTypeId),
       sourceDescription: `数据管理｜能源数据｜${item.unitName}｜${type.energyTypeName}｜${year}${period === 'month' ? `年${month}月` : year === ENERGY_QUERY_CURRENT_YEAR ? `年1—${effectiveMonth}月累计` : '年度'}`,
     };
   }).sort((a, b) => b.standardCoalAmount - a.standardCoalAmount);

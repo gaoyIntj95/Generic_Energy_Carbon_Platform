@@ -111,9 +111,9 @@ describe('energy unit centralized mock store', () => {
     expect(units.filter((unit) => unit.parentEnergyUnitId === 'eu-utilities')
       .map((unit) => unit.energyUnitName)).toEqual([
         '空压系统',
-        '能源回收系统',
+        '余热发电机组',
+        '余热回收利用系统',
         '锅炉系统',
-        '配电系统',
       ]);
   });
 

@@ -34,12 +34,12 @@ export type CarbonFactor = {
   approval?: string;
 };
 
-const fuelParameters = (kind: 'gas' | 'diesel'): CarbonFactorParameter[] => [
+const fuelParameters = (kind: 'gas' | 'diesel' | 'coal' | 'rdf'): CarbonFactorParameter[] => [
   {
     key: 'ncv',
     name: '低位发热量 NCV',
-    value: kind === 'gas' ? 0.038931 : 42.652,
-    display: kind === 'gas' ? '0.038931' : '42.652',
+    value: kind === 'gas' ? 0.038931 : kind === 'diesel' ? 42.652 : kind === 'coal' ? 20.908 : 18.5,
+    display: kind === 'gas' ? '0.038931' : kind === 'diesel' ? '42.652' : kind === 'coal' ? '20.908' : '18.500',
     unit: kind === 'gas' ? 'GJ/Nm³' : 'GJ/t',
     sourceType: '标准缺省值',
     source: '国家因子库第二版',
@@ -48,23 +48,23 @@ const fuelParameters = (kind: 'gas' | 'diesel'): CarbonFactorParameter[] => [
   {
     key: 'cc',
     name: '单位热值含碳量 CC',
-    value: kind === 'gas' ? 15.242055 : 20.480956,
-    display: kind === 'gas' ? '15.242055' : '20.480956',
+    value: kind === 'gas' ? 15.242055 : kind === 'diesel' ? 20.480956 : kind === 'coal' ? 33.17 : 27.8293,
+    display: kind === 'gas' ? '15.242055' : kind === 'diesel' ? '20.480956' : kind === 'coal' ? '33.170000' : '27.829300',
     unit: 'tC/TJ',
     sourceType: '标准缺省值',
     source: '国家因子库第二版',
     editable: true,
   },
-  { key: 'of', name: '碳氧化率 OF', value: 99, display: '99', unit: '%', sourceType: '标准缺省值', source: '通用工业核算方法', editable: true },
+  { key: 'of', name: '碳氧化率 OF', value: kind === 'coal' || kind === 'rdf' ? 98 : 99, display: kind === 'coal' || kind === 'rdf' ? '98' : '99', unit: '%', sourceType: '标准缺省值', source: '通用工业核算方法', editable: true },
   { key: 'mw', name: '分子量换算', value: 44 / 12, display: '44/12', unit: '—', sourceType: '方法学常数', source: '化学计量关系', editable: false },
 ];
 
 export const carbonFactorsV4: CarbonFactor[] = [
   {
-    factorId: 'pf-rdf', scope: 'enterprise', name: 'RDF企业示例排放因子', objectType: '综合排放因子', activity: '固定燃烧', gas: 'CO₂e',
+    factorId: 'pf-rdf', scope: 'enterprise', name: 'RDF固定燃烧参数组', objectType: '参数组/公式模板', activity: '固定燃烧', gas: 'CO₂e',
     value: '1.850', unit: 'tCO₂e/t', source: '企业示例参数（待研发接入参数库）', version: '2026年度', geo: '当前企业', industry: '通用工业企业',
     validity: '当前有效', raw: '1.850 tCO₂e/t', quality: '演示参数，正式使用前应由企业实测或适用标准替换', effective: '2026年度', reference: 'RDF燃料企业层级示例口径',
-    formula: '排放量 = RDF消耗量 × RDF排放因子', selectable: true, calculationType: 'direct', approval: '演示数据',
+    formula: '排放量 = 燃料消耗量 × NCV × CC ÷ 1000 × OF × 44/12', parameters: fuelParameters('rdf'), selectable: true, calculationType: 'fuelParameter', approval: '演示数据',
   },
   {
     factorId: 'pf-ng', scope: 'public', name: '天然气固定燃烧参数组', objectType: '参数组/公式模板', activity: '固定燃烧', gas: 'CO₂',
@@ -176,18 +176,16 @@ export const carbonFactorsV4: CarbonFactor[] = [
     reference: '区域电网排放因子', formula: '排放量 = 外购电量 × 电力排放因子', selectable: false, calculationType: 'direct',
   },
   {
-    factorId: 'pf-coal', scope: 'public', name: '原煤固定燃烧排放因子', objectType: '综合排放因子', activity: '固定燃烧', gas: 'CO₂',
+    factorId: 'pf-coal', scope: 'public', name: '原煤固定燃烧参数组', objectType: '参数组/公式模板', activity: '固定燃烧', gas: 'CO₂',
     value: '2.493', unit: 'tCO₂/t', source: '国家温室气体排放因子数据库', version: '当前任务适用版', geo: '全国', industry: '通用工业',
     validity: '当前有效', raw: '2.493 tCO₂/t', quality: '标准推荐值；按核算年度匹配', effective: '按核算年度匹配',
-    reference: '能源活动—化石燃料固定燃烧—原煤', formula: '排放量 = 原煤消费量 × 原煤排放因子', selectable: true, calculationType: 'direct',
+    reference: '能源活动—化石燃料固定燃烧—原煤', formula: '排放量 = 燃料消耗量 × NCV × CC ÷ 1000 × OF × 44/12', parameters: fuelParameters('coal'), selectable: true, calculationType: 'fuelParameter',
   },
 ];
 
 export const supportBasicV4 = [
-  { group: '核算主体与边界', item: '报告主体信息', activity: '主体名称及统一社会信用代码', origin: '组织档案快照', materials: 2, state: '已上传' as const },
-  { group: '核算主体与边界', item: '组织边界', activity: '企业法人边界及设施清单', origin: '核算任务·边界设置', materials: 3, state: '已上传' as const },
-  { group: '核算制度与方法', item: '核算方法说明', activity: 'GB/T 32150—2025、ISO 14064-1:2018', origin: '核算任务·方法设置', materials: 1, state: '已上传' as const },
-  { group: '质量保证', item: '数据管理制度', activity: '核算数据收集与复核制度', origin: '在线上传', materials: 0, state: '待补充' as const },
+  { group: '核算主体与边界', item: '核算主体与组织边界', activity: '主体身份、企业法人边界及设施清单', origin: '组织档案快照、核算任务·边界设置', materials: 5, state: '已上传' as const },
+  { group: '质量保证', item: '碳排放管理制度', activity: '核算数据收集与复核制度', origin: '在线上传', materials: 0, state: '待补充' as const },
 ];
 
 const customCarbonFactorsV4: CarbonFactor[] = [];

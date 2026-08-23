@@ -1,6 +1,6 @@
 .app {
   width: 100%;
-  min-width: 1440px;
+  min-width: 0;
   min-height: 100vh;
   background: var(--color-bg);
 }
@@ -17,7 +17,41 @@
   width: 100%;
   max-width: var(--content-max-width);
   margin: 0 auto;
-  padding: 16px var(--page-padding) 32px;
+  padding: 12px var(--page-padding) 32px;
+}
+
+.pageIntro {
+  position: relative;
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+  padding: 8px 4px 8px 17px;
+  overflow: hidden;
+  background: linear-gradient(90deg, rgb(232 247 241 / 72%), rgb(255 255 255 / 18%) 64%);
+  border-bottom: 1px solid #d6e9e1;
+}
+
+.pageIntro::before {
+  position: absolute;
+  top: 13px;
+  bottom: 13px;
+  left: 0;
+  width: 3px;
+  background: var(--color-brand);
+  border-radius: 3px;
+  content: '';
+}
+
+.pageIntro > header {
+  flex: 1 1 auto;
+}
+
+.pathSeparator {
+  flex: 0 0 auto;
+  color: #91b7a8;
+  font-size: 14px;
 }
 
 .pageSurface {

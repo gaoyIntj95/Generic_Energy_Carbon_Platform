@@ -1,15 +1,18 @@
 import {
   listV11ConversionOutputs,
+  listV11ExternalSupplyRecords,
   listV11EnergyRecords,
   listV11EnergyTypes,
   v11EnergyRecordAnnualAmount,
   v11RecordScopeType,
   type V11ConversionOutput,
+  type V11ExternalSupplyRecord,
   type V11EnergyRecord,
   type V11EnergyType,
 } from './dataManagementV11Store';
 import { listEnergyUnits } from './energyUnitMockStore';
 import type { EnergyUnit } from '../types/energyUnit';
+import { effectiveAnalysisMonth, isYearToDateAnalysis } from './energyAnalysisPeriod';
 
 export type FlowViewLevel = 'level1' | 'level2';
 export type FlowPeriod = { year: number; grain: 'month' | 'year'; month: number };
@@ -60,6 +63,8 @@ export interface FlowLevelOneBalanceRow {
   distributionStandardAmount: number;
   externalOutputAmount: number;
   externalOutputStandardAmount: number;
+  confirmedConversionLossAmount: number;
+  confirmedConversionLossStandardAmount: number;
   unallocatedAmount: number;
   unallocatedStandardAmount: number;
   overAllocatedAmount: number;
@@ -153,6 +158,7 @@ export interface FlowAnalysisDataset {
   internalAvailableStandardCoalAmount: number;
   utilizationStandardCoalAmount: number;
   differenceStandardCoalAmount: number;
+  confirmedConversionLossStandardCoalAmount: number;
   conversionLossStandardCoalAmount: number;
   conversionDifferenceStandardCoalAmount: number;
   externalStandardCoalAmount: number;
@@ -188,21 +194,17 @@ export function summarizeFlowBalance(
   scope = 'enterprise',
 ): EnergyBalanceSummary {
   if (scope === 'enterprise') {
-    const recovered = sum(levelOneDataset.levelOneBalanceRows.map(
-      (row) => row.internalRecoveryStandardAmount,
-    ));
-    // Optimization uses the same internal-balance boundary shown in the
-    // overview: level-one distribution, not the enterprise-boundary input.
-    const input = levelOneDataset.utilizationStandardCoalAmount;
-    const difference = input
-      - levelTwoDataset.utilizationStandardCoalAmount
-      - recovered
-      - levelOneDataset.externalStandardCoalAmount;
+    // Phase one diagnoses the management balance that is already closed by the
+    // level-one flow view. Level-two utilization is an optional decomposition
+    // and must not turn undisaggregated level-one energy into a false loss.
+    const distributed = levelOneDataset.utilizationStandardCoalAmount;
+    const external = levelOneDataset.externalStandardCoalAmount;
+    const difference = levelOneDataset.differenceStandardCoalAmount;
     return {
-      inputStandardCoalAmount: input,
-      effectiveUseStandardCoalAmount: levelTwoDataset.utilizationStandardCoalAmount,
-      recoveredStandardCoalAmount: recovered,
-      externalOutputStandardCoalAmount: levelOneDataset.externalStandardCoalAmount,
+      inputStandardCoalAmount: distributed + external + difference,
+      effectiveUseStandardCoalAmount: distributed,
+      recoveredStandardCoalAmount: 0,
+      externalOutputStandardCoalAmount: external,
       differenceStandardCoalAmount: difference,
     };
   }
@@ -210,18 +212,17 @@ export function summarizeFlowBalance(
   const rows = levelTwoDataset.levelTwoBalanceRows.filter(
     (row) => row.level1EnergyUnitId === scope,
   );
-  const input = sum(rows.map((row) => row.distributionStandardAmount));
-  const effectiveUse = sum(rows.map((row) => row.utilizationStandardAmount));
+  const distributed = sum(rows.map((row) => row.distributionStandardAmount));
   const unitName = rows[0]?.level1EnergyUnitName;
   const external = sum(levelOneDataset.detailRows
     .filter((row) => row.stage === '外部输出' && row.level1EnergyUnitName === unitName)
     .map((row) => row.standardCoalAmount));
   return {
-    inputStandardCoalAmount: input,
-    effectiveUseStandardCoalAmount: effectiveUse,
+    inputStandardCoalAmount: distributed + external,
+    effectiveUseStandardCoalAmount: distributed,
     recoveredStandardCoalAmount: 0,
     externalOutputStandardCoalAmount: external,
-    differenceStandardCoalAmount: input - effectiveUse - external,
+    differenceStandardCoalAmount: 0,
   };
 }
 
@@ -235,6 +236,7 @@ type ConversionAmount = {
   output: Amount;
   internal: Amount;
   external: Amount;
+  confirmedLoss: Amount;
   lossStandard: number;
 };
 
@@ -257,13 +259,18 @@ function directSecondLevelUnit(energyUnitId: string | null, units: EnergyUnit[])
 }
 
 function recordPhysicalAmount(record: V11EnergyRecord, period: FlowPeriod) {
-  if (period.grain === 'year') return v11EnergyRecordAnnualAmount(record);
+  if (period.grain === 'year') {
+    const monthCount = effectiveAnalysisMonth(period.year, 12);
+    return monthCount < 12
+      ? record.monthlyAmounts.slice(0, monthCount).reduce((sum, value) => sum + value, 0)
+      : v11EnergyRecordAnnualAmount(record);
+  }
   if (record.entryMode === 'annual') return 0;
   return record.monthlyAmounts[period.month - 1] ?? 0;
 }
 
 function hasPeriodData(record: V11EnergyRecord, period: FlowPeriod) {
-  if (period.grain === 'year') return v11EnergyRecordAnnualAmount(record) > 0;
+  if (period.grain === 'year') return recordPhysicalAmount(record, period) > 0;
   const monthIndex = period.month - 1;
   return record.monthlyReportedMonths?.[monthIndex]
     ?? (record.monthlyAmounts[monthIndex] ?? 0) > 0;
@@ -298,11 +305,17 @@ function conversionAmount(
   records: V11EnergyRecord[],
   types: V11EnergyType[],
   period: FlowPeriod,
+  externalSupplies: V11ExternalSupplyRecord[],
 ): ConversionAmount {
   const scale = conversionScale(conversion, records, period);
   const monthIndex = period.month - 1;
   const periodValue = (annualValue: number | undefined, monthlyValues?: number[]) => {
-    if (period.grain === 'year') return annualValue ?? 0;
+    if (period.grain === 'year') {
+      const monthCount = effectiveAnalysisMonth(period.year, 12);
+      return monthCount < 12
+        ? monthlyValues?.slice(0, monthCount).reduce((sum, value) => sum + value, 0) ?? 0
+        : annualValue ?? 0;
+    }
     return monthlyValues?.[monthIndex] ?? (annualValue ?? 0) * scale;
   };
   const linkedInput = records.find((record) => record.energyRecordId === conversion.inputEnergyRecordId);
@@ -320,7 +333,12 @@ function conversionAmount(
     ?? periodValue(conversion.recoveryAmount ?? conversion.inputAmount, conversion.monthlyInputAmounts);
   const outputPhysical = periodValue(conversion.outputAmount, conversion.monthlyOutputAmounts);
   const internalPhysical = periodValue(conversion.internalAmount, conversion.monthlyInternalAmounts);
-  const externalPhysical = periodValue(conversion.externalAmount, conversion.monthlyExternalAmounts);
+  const externalPhysical = externalSupplies
+    .filter((item) => item.conversionOutputId === conversion.conversionOutputId)
+    .reduce((total, item) => {
+      if (period.grain !== 'year') return total + (item.monthlyAmounts?.[monthIndex] ?? 0);
+      return total + externalSupplyAmount(item, period);
+    }, 0);
   const input = {
     physical: inputPhysical,
     standard: linkedAmount?.standard ?? standardAmount(inputPhysical, inputType),
@@ -331,6 +349,7 @@ function conversionAmount(
     standard: standardAmount(outputPhysical, outputType),
     unit: conversion.outputUnit ?? outputType?.measurementUnit ?? '',
   };
+  const confirmedLossPhysical = periodValue(conversion.lossAmount, conversion.monthlyLossAmounts);
   return {
     conversion,
     inputType,
@@ -347,8 +366,21 @@ function conversionAmount(
       standard: standardAmount(externalPhysical, outputType),
       unit: output.unit,
     },
+    confirmedLoss: {
+      physical: confirmedLossPhysical,
+      standard: standardAmount(confirmedLossPhysical, outputType),
+      unit: output.unit,
+    },
     lossStandard: Math.max(input.standard - output.standard, 0),
   };
+}
+
+function externalSupplyAmount(item: V11ExternalSupplyRecord, period: FlowPeriod) {
+  if (period.grain !== 'year') return item.monthlyAmounts?.[period.month - 1] ?? 0;
+  const monthCount = effectiveAnalysisMonth(period.year, 12);
+  return monthCount < 12
+    ? item.monthlyAmounts?.slice(0, monthCount).reduce((sum, value) => sum + value, 0) ?? 0
+    : item.amount;
 }
 
 function conversionDataQualityIssues(
@@ -356,6 +388,7 @@ function conversionDataQualityIssues(
   records: V11EnergyRecord[],
   types: V11EnergyType[],
   period: FlowPeriod,
+  externalSupplies: V11ExternalSupplyRecord[],
 ) {
   const issues: string[] = [];
   conversions.forEach((conversion) => {
@@ -381,8 +414,21 @@ function conversionDataQualityIssues(
     if (inputType && outputType && inputType.energyTypeId === outputType.energyTypeId && conversion.recordType === '其他转换') {
       issues.push(`${conversion.recordType}存在“${inputType.energyTypeName}→${outputType.energyTypeName}”同品种转换，请确认是否应改为能源分配或自产能源`);
     }
-    const assigned = (conversion.internalAmount ?? 0) + conversion.externalAmount + (conversion.lossAmount ?? 0);
-    if (Math.abs((conversion.outputAmount ?? 0) - assigned) > 1e-8) {
+    const externalAmount = externalSupplies
+      .filter((item) => item.conversionOutputId === conversion.conversionOutputId)
+      .reduce((total, item) => total + (period.grain === 'month' ? externalSupplyAmount(item, period) : item.amount), 0);
+    const monthIndex = period.month - 1;
+    const outputAmount = period.grain === 'month'
+      ? conversion.monthlyOutputAmounts?.[monthIndex] ?? 0
+      : conversion.outputAmount ?? 0;
+    const internalAmount = period.grain === 'month'
+      ? conversion.monthlyInternalAmounts?.[monthIndex] ?? 0
+      : conversion.internalAmount ?? 0;
+    const lossAmount = period.grain === 'month'
+      ? conversion.monthlyLossAmounts?.[monthIndex] ?? 0
+      : conversion.lossAmount ?? 0;
+    const assigned = internalAmount + externalAmount + lossAmount;
+    if (Math.abs(outputAmount - assigned) > 1e-8) {
       issues.push(`${conversion.recordType}产出总量与内部去向、外部输出及损失不一致`);
     }
     if (period.grain === 'month'
@@ -427,6 +473,9 @@ function addRecordBucket(
 }
 
 function periodLabel(period: FlowPeriod) {
+  if (period.grain === 'year' && isYearToDateAnalysis(period.year)) {
+    return `${period.year}年度（截至${effectiveAnalysisMonth(period.year, 12)}月）`;
+  }
   return period.grain === 'year' ? `${period.year}年度` : `${period.year}年${period.month}月`;
 }
 
@@ -489,15 +538,18 @@ export function buildFlowAnalysisDataset(
     record.year === period.year
     && v11RecordScopeType(record) !== 'device');
   const records = sourceRecords.filter((record) => record.energyRole === '能源消费');
+  const externalSupplies = listV11ExternalSupplyRecords().filter((item) => item.year === period.year);
   const periodRecords = records.filter((record) => hasPeriodData(record, period));
   const conversionAmounts = listV11ConversionOutputs()
     .filter((conversion) => conversion.year === period.year)
-    .map((conversion) => conversionAmount(conversion, sourceRecords, types, period));
+    .filter((conversion) => conversion.recordType !== '直接外供')
+    .map((conversion) => conversionAmount(conversion, sourceRecords, types, period, externalSupplies));
   const conversionIssues = conversionDataQualityIssues(
-    listV11ConversionOutputs().filter((conversion) => conversion.year === period.year),
+    listV11ConversionOutputs().filter((conversion) => conversion.year === period.year && conversion.recordType !== '直接外供'),
     sourceRecords,
     types,
     period,
+    externalSupplies,
   );
   const linkedInputIds = new Set(conversionAmounts.flatMap((item) =>
     item.conversion.inputEnergyRecordId ? [item.conversion.inputEnergyRecordId] : []));
@@ -540,6 +592,26 @@ export function buildFlowAnalysisDataset(
       (distributionByUnit.get(record.energyUnitId) ?? 0) + amount.standard,
     );
   });
+  // 转换产出的内部使用量按录入的目标单元归入一级分配；二级目标向上归并到其一级父单元。
+  conversionAmounts.forEach((item) => {
+    if (!item.conversion.outputTargetEnergyUnitId || item.internal.standard <= 0 || !item.outputType) return;
+    const target = unitById.get(item.conversion.outputTargetEnergyUnitId);
+    if (!target) return;
+    const levelOneTargetId = target.unitLevel === 'level1' ? target.energyUnitId : target.parentEnergyUnitId;
+    if (!levelOneTargetId) return;
+    // If the target level already has a same-type distribution ledger, that ledger
+    // is the downstream allocation of this conversion output. Do not add the
+    // conversion internal amount a second time.
+    const hasDownstreamDistribution = levelOneRecords.some((record) =>
+      record.energyUnitId === levelOneTargetId && record.energyTypeId === item.outputType!.energyTypeId,
+    );
+    if (hasDownstreamDistribution) return;
+    addAmount(distributionByType, item.outputType, item.internal);
+    distributionByUnit.set(
+      levelOneTargetId,
+      (distributionByUnit.get(levelOneTargetId) ?? 0) + item.internal.standard,
+    );
+  });
 
   const allTypeIds = new Set([
     ...inputByType.keys(),
@@ -560,9 +632,27 @@ export function buildFlowAnalysisDataset(
       physical: sum(conversionAmounts.filter((item) => item.outputType?.energyTypeId === energyTypeId).map((item) => item.output.physical)),
       standard: sum(conversionAmounts.filter((item) => item.outputType?.energyTypeId === energyTypeId).map((item) => item.output.standard)),
     };
-    const external = {
+    // 转换产出中的直接外供从转换节点流向企业外部，并不进入“厂内可供分配”节点；
+    // 直接外供则从厂内能源池流出，需在计算该节点的未分配差额时扣除。
+    const conversionInternalOutput = {
+      physical: sum(conversionAmounts.filter((item) => item.outputType?.energyTypeId === energyTypeId).map((item) => item.internal.physical)),
+      standard: sum(conversionAmounts.filter((item) => item.outputType?.energyTypeId === energyTypeId).map((item) => item.internal.standard)),
+    };
+    const conversionExternal = {
       physical: sum(conversionAmounts.filter((item) => item.outputType?.energyTypeId === energyTypeId).map((item) => item.external.physical)),
       standard: sum(conversionAmounts.filter((item) => item.outputType?.energyTypeId === energyTypeId).map((item) => item.external.standard)),
+    };
+    const directExternal = {
+      physical: sum(externalSupplies.filter((item) => !item.conversionOutputId && (item.energyTypeId ?? '') === energyTypeId).map((item) => externalSupplyAmount(item, period))),
+      standard: sum(externalSupplies.filter((item) => !item.conversionOutputId && (item.energyTypeId ?? '') === energyTypeId).map((item) => standardAmount(externalSupplyAmount(item, period), type))),
+    };
+    const external = {
+      physical: conversionExternal.physical + directExternal.physical,
+      standard: conversionExternal.standard + directExternal.standard,
+    };
+    const confirmedLoss = {
+      physical: sum(conversionAmounts.filter((item) => item.outputType?.energyTypeId === energyTypeId).map((item) => item.confirmedLoss.physical)),
+      standard: sum(conversionAmounts.filter((item) => item.outputType?.energyTypeId === energyTypeId).map((item) => item.confirmedLoss.standard)),
     };
     const distribution = distributionByType.get(energyTypeId) ?? {
       physical: 0,
@@ -571,10 +661,10 @@ export function buildFlowAnalysisDataset(
     };
     const externalInput = externalInputByType.get(energyTypeId)?.standard ?? 0;
     const internalRecovery = internalRecoveryByType.get(energyTypeId)?.standard ?? 0;
-    const availableAmount = input.physical + conversionOutput.physical - conversionInput.physical;
-    const availableStandardAmount = input.standard + conversionOutput.standard - conversionInput.standard;
-    const difference = availableAmount - distribution.physical - external.physical;
-    const standardDifference = availableStandardAmount - distribution.standard - external.standard;
+    const availableAmount = input.physical + conversionInternalOutput.physical - conversionInput.physical;
+    const availableStandardAmount = input.standard + conversionInternalOutput.standard - conversionInput.standard;
+    const difference = availableAmount - distribution.physical - directExternal.physical;
+    const standardDifference = availableStandardAmount - distribution.standard - directExternal.standard;
     return {
       energyTypeId,
       energyTypeName: type.energyTypeName,
@@ -589,6 +679,8 @@ export function buildFlowAnalysisDataset(
       distributionStandardAmount: distribution.standard,
       externalOutputAmount: external.physical,
       externalOutputStandardAmount: external.standard,
+      confirmedConversionLossAmount: confirmedLoss.physical,
+      confirmedConversionLossStandardAmount: confirmedLoss.standard,
       unallocatedAmount: Math.max(difference, 0),
       unallocatedStandardAmount: Math.max(standardDifference, 0),
       overAllocatedAmount: Math.max(-difference, 0),
@@ -669,14 +761,29 @@ export function buildFlowAnalysisDataset(
   const inputStandard = sum([...inputByType.values()].map((amount) => amount.standard));
   const distributionStandard = sum([...distributionByType.values()].map((amount) => amount.standard));
   const utilizationStandard = sum([...levelTwoBuckets.values()].map((amount) => amount.standard));
-  const externalStandard = sum(conversionAmounts.map((item) => item.external.standard));
+  // 外供既可能挂在转换产出上，也可能直接挂在企业级能源输入上。
+  // 两类记录都必须进入同一个外部输出口径，否则能流图/平衡表有数据，KPI
+  // 的外部输出量却会漏算直接外供。
+  const directExternalStandard = externalSupplies
+    .filter((item) => !item.conversionOutputId)
+    .reduce((total, item) => {
+      const source = item.inputEnergyRecordId
+        ? sourceRecords.find((record) => record.energyRecordId === item.inputEnergyRecordId)
+        : null;
+      const type = typeById.get(item.energyTypeId ?? source?.energyTypeId ?? '');
+      return total + (type ? standardAmount(externalSupplyAmount(item, period), type) : 0);
+    }, 0);
+  const externalStandard = sum(conversionAmounts.map((item) => item.external.standard))
+    + directExternalStandard;
+  const confirmedConversionLossStandard = sum(conversionAmounts.map((item) => item.confirmedLoss.standard));
   const conversionLossStandard = sum(conversionAmounts.map((item) => item.lossStandard));
   const unallocatedStandard = sum(levelOneBalanceRows.map((row) => row.unallocatedStandardAmount));
   const pendingStandard = sum(levelTwoBalanceRows.map((row) => row.pendingStandardAmount));
   const overAllocatedStandard = sum(levelTwoBalanceRows.map((row) => row.overAllocatedStandardAmount));
   const conversionOutputStandard = sum(conversionAmounts.map((item) => item.output.standard));
+  const conversionInternalOutputStandard = sum(conversionAmounts.map((item) => item.internal.standard));
   const availableForInternal = Math.max(
-    inputStandard - sum(conversionAmounts.map((item) => item.input.standard)) + conversionOutputStandard,
+    inputStandard - sum(conversionAmounts.map((item) => item.input.standard)) + conversionInternalOutputStandard,
     0,
   );
   const conversionDifferenceRows: FlowConversionDifferenceRow[] = conversionAmounts.map((item) => {
@@ -713,13 +820,15 @@ export function buildFlowAnalysisDataset(
   const nodeShare = (amount: number) => terminalTotal > 0 ? amount / terminalTotal * 100 : 0;
   inputByType.forEach((amount, energyTypeId) => {
     if (amount.standard <= 0) return;
+    const recoveryOnly = (internalRecoveryByType.get(energyTypeId)?.standard ?? 0) > 0
+      && (externalInputByType.get(energyTypeId)?.standard ?? 0) <= 0;
     nodes.push({
       nodeId: `input:${energyTypeId}`,
       stage: 'input',
-      name: `企业输入·${typeById.get(energyTypeId)?.energyTypeName ?? energyTypeId}`,
+      name: `${recoveryOnly ? '内部回收' : '企业输入'}·${typeById.get(energyTypeId)?.energyTypeName ?? energyTypeId}`,
       valueLabel: amountLabel(amount.standard),
       standardCoalAmount: amount.standard,
-      nodeType: '企业边界输入',
+      nodeType: recoveryOnly ? '内部回收能源' : '企业边界输入',
       share: inputStandard > 0 ? amount.standard / inputStandard * 100 : 0,
     });
   });
@@ -817,6 +926,26 @@ export function buildFlowAnalysisDataset(
       });
     }
   });
+  conversionAmounts.forEach((item) => {
+    if (!item.conversion.outputTargetEnergyUnitId || item.internal.standard <= 0 || !item.outputType) return;
+    const target = unitById.get(item.conversion.outputTargetEnergyUnitId);
+    const levelOneTargetId = target?.unitLevel === 'level1' ? target.energyUnitId : target?.parentEnergyUnitId;
+    if (!levelOneTargetId) return;
+    const hasDownstreamDistribution = levelOneRecords.some((record) =>
+      record.energyUnitId === levelOneTargetId && record.energyTypeId === item.outputType!.energyTypeId,
+    );
+    if (hasDownstreamDistribution) return;
+    const sourceNodeId = `medium:${item.outputType.energyTypeId}`;
+    const targetNodeId = `distribution:${levelOneTargetId}`;
+    if (nodes.some((node) => node.nodeId === sourceNodeId) && nodes.some((node) => node.nodeId === targetNodeId)) {
+      links.push({
+        linkId: `conversion-distribution:${item.conversion.conversionOutputId}`,
+        sourceNodeId,
+        targetNodeId,
+        standardCoalAmount: item.internal.standard,
+      });
+    }
+  });
   conversionAmounts.filter((item) => item.external.standard > 0 && item.outputType).forEach((item) => {
     const nodeId = `external:${item.outputType!.energyTypeId}`;
     if (!nodes.some((node) => node.nodeId === nodeId)) {
@@ -838,6 +967,37 @@ export function buildFlowAnalysisDataset(
       sourceNodeId: `conversion:${item.conversion.conversionOutputId}`,
       targetNodeId: nodeId,
       standardCoalAmount: item.external.standard,
+    });
+  });
+  externalSupplies.filter((item) => item.inputEnergyRecordId).forEach((item) => {
+    const source = sourceRecords.find((record) => record.energyRecordId === item.inputEnergyRecordId);
+    const type = typeById.get(item.energyTypeId ?? source?.energyTypeId ?? '');
+    if (!source || !type) return;
+    const amount = externalSupplyAmount(item, period);
+    const standard = standardAmount(amount, type);
+    if (standard <= 0) return;
+    const nodeId = `external:${type.energyTypeId}`;
+    const existing = nodes.find((node) => node.nodeId === nodeId);
+    if (existing) {
+      existing.standardCoalAmount += standard;
+      existing.valueLabel = amountLabel(existing.standardCoalAmount);
+      existing.share = nodeShare(existing.standardCoalAmount);
+    } else {
+      nodes.push({
+        nodeId,
+        stage: 'external',
+        name: `外部输出·${type.energyTypeName}`,
+        valueLabel: amountLabel(standard),
+        standardCoalAmount: standard,
+        nodeType: '外部输出',
+        share: nodeShare(standard),
+      });
+    }
+    links.push({
+      linkId: `external:direct:${item.externalSupplyId}`,
+      sourceNodeId: `medium:${type.energyTypeId}`,
+      targetNodeId: nodeId,
+      standardCoalAmount: standard,
     });
   });
 
@@ -999,10 +1159,91 @@ export function buildFlowAnalysisDataset(
       relatedNodeIds: [`medium:${type.energyTypeId}`, `distribution:${unit.energyUnitId}`],
     });
   });
+  // 当转换产出没有对应的一级分配台账时，图和余额会自动将其内部使用量归入目标一级单元；
+  // 流向明细也必须生成同一条分配记录，才能完成图、表、明细的可追溯核对。
+  conversionAmounts.forEach((item) => {
+    if (!item.conversion.outputTargetEnergyUnitId || item.internal.standard <= 0 || !item.outputType) return;
+    const target = unitById.get(item.conversion.outputTargetEnergyUnitId);
+    const levelOneTargetId = target?.unitLevel === 'level1' ? target.energyUnitId : target?.parentEnergyUnitId;
+    const levelOneTarget = levelOneTargetId ? unitById.get(levelOneTargetId) : null;
+    if (!levelOneTarget) return;
+    const hasDownstreamDistribution = levelOneRecords.some((record) =>
+      record.energyUnitId === levelOneTargetId && record.energyTypeId === item.outputType!.energyTypeId,
+    );
+    if (hasDownstreamDistribution) return;
+    levelOneDetails.push({
+      flowDetailId: `distribution:conversion:${item.conversion.conversionOutputId}`,
+      stage: '能源分配',
+      source: `厂内${item.outputType.energyTypeName}`,
+      target: levelOneTarget.energyUnitName,
+      energyTypeName: item.outputType.energyTypeName,
+      amount: item.internal.standard,
+      amountUnit: 'tce',
+      standardCoalAmount: item.internal.standard,
+      energyUnitName: levelOneTarget.energyUnitName,
+      sourceRecordIds: [item.conversion.conversionOutputId],
+      traceDescription: '根据转换记录的内部使用量自动生成的一级分配记录',
+      traceRecords: [{
+        recordId: item.conversion.conversionOutputId,
+        recordType: '能源转换与输出',
+        originalAmount: item.internal.physical,
+        originalUnit: item.internal.unit,
+        standardCoalAmount: item.internal.standard,
+        factorDescription: factorDescription(item.outputType),
+        periodLabel: periodLabel(period),
+        sourceType: '转换产出内部使用',
+        relatedRecordId: item.conversion.inputEnergyRecordId ?? '无投入自产/回收能源',
+        updatedAt: '上游记录未提供修改时间',
+      }],
+      abnormal: false,
+      relatedNodeIds: [
+        `conversion:${item.conversion.conversionOutputId}`,
+        `medium:${item.outputType.energyTypeId}`,
+        `distribution:${levelOneTargetId}`,
+      ],
+    });
+  });
+  externalSupplies
+    .filter((item) => item.inputEnergyRecordId)
+    .forEach((item) => {
+      const source = sourceRecords.find((record) => record.energyRecordId === item.inputEnergyRecordId);
+      const type = typeById.get(item.energyTypeId ?? source?.energyTypeId ?? '');
+      if (!source || !type) return;
+      const amount = externalSupplyAmount(item, period);
+      const output = { physical: amount, standard: standardAmount(amount, type), unit: item.unit ?? type.measurementUnit };
+      if (output.standard <= 0) return;
+      levelOneDetails.push({
+        flowDetailId: `external:${item.externalSupplyId}`,
+        stage: '外部输出',
+        source: `厂内${type.energyTypeName}`,
+        target: item.receiver || '企业外部',
+        energyTypeName: type.energyTypeName,
+        amount: output.standard,
+        amountUnit: 'tce',
+        standardCoalAmount: output.standard,
+        energyUnitName: '全厂',
+        sourceRecordIds: [item.externalSupplyId, item.inputEnergyRecordId!],
+        traceDescription: '能源外供台账',
+        traceRecords: [{
+          recordId: item.externalSupplyId,
+          recordType: '能源外供',
+          originalAmount: output.physical,
+          originalUnit: output.unit,
+          standardCoalAmount: output.standard,
+          factorDescription: factorDescription(type),
+          periodLabel: periodLabel(period),
+          sourceType: '直接外供',
+          relatedRecordId: item.inputEnergyRecordId!,
+          updatedAt: '上游记录未提供修改时间',
+        }],
+        abnormal: false,
+        relatedNodeIds: [`medium:${type.energyTypeId}`, `external:${type.energyTypeId}`],
+      });
+    });
   conversionAmounts.filter((item) => item.external.standard > 0).forEach((item) => {
     const outputName = item.outputType?.energyTypeName ?? item.conversion.outputEnergyName ?? '能源产出';
     levelOneDetails.push({
-      flowDetailId: `external:${item.conversion.conversionOutputId}`,
+      flowDetailId: `external:conversion:${item.conversion.conversionOutputId}`,
       stage: '外部输出',
       source: outputName,
       target: item.conversion.receiver || '企业外部',
@@ -1011,7 +1252,7 @@ export function buildFlowAnalysisDataset(
       amountUnit: 'tce',
       standardCoalAmount: item.external.standard,
       energyUnitName: firstLevelUnit(item.conversion.conversionEnergyUnitId, units)?.energyUnitName ?? '全厂',
-      sourceRecordIds: [item.conversion.conversionOutputId],
+      sourceRecordIds: externalSupplies.filter((supply) => supply.conversionOutputId === item.conversion.conversionOutputId).map((supply) => supply.externalSupplyId),
       traceDescription: '能源转换与输出记录（外部输出）',
       traceRecords: [conversionTrace(item, period, true)],
       abnormal: false,
@@ -1157,9 +1398,20 @@ export function buildFlowAnalysisDataset(
   const overAllocatedObjectCount = new Set(levelTwoBalanceRows
     .filter((row) => row.status === '层级异常')
     .map((row) => row.level1EnergyUnitId)).size;
+  const levelOneOverAllocatedStandard = sum(levelOneBalanceRows.map((row) => row.overAllocatedStandardAmount));
+  const levelOneOverAllocatedTypes = levelOneBalanceRows
+    .filter((row) => row.overAllocatedStandardAmount > 0.01)
+    .map((row) => row.energyTypeName);
   const missingPeriodRecordCount = records.filter((record) => !hasPeriodData(record, period)).length;
   const periodDataNotice = period.grain === 'month' && missingPeriodRecordCount > 0
     ? `\u5f53\u524d\u6708\u4efd\u6709 ${missingPeriodRecordCount} \u6761\u80fd\u6e90\u6570\u636e\u4ec5\u7ef4\u62a4\u5e74\u5ea6\u503c\u6216\u5c1a\u672a\u586b\u62a5\u6708\u5ea6\u503c\uff0c\u672c\u6b21\u5206\u6790\u4e0d\u6309\u5e74\u5ea6\u503c\u5206\u644a\u5230\u6708\u5ea6\u3002`
+    : '';
+  const externalSupplyDataNotice = period.grain === 'month'
+    && externalSupplies.some((item) => item.amount > 0 && !item.monthlyAmounts)
+    ? '\u5f53\u524d\u6708\u4efd\u5b58\u5728\u4ec5\u7ef4\u62a4\u5e74\u5ea6\u503c\u7684\u5916\u4f9b\u53f0\u8d26\uff0c\u672c\u6b21\u5206\u6790\u4e0d\u5c06\u5e74\u5ea6\u5916\u4f9b\u91cf\u5206\u644a\u5230\u6708\u5ea6\u3002'
+    : '';
+  const levelOneBalanceNotice = levelOneOverAllocatedStandard > 0.01
+    ? `\u4e00\u7ea7\u5206\u914d\u8d85\u51fa\u53ef\u4f9b\u80fd\u6e90 ${levelOneOverAllocatedStandard.toLocaleString('zh-CN', { maximumFractionDigits: 1 })} tce\uff08${[...new Set(levelOneOverAllocatedTypes)].join('\u3001')}\uff09\uff0c\u8bf7\u8865\u5145\u5bf9\u5e94\u7684\u8f6c\u6362\u4ea7出\u6216\u6838\u67e5\u5206\u914d\u53f0\u8d26\u662f\u5426\u91cd\u590d\u8ba1\u5165\u3002`
     : '';
   const baseDataNotice = levelOneRecords.length === 0
     ? '当前期间尚未维护一级用能单元能源分配数据，暂无法生成能流分析。'
@@ -1177,6 +1429,8 @@ export function buildFlowAnalysisDataset(
   const dataNotice = [
     conversionIssues.length ? `能源转换源头校验：${conversionIssues.join('；')}` : '',
     periodDataNotice,
+    externalSupplyDataNotice,
+    levelOneBalanceNotice,
     baseDataNotice,
   ].filter(Boolean).join(' ');
 
@@ -1189,6 +1443,7 @@ export function buildFlowAnalysisDataset(
     internalAvailableStandardCoalAmount: availableForInternal,
     utilizationStandardCoalAmount: viewLevel === 'level1' ? distributionStandard : utilizationStandard,
     differenceStandardCoalAmount: viewLevel === 'level1' ? unallocatedStandard : pendingStandard,
+    confirmedConversionLossStandardCoalAmount: confirmedConversionLossStandard,
     conversionLossStandardCoalAmount: conversionLossStandard,
     conversionDifferenceStandardCoalAmount: conversionDifferenceStandard,
     externalStandardCoalAmount: externalStandard,

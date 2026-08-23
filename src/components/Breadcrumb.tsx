@@ -1,5 +1,14 @@
 import styles from './Breadcrumb.module.css';
 
-export function Breadcrumb({ group, page }: { group: string; page: string }) {
-  return <div className={styles.breadcrumb} aria-label="面包屑"><span>工业企业能碳管理平台</span><span className={styles.separator}>/</span><span>{group}</span><span className={styles.separator}>/</span><strong>{page}</strong></div>;
+export function Breadcrumb({ items }: { items: string[] }) {
+  return (
+    <nav className={styles.breadcrumb} aria-label="面包屑">
+      {items.map((item, index) => (
+        <span className={styles.item} key={`${item}-${index}`}>
+          {index > 0 && <span className={styles.separator} aria-hidden="true">/</span>}
+          <span>{item}</span>
+        </span>
+      ))}
+    </nav>
+  );
 }

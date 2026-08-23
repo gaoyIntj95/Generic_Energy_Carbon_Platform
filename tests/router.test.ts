@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allNavItems, navigation } from '../src/app/router';
+import { allNavItems, navigation, navItemMatches, type NavItem } from '../src/app/router';
 
 describe('navigation manifest', () => {
   it('contains every confirmed page as a unique route', () => {
@@ -49,5 +49,19 @@ describe('navigation manifest', () => {
     ]);
     expect(allNavItems.some((item) => item.label === '供应链碳管理')).toBe(false);
     expect(allNavItems.some((item) => item.label === '碳足迹核算')).toBe(false);
+  });
+
+  it('distinguishes energy data submenu entries by query string', () => {
+    const energySubmenu = navigation
+      .find((group) => group.key === 'data-management')?.display
+      ?.find((entry) => 'items' in entry && entry.key === 'energy-data-submenu');
+    const items = energySubmenu && 'items' in energySubmenu ? energySubmenu.items as NavItem[] : [];
+
+    expect(navItemMatches(items[0], '/data-management/energy-data', '')).toBe(true);
+    expect(navItemMatches(items[0], '/data-management/energy-data', '?year=2026&scope=enterprise')).toBe(true);
+    expect(navItemMatches(items[0], '/data-management/energy-data', '?tab=costs')).toBe(false);
+    expect(navItemMatches(items[1], '/data-management/energy-data', '?tab=costs')).toBe(true);
+    expect(navItemMatches(items[1], '/data-management/energy-data', '?tab=costs&year=2026')).toBe(true);
+    expect(navItemMatches(items[2], '/data-management/energy-data', '?tab=recovery')).toBe(true);
   });
 });

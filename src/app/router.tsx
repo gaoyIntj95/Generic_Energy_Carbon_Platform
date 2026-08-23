@@ -13,11 +13,20 @@ export type NavGroup = {
   display?: NavDisplayEntry[];
 };
 
+export function navItemMatches(item: NavItem, pathname: string, search: string) {
+  const [itemPath, itemQuery] = item.path.split('?');
+  if (itemPath !== pathname) return false;
+  const currentParams = new URLSearchParams(search);
+  if (!itemQuery) return !currentParams.has('tab');
+  const expectedParams = new URLSearchParams(itemQuery);
+  return [...expectedParams.entries()].every(([key, value]) => currentParams.get(key) === value);
+}
+
 const dataManagementItems: NavItem[] = [
   { label: '用能单元', pageTitle: '用能单元管理', path: '/data-management/units', description: '配置企业用能单元及上下级关系，用于能源数据归属、查询与分析。' },
   { label: '能源品种', path: '/data-management/energy-types', description: '管理企业实际使用的能源品种、计量单位及默认折标参数。' },
   { label: '重点设备', path: '/data-management/devices', description: '维护重点设备基础档案及其用能归属，为后续设备级分析提供基础。' },
-  { label: '能源数据', path: '/data-management/energy-data', description: '按企业及用能单元层级维护能源量和能源成本；锅炉、余热发电、自发电、回收利用及外供统一在能源转换与输出中维护。' },
+      { label: '能源数据', path: '/data-management/energy-data', description: '按企业及用能单元层级维护能源消费、能源转换和能源成本数据。' },
   { label: '运营数据', path: '/data-management/operations', description: '录入产品产量和经济指标，支撑能耗强度、能效对标与预算分析。' },
 ];
 
@@ -53,7 +62,7 @@ const supplyChainPlanning: NavPlaceholder = {
 };
 
 const assetStrategyItems: NavItem[] = [
-  { label: '能效平衡与优化', path: '/asset-strategy/balance', description: '基于能耗查询、能耗指标、能效对标和能流分析结果，识别重点优化对象并提出改善方向。' },
+  { label: '能效平衡与优化', path: '/asset-strategy/balance', description: '基于能源流向、能效指标和异常诊断结果，识别能源管理问题并辅助发现优化机会。' },
   { label: '用能分析与策略推荐', path: '/asset-strategy/analysis', description: '基于用能数据，分析能源消费结构、成本结构和能效表现，识别重点用能单元并提供策略建议。' },
   { label: '用能与碳排放预算管理', path: '/asset-strategy/budget', description: '对一个时间周期内的能源消费和碳排放进行分析预测，实现预算目标、执行监控、预测预警和动态调整。' },
   { label: '碳资产管理', path: '/asset-strategy/assets', description: '支持履约周期资产管理、未来排放预测及履约风险预警。' },
@@ -86,7 +95,21 @@ export const navigation: NavGroup[] = [
     key: 'data-management',
     label: '数据管理',
     items: dataManagementItems,
-    display: dataManagementItems,
+    display: [
+      dataManagementItems[0],
+      dataManagementItems[1],
+      dataManagementItems[2],
+      {
+        key: 'energy-data-submenu',
+        label: '能源数据',
+        items: [
+          { ...dataManagementItems[3], label: '能源消费', path: '/data-management/energy-data' },
+          { ...dataManagementItems[3], label: '能源成本', path: '/data-management/energy-data?tab=costs' },
+          { ...dataManagementItems[3], label: '能源回收、转换与外供', path: '/data-management/energy-data?tab=recovery' },
+        ],
+      },
+      dataManagementItems[4],
+    ],
   },
 ];
 

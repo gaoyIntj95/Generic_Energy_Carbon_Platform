@@ -51,7 +51,7 @@ export interface EnergyQueryDayDetail {
   physicalAmount: number;
   standardCoalAmount: number;
   deviationFromDailyAverage: number;
-  dataStatus: '正常' | '偏高';
+  dataStatus: '正常' | '偏高' | '偏低';
 }
 
 const annualMonthWeights = [0.074, 0.071, 0.078, 0.079, 0.083, 0.081, 0.087, 0.089, 0.086, 0.09, 0.088, 0.094];
@@ -112,7 +112,7 @@ export function createEnergyQueryMonthlyDetails(row: EnergyQueryRow): EnergyQuer
       physicalAmount: physicalAmounts[index],
       standardCoalAmount: standardCoalAmounts[index],
       deviationFromDailyAverage: deviation,
-      dataStatus: deviation >= 12 ? '偏高' : '正常',
+      dataStatus: deviation >= 12 ? '偏高' : deviation <= -12 ? '偏低' : '正常',
     };
   });
 }

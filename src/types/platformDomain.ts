@@ -174,6 +174,7 @@ export interface BudgetTarget {
   energyUnitId: string | null;
   year: number;
   targetValue: number;
+  monthlyTargetValues?: number[];
   warningThreshold: number;
   targetUnit: 'tce' | 'tCO₂e';
   description: string;
@@ -207,9 +208,11 @@ export interface CarbonAsset {
   assetSource: string;
   totalAmount: number;
   eligibleAmount: number;
+  carryoverEligibleAmount?: number;
   lockedAmount: number;
   usedAmount: number;
   voucherNumber: string;
+  voucherPreviewUrl?: string;
   bookedAt: string;
   assetState: CarbonAssetState;
   remark: string;
@@ -221,9 +224,11 @@ export interface CarbonAssetWriteInput {
   assetSource: string;
   totalAmount: number;
   eligibleAmount: number;
+  carryoverEligibleAmount?: number;
   lockedAmount: number;
   usedAmount: number;
   voucherNumber: string;
+  voucherPreviewUrl?: string;
   bookedAt: string;
   remark: string;
 }

@@ -15,7 +15,8 @@ export interface BenchmarkTarget {
 const seedTargets: BenchmarkTarget[] = [
   { targetId: 'target-enterprise-2026', objectType: 'enterprise', objectId: 'enterprise', metricCode: 'energy_per_added_value', year: 2026, energyUnitId: null, value: 0.12 },
   { targetId: 'target-unit-a-2026', objectType: 'unit', objectId: 'eu-clinker-line-1', metricCode: 'energy_per_product', year: 2026, energyUnitId: 'eu-clinker-line-1', value: 90 },
-  { targetId: 'target-unit-b-2026', objectType: 'unit', objectId: 'eu-cement-grinding-line', metricCode: 'energy_per_product', year: 2026, energyUnitId: 'eu-cement-grinding-line', value: 6 },
+  // 生产车间B的电力、天然气与产量口径计算结果约为 52—58 kgce/t，目标保持同一指标量级。
+  { targetId: 'target-unit-b-2026', objectType: 'unit', objectId: 'eu-cement-grinding-line', metricCode: 'energy_per_product', year: 2026, energyUnitId: 'eu-cement-grinding-line', value: 52 },
   { targetId: 'target-product-a-2026', objectType: 'product', objectId: 'product-a', metricCode: 'energy_per_product', year: 2026, energyUnitId: null, value: 52 },
   { targetId: 'target-product-b-2026', objectType: 'product', objectId: 'product-b', metricCode: 'energy_per_product', year: 2026, energyUnitId: null, value: 26 },
   { targetId: 'target-product-c-2026', objectType: 'product', objectId: 'product-c', metricCode: 'energy_per_product', year: 2026, energyUnitId: null, value: 60 },

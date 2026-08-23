@@ -40,7 +40,7 @@
 .overlay { position: fixed; z-index: 80; inset: 0; display: flex; align-items: center; justify-content: center; background: rgb(18 31 38 / 50%); }
 .modal,.drawer { display: flex; max-height: 86vh; flex-direction: column; background: #fff; border-radius: 5px; box-shadow: 0 18px 50px rgb(0 0 0 / 25%); }
 .modal > header,.drawer > header { display: flex; min-height: 54px; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid #e4e9e7; }
-.modal > header h2,.drawer > header h2 { margin: 0; font-size: 17px; }.modal > header button,.drawer > header button { color: #7d8991; background: none; border: 0; font-size: 25px; cursor: pointer; }
+.modal > header h2,.drawer > header h2 { margin: 0; font-size: 17px; }.modalHeaderContent { display: grid; gap: 4px; }.modalHeaderContent p { margin: 0; color: #82909a; font-size: 12px; font-weight: 400; }.modal > header button,.drawer > header button { color: #7d8991; background: none; border: 0; font-size: 25px; cursor: pointer; }
 .modalBody,.drawerBody { overflow: auto; padding: 20px; }.modal > footer,.drawer > footer { display: flex; min-height: 58px; align-items: center; justify-content: flex-end; gap: 8px; padding: 0 20px; border-top: 1px solid #e4e9e7; }
 .drawer { position: absolute; top: 0; right: 0; height: 100%; max-height: none; border-radius: 0; }.drawerBody { flex: 1; }
 .toast { position: fixed; z-index: 100; top: 76px; left: 50%; padding: 11px 20px; color: #fff; background: #263d38; border-radius: 4px; box-shadow: 0 8px 22px rgb(0 0 0 / 18%); transform: translateX(-50%); animation: toastIn .18s ease; }
