@@ -271,7 +271,7 @@ function AnnualEnergyDetail({
       </div>
       <div className={styles.drillTableWrap}>
         <table className={styles.drillTable} aria-label="年度月明细">
-          <thead><tr><th>月份</th><th>实物量</th><th>单位</th><th>折标量（tce）</th><th>占全年</th><th>同比</th><th>环比</th><th>数据状态</th></tr></thead>
+          <thead><tr><th>月份</th><th>实物量</th><th>单位</th><th>折标量（tce）</th><th>占全年</th><th>同比（较上年同月）</th><th>环比（较上月）</th><th>数据状态</th></tr></thead>
           <tbody>{details.map((item) => (
             <tr key={item.detailId}>
               <td>{item.month}</td>
@@ -287,7 +287,7 @@ function AnnualEnergyDetail({
           <tfoot><tr><td>合计</td><td>{format(row.physicalAmount)}</td><td>{row.measurementUnit}</td><td>{format(row.standardCoalAmount)}</td><td>100.0%</td><td>{percent(row.yearOnYear)}</td><td>—</td><td>完整</td></tr></tfoot>
         </table>
       </div>
-      <div className={styles.modalNote}><strong>数据来源：</strong>{row.sourceDescription}<br /><strong>折标口径：</strong>各月读取对应能源品种的有效折标参数，年度值由12个月记录汇总。<br /><strong>状态规则：</strong>月度折标量相对年度月均值高于或等于12%标记“偏高”，低于或等于-12%标记“偏低”，其余为“正常”。</div>
+      <div className={styles.modalNote}><strong>数据来源：</strong>{row.sourceDescription}<br /><strong>折标口径：</strong>各月读取对应能源品种的有效折标参数，年度值由已报月份记录汇总。<br /><strong>比较口径：</strong>同比为本月与上年同月比较，环比为本月与上月比较；首月无上月数据时不展示环比。<br /><strong>状态规则：</strong>月度折标量相对年度月均值高于或等于12%标记“偏高”，低于或等于-12%标记“偏低”，其余为“正常”。</div>
     </div>
   );
 }

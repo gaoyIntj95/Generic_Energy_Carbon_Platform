@@ -13,6 +13,10 @@
 }
 
 .notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   margin: 0 16px 14px;
   padding: 10px 12px;
   color: #467565;
@@ -21,6 +25,52 @@
   border-radius: 6px;
   font-size: 13px;
   line-height: 1.6;
+}
+
+.notice div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.notice strong {
+  color: #285f4d;
+}
+
+.noticeLink {
+  flex: 0 0 auto;
+  padding: 0;
+  color: #087fbc;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  white-space: nowrap;
+}
+
+.helpContent {
+  display: grid;
+  gap: 16px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.helpContent section {
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e6eeeb;
+}
+
+.helpContent section:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.helpContent strong {
+  color: var(--text);
+}
+
+.helpContent p {
+  margin: 4px 0 0;
 }
 
 .tableCard {

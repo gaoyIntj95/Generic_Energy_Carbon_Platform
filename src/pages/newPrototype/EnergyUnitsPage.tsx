@@ -148,6 +148,7 @@ export function EnergyUnitsPage() {
   const [activeFilter, setActiveFilter] = useState<FilterState>(emptyFilter);
   const [expanded, setExpanded] = useState(() => initialExpanded(listEnergyUnits()));
   const [dialog, setDialog] = useState<DialogState>(null);
+  const [showHelp, setShowHelp] = useState(false);
   const [toast, setToast] = useState('');
   const [draggingUnitId, setDraggingUnitId] = useState<string | null>(null);
   const [dropTargetUnitId, setDropTargetUnitId] = useState<string | null>(null);
@@ -349,11 +350,12 @@ export function EnergyUnitsPage() {
 
       <Card className={styles.tableCard}>
         <div className={styles.notice}>
-          用能单元按一级、二级层级管理，能源数据统一归属于具体用能单元。能源回收、转换和外供在“能源数据 &gt; 能源回收、转换与外供”中按实际系统维护；用能单元用于维护组织与归属关系。未筛选时，可直接拖拽用能单元行调整同级顺序；一级与一级、同一一级下的二级与二级可以互换位置。
+          <div><strong>用能单元用于维护企业的用能层级和数据归属。</strong><span>一级为车间或区域，二级为工序、系统或环节。</span></div>
+          <button type="button" className={styles.noticeLink} onClick={() => setShowHelp(true)}>查看说明</button>
         </div>
         <div className={styles.tableArea}>
           {groupedRows.map(({ category, rows: categoryRows }) => <section key={category} className={styles.categorySection}>
-            <div className={styles.categoryHeader}><strong>{category}用能单元</strong><span>{category === '生产类' ? '按产品产量等生产运营指标进行能耗分析。' : '按运行、建筑或物流等运营指标进行能耗分析。'}</span></div>
+            <div className={styles.categoryHeader}><strong>{category}用能单元</strong><span>{category === '生产类' ? '按产量等生产指标分析能耗。' : '按运行、建筑或物流等指标分析能耗。'}</span></div>
             <DataTable
             columns={columns}
             data={categoryRows}
@@ -396,6 +398,25 @@ export function EnergyUnitsPage() {
           <span className={styles.pageDot}>1</span>
         </div>
       </Card>
+
+      {showHelp && (
+        <Modal title="用能单元说明" width={560} onClose={() => setShowHelp(false)}>
+          <div className={styles.helpContent}>
+            <section>
+              <strong>层级与归属</strong>
+              <p>一级用能单元通常对应车间或区域，二级用能单元对应工序、系统或环节。能源数据、运营数据和重点设备都需要关联到具体用能单元。</p>
+            </section>
+            <section>
+              <strong>排序</strong>
+              <p>未设置关键字或类型筛选时，可以拖拽调整同级用能单元的顺序，不能跨层级调整。</p>
+            </section>
+            <section>
+              <strong>其他能源业务</strong>
+              <p>能源回收、转换与外供请前往“数据管理 &gt; 能源数据 &gt; 能源回收、转换与外供”维护。</p>
+            </section>
+          </div>
+        </Modal>
+      )}
 
       {(dialog?.type === 'addRoot' ||
         dialog?.type === 'addChild' ||

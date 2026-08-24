@@ -696,6 +696,40 @@ const downloadEvidenceFile = (file: { fileName: string }) => {
   URL.revokeObjectURL(url);
 };
 
+const downloadEvidencePackage = (items: SupportItem[], year: string) => {
+  const completed = items.filter((item) => item.evidenceFiles?.length).length;
+  const manifestRows = items.map((item) => [
+    item.emission ? '排放源支撑材料' : '核算基础材料',
+    item.group,
+    item.item,
+    item.activity,
+    item.activityDataSources,
+    item.evidenceFiles?.map((file) => file.fileName).join('、') || '待补充',
+    item.evidenceFiles?.length ? '已上传' : '待补充',
+  ]);
+  const csv = '\ufeff' + [['材料类别', '排放类别/分组', '核查事项/排放源', '活动数据', '活动数据来源', '支撑材料', '材料状态'], ...manifestRows]
+    .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+  const missing = items.filter((item) => !item.evidenceFiles?.length)
+    .map((item) => `${item.emission ? '排放源' : '基础材料'}\t${item.group}\t${item.item}\t${item.activityDataSources}`)
+    .join('\n');
+  const files = [
+    { name: '00_材料目录.csv', content: csv },
+    { name: '05_缺口清单.tsv', content: missing ? `材料类别\t分组\t核查事项\t活动数据来源\n${missing}` : '当前没有待补充材料。' },
+    { name: 'README.txt', content: `核查证据包（演示）\n核算年度：${year}\n材料事项完成：${completed}/${items.length}\n说明：包内文件为当前原型中的材料占位内容，实际文件由统一文件服务提供。\n` },
+    ...items.flatMap((item) => (item.evidenceFiles ?? []).map((file) => ({
+      name: `材料/${file.fileName}`,
+      content: `证据材料（演示文件）\n文件名：${file.fileName}\n关联事项：${item.item}\n关联来源：${file.activityDataSource}\n`,
+    }))),
+  ];
+  const url = URL.createObjectURL(createTarBlob(files));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `XX科技有限公司_${year}年度核查证据包.tar`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+};
+
 function SupportPage({
   inventory,
   basicItems,
@@ -714,8 +748,6 @@ function SupportPage({
   const [state, setState] = useState('');
   const [stateInput, setStateInput] = useState('');
   const [appliedYear, setAppliedYear] = useState('2026');
-  const [collapsedSupportScopes, setCollapsedSupportScopes] = useState<Set<string>>(() => new Set());
-  const [collapsedSupportGroups, setCollapsedSupportGroups] = useState<Set<string>>(() => new Set());
   const sourceRows: SupportItem[] = inventory.map((row) => ({
     id: row.emissionSourceId,
     group: row.emissionCategory,
@@ -737,16 +769,18 @@ function SupportPage({
   const matchesFilters = (item: SupportItem) => (!keyword || [item.item, item.group, item.activity, ...(item.evidenceFiles ?? []).map((file) => file.fileName)].some((text) => text.includes(keyword))) && (!state || item.state === state);
   const filteredBasicRows = basicRowsWithFiles.filter(matchesFilters);
   const filteredSourceRows = sourceRows.filter(matchesFilters);
-  const groups = [...new Set(filteredSourceRows.map((item) => item.group))];
-  const supportScopes = emissionScopeDictionary.map((scope) => ({
-    ...scope,
-    categories: scope.categories.filter((category) => groups.includes(category)),
-  })).filter((scope) => scope.categories.length > 0);
+  const allSupportRows = [...basicRowsWithFiles, ...sourceRows];
+  const completedSupportCount = allSupportRows.filter((item) => item.evidenceFiles?.length).length;
+  const missingSupportCount = allSupportRows.length - completedSupportCount;
+  const supportProgress = allSupportRows.length ? Math.round((completedSupportCount / allSupportRows.length) * 100) : 0;
+  const scopeLabelFor = (group: string) => emissionScopeDictionary.find((scope) => scope.categories.some((category) => category === group))?.label ?? '其他排放';
   const renderSupportRow = (item: SupportItem) => <tr key={`${item.group}-${item.item}`}>
-    <td><div className={styles.chainCell}><b>{item.type}</b></div></td>
-    <td><div className={styles.chainCell}><b>{item.item}</b></div></td>
-    <td><div className={styles.chainCell}><span>{item.activity}</span></div></td>
-    <td>{item.evidenceFiles?.length ? <div className={styles.materialCell}><div className={styles.materialPrimary}><b>{item.evidenceFiles[0].fileName}</b><span>{materialType(item.evidenceFiles[0].fileName)}</span></div>{item.evidenceFiles.length > 1 && <small>等 {item.evidenceFiles.length} 份材料</small>}</div> : <span className={styles.materialEmpty}>未上传材料</span>}</td>
+    <td className={styles.supportScopeCell}>{scopeLabelFor(item.group)}</td>
+    <td className={styles.supportCategoryCell}>{item.group}</td>
+    <td><span className={styles.supportSourceTypeTag}>{item.type}</span></td>
+    <td className={styles.supportEmissionCell}><b>{item.item}</b></td>
+    <td className={styles.supportActivityValue}>{item.activity}</td>
+    <td>{item.evidenceFiles?.length ? <div className={styles.materialCell}><div className={styles.materialPrimary}><b title={item.evidenceFiles[0].fileName}>{item.evidenceFiles[0].fileName}</b><span>{materialType(item.evidenceFiles[0].fileName)}</span></div>{item.evidenceFiles.length > 1 && <small>等 {item.evidenceFiles.length} 份材料</small>}</div> : <span className={styles.materialEmpty}>未上传材料</span>}</td>
     <td><Tag tone={item.state === '已完成' ? 'green' : 'orange'}>{item.state === '已完成' ? '已上传' : item.state}</Tag></td>
     <td className={styles.rowActions}><button type="button" onClick={() => openDialog({ kind: 'viewSupport', item })}>查看</button><button type="button" onClick={() => openDrawer({ kind: 'support', item, manage: true, upload: true })}>上传</button><button type="button" className={styles.deleteLink} onClick={() => openDialog({ kind: 'deleteSupport', item })}>删除</button></td>
   </tr>;
@@ -761,6 +795,14 @@ function SupportPage({
       <CarbonContextBar className={styles.supportHead} showQuery={false} onQuery={() => setAppliedYear('2026')} />
       <section className={`${styles.card} ${styles.supportPanel}`}>
         <div className={styles.supportInfo}><span className={styles.supportInfoIcon} aria-hidden="true">i</span><span>基础材料用于证明核算主体、组织边界和数据质量制度；排放源、活动数据及因子信息由正式碳核算清单自动带入并保持只读。用户仅需维护对应的支撑材料。</span></div>
+        <div className={styles.supportOverview} aria-label="材料准备概览">
+          <div className={styles.supportOverviewHeading}><div><span>核查准备</span><b>材料准备概览</b></div><Button outline compact onClick={() => downloadEvidencePackage(allSupportRows, appliedYear)}>⇩ 下载核查证据包</Button></div>
+          <div className={styles.supportOverviewBody}>
+            <div className={styles.supportProgressBlock}><div className={styles.supportProgressMeta}><span>材料准备进度</span><strong>{supportProgress}%</strong></div><div className={styles.supportProgressTrack}><span style={{ width: `${supportProgress}%` }} /></div><small>按核算基础材料和排放源证据条目统计</small></div>
+            <div className={styles.supportOverviewMetric}><span>已完成</span><b>{completedSupportCount} <em>/ {allSupportRows.length}</em></b></div>
+            <div className={`${styles.supportOverviewMetric} ${missingSupportCount ? styles.supportOverviewMetricWarn : ''}`}><span>待补充</span><b>{missingSupportCount}</b></div>
+          </div>
+        </div>
         <div className={styles.supportToolbar}><div className={styles.search}><input value={keywordInput} onChange={(event) => setKeywordInput(event.target.value)} placeholder="搜索核查事项、排放源或材料名称" /></div><label>材料状态<select value={stateInput} onChange={(event) => setStateInput(event.target.value)}><option value="">全部</option><option value="待补充">待补充</option><option value="已完成">已上传</option></select></label><Button primary compact onClick={() => { setKeyword(keywordInput.trim()); setState(stateInput); }}>查询</Button></div>
         <div className={`${styles.supportSectionTitle} ${styles.supportBasicSectionTitle}`}><b>核算基础材料</b><span>核算主体、组织边界与管理制度材料</span></div>
         <div className={styles.supportTableWrap}><table className={styles.supportTable} data-support-table="basic">
@@ -770,27 +812,10 @@ function SupportPage({
         </table></div>
         <div className={`${styles.supportSectionTitle} ${styles.supportSourceSectionTitle}`}><b>排放源支撑材料</b><span>按排放范围及排放类别展示</span></div>
         <div className={styles.supportTableWrap}><table className={styles.supportTable} data-support-table="source">
-          <colgroup><col style={{ width: '15%' }} /><col style={{ width: '21%' }} /><col style={{ width: '19%' }} /><col style={{ width: '24%' }} /><col style={{ width: '10%' }} /><col style={{ width: '11%' }} /></colgroup>
-          <tbody>
-          {supportScopes.length ? supportScopes.flatMap((scope) => [
-            <tr className={styles.supportScope} key={`${scope.id}-head`}><td colSpan={6}><button type="button" className={styles.supportScopeTitle} data-support-scope-title={scope.label} aria-expanded={!collapsedSupportScopes.has(scope.id)} onClick={() => setCollapsedSupportScopes((current) => {
-              const next = new Set(current);
-              if (next.has(scope.id)) next.delete(scope.id); else next.add(scope.id);
-              return next;
-            })}><span aria-hidden="true">{collapsedSupportScopes.has(scope.id) ? '▸' : '▾'}</span><b>{scope.label}</b></button></td></tr>,
-            ...(collapsedSupportScopes.has(scope.id) ? [] : scope.categories.flatMap((group) => [
-              <tr className={styles.supportGroup} key={`${group}-head`}><td colSpan={6}><button type="button" className={styles.supportGroupTitle} data-group-title={group} aria-expanded={!collapsedSupportGroups.has(group)} onClick={() => setCollapsedSupportGroups((current) => {
-                const next = new Set(current);
-                if (next.has(group)) next.delete(group); else next.add(group);
-                return next;
-              })}><span aria-hidden="true">{collapsedSupportGroups.has(group) ? '▸' : '▾'}</span><b>{group}</b></button></td></tr>,
-              ...(collapsedSupportGroups.has(group) ? [] : [
-                <tr className={styles.supportColumnHeader} key={`${group}-columns`} aria-hidden="true"><th>温室气体源类型</th><th>排放源</th><th>活动数据项</th><th>支撑材料</th><th>材料状态</th><th>操作</th></tr>,
-                ...filteredSourceRows.filter((item) => item.group === group).map(renderSupportRow),
-              ]),
-            ])),
-          ]) : <tr><td colSpan={6} className={styles.emptyRow}>暂无符合条件的排放源支撑材料</td></tr>}
-        </tbody></table></div>
+          <colgroup><col style={{ width: '12%' }} /><col style={{ width: '17%' }} /><col style={{ width: '14%' }} /><col style={{ width: '19%' }} /><col style={{ width: '13%' }} /><col style={{ width: '17%' }} /><col style={{ width: '8%' }} /><col style={{ width: '10%' }} /></colgroup>
+          <thead><tr><th>排放范围</th><th>排放类别</th><th>温室气体源类型</th><th>排放源</th><th>活动数据项</th><th>支撑材料</th><th>材料状态</th><th>操作</th></tr></thead>
+          <tbody>{filteredSourceRows.length ? filteredSourceRows.map(renderSupportRow) : <tr><td colSpan={8} className={styles.emptyRow}>暂无符合条件的排放源支撑材料</td></tr>}</tbody>
+        </table></div>
       </section>
     </div>
   );
@@ -968,9 +993,6 @@ function CarbonReportPage({
   const [year, setYear] = useState(2026);
   const [keyword, setKeyword] = useState('');
   const [selectedId, setSelectedId] = useState(() => listCarbonReportMocks()[0]?.carbonReportId ?? '');
-  const [exportOpen, setExportOpen] = useState(false);
-  const [includeReport, setIncludeReport] = useState(true);
-  const [includeEvidence, setIncludeEvidence] = useState(false);
   const snapshots = listCarbonSnapshots();
   const visibleReports = reports.filter((report) =>
     report.year === year && report.reportName.includes(keyword.trim()));
@@ -999,7 +1021,6 @@ function CarbonReportPage({
       amount: rows.reduce((total, row) => total + row.emissionAmount, 0),
     };
   });
-  const evidenceFiles = reportInventory.flatMap((row) => row.evidenceFiles ?? []);
   const selectYear = (nextYear: number) => {
     setYear(nextYear);
     const next = reports.find((report) => report.year === nextYear);
@@ -1032,34 +1053,23 @@ function CarbonReportPage({
     setSelectedId(report.carbonReportId);
     notify('已基于当前正式核算清单生成排放报告');
   };
-  const exportPackage = () => {
-    if (!selectedReport || (!includeReport && !includeEvidence)) return;
+  const exportReport = () => {
+    if (!selectedReport) return;
     const reportHtml = [
       '<!doctype html><meta charset="utf-8">',
       `<title>${selectedReport.reportName}</title>`,
       '<style>body{font:14px/1.7 Arial,"Microsoft YaHei";padding:32px;color:#24333c}h1{font-size:22px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #cad4d8;padding:8px;text-align:left}</style>',
       `<h1>${selectedReport.reportName}</h1>`,
       `<p>核算年度：${selectedReport.year}年　核算主体：${selectedReport.organizationName}　数据来源：当前正式清单</p>`,
-      includeReport
-        ? `<h2>排放报告</h2><p>排放总量：${format(totalEmission)} tCO₂e</p><table><thead><tr><th>排放类别</th><th>排放源数量</th><th>排放量（tCO₂e）</th></tr></thead><tbody>${categoryRows.map((row) => `<tr><td>${row.category}</td><td>${row.count}</td><td>${format(row.amount)}</td></tr>`).join('')}</tbody></table>`
-        : '',
+      `<h2>排放报告</h2><p>排放总量：${format(totalEmission)} tCO₂e</p><table><thead><tr><th>排放类别</th><th>排放源数量</th><th>排放量（tCO₂e）</th></tr></thead><tbody>${categoryRows.map((row) => `<tr><td>${row.category}</td><td>${row.count}</td><td>${format(row.amount)}</td></tr>`).join('')}</tbody></table>`,
     ].join('');
-    const packageFiles: Array<{ name: string; content: string }> = [];
-    if (includeReport) packageFiles.push({ name: `${selectedReport.reportName}.html`, content: reportHtml });
-    if (includeEvidence) packageFiles.push({
-      name: '核查凭证材料目录.txt',
-      content: evidenceFiles.length
-        ? evidenceFiles.map((file, index) => `${index + 1}. ${file.fileName}｜关联来源：${file.activityDataSource}`).join('\n')
-        : '当前正式清单尚未关联可导出的核查凭证材料。',
-    });
-    const url = URL.createObjectURL(createTarBlob(packageFiles));
+    const url = URL.createObjectURL(new Blob([reportHtml], { type: 'text/html;charset=utf-8' }));
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `${selectedReport.reportName}_核查资料包.tar`;
+    anchor.download = `${selectedReport.reportName}.html`;
     anchor.click();
     URL.revokeObjectURL(url);
-    setExportOpen(false);
-    notify('核查资料包已生成');
+    notify('排放报告已导出');
   };
 
   return <div className={`${styles.page} ${styles.reportPage}`}>
@@ -1105,7 +1115,7 @@ function CarbonReportPage({
       </aside>
       <main className={styles.reportPreviewPane}>
         <div className={styles.reportPreviewActions}>
-          <Button primary compact onClick={() => setExportOpen(true)}>导出核查资料包</Button>
+          <Button primary compact onClick={exportReport}>导出报告</Button>
         </div>
         {selectedReport ? <article className={styles.carbonReportPaper}>
           <header>
@@ -1139,26 +1149,6 @@ function CarbonReportPage({
         </article> : <div className={styles.reportDocumentEmpty}>请选择或生成报告</div>}
       </main>
     </section>
-    {exportOpen && selectedReport && <Dialog
-      title="导出核查资料包"
-      onClose={() => setExportOpen(false)}
-      footer={<><Button onClick={() => setExportOpen(false)}>取消</Button><Button primary disabled={!includeReport && !includeEvidence} onClick={exportPackage}>导出资料包</Button></>}
-    >
-      <div className={styles.exportReportSection}>
-        <h3>导出信息</h3>
-        <p><span>核算年度：{selectedReport.year}年</span><span>核算主体：{selectedReport.organizationName}</span></p>
-      </div>
-      <div className={styles.exportReportSection}>
-        <h3>导出内容</h3>
-        <label><input type="checkbox" checked={includeReport} onChange={(event) => setIncludeReport(event.target.checked)} /> 排放报告</label>
-        <label><input type="checkbox" checked={includeEvidence} onChange={(event) => setIncludeEvidence(event.target.checked)} /> 核查凭证材料</label>
-      </div>
-      <div className={styles.exportReportSection}>
-        <h3>导出提示</h3>
-        <p>系统将导出当前报告及已上传的凭证材料目录。未上传的凭证材料不会生成空文件。</p>
-        <small>当前正式清单已关联 {evidenceFiles.length} 份凭证材料。</small>
-      </div>
-    </Dialog>}
   </div>;
 }
 

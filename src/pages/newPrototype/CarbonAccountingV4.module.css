@@ -1348,6 +1348,115 @@
   font-weight: 700;
 }
 
+.supportOverview {
+  margin: 14px 16px 0;
+  padding: 16px 18px;
+  background: linear-gradient(105deg, #f4fbf8, #fbfdfc 72%);
+  border: 1px solid #dcece5;
+  border-radius: 10px;
+}
+
+.supportOverviewHeading,
+.supportOverviewBody,
+.supportProgressMeta {
+  display: flex;
+  align-items: center;
+}
+
+.supportOverviewHeading {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.supportOverviewHeading div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.supportOverviewHeading span {
+  color: #7d8d87;
+  font-size: 12px;
+}
+
+.supportOverviewHeading b {
+  color: #24483c;
+  font-size: 16px;
+}
+
+.supportOverviewBody {
+  gap: 28px;
+  margin-top: 15px;
+}
+
+.supportProgressBlock {
+  flex: 1;
+  min-width: 260px;
+}
+
+.supportProgressMeta {
+  justify-content: space-between;
+  color: #5f716a;
+  font-size: 12px;
+}
+
+.supportProgressMeta strong {
+  color: #168365;
+  font-size: 18px;
+}
+
+.supportProgressTrack {
+  height: 8px;
+  margin-top: 8px;
+  overflow: hidden;
+  background: #dcebe5;
+  border-radius: 999px;
+}
+
+.supportProgressTrack span {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  background: #20a477;
+  border-radius: inherit;
+  transition: width .2s ease;
+}
+
+.supportProgressBlock small {
+  display: block;
+  margin-top: 7px;
+  color: #87958f;
+  font-size: 11px;
+}
+
+.supportOverviewMetric {
+  min-width: 88px;
+  padding-left: 24px;
+  border-left: 1px solid #dce9e4;
+}
+
+.supportOverviewMetric span {
+  display: block;
+  color: #7c8b85;
+  font-size: 11px;
+}
+
+.supportOverviewMetric b {
+  display: block;
+  margin-top: 4px;
+  color: #168365;
+  font-size: 20px;
+}
+
+.supportOverviewMetric em {
+  color: #8c9a95;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 400;
+}
+
+.supportOverviewMetricWarn b { color: #c4772b; }
+
 .supportToolbar {
   display: flex;
   align-items: center;
@@ -1391,6 +1500,36 @@
 .supportToolbar + .supportSectionTitle { margin-top: 0; border-top: 0; }
 .supportSourceSectionTitle { background: #eaf6f1; border-color: #cfe4db; }
 .supportSourceSectionTitle::before { background: #1d8064; }
+
+.supportScopeCell,
+.supportCategoryCell {
+  color: #7d8d87;
+  font-size: 11px !important;
+}
+
+.supportCategoryCell { color: #62736c; }
+
+.supportSourceTypeTag {
+  display: inline-block;
+  padding: 4px 7px;
+  color: #60756d;
+  background: #f0f5f3;
+  border: 1px solid #e0ebe6;
+  border-radius: 5px;
+  font-size: 11px;
+}
+
+.supportEmissionCell b {
+  color: #23483c;
+  font-size: 13px;
+}
+
+.supportActivityValue {
+  color: #294e42;
+  font-weight: 650;
+  text-align: right !important;
+  white-space: nowrap;
+}
 
 .supportTable th {
   height: 42px;
@@ -1443,6 +1582,24 @@
 .supportTable td {
   text-align: center !important;
   vertical-align: middle;
+}
+
+.supportTable[data-support-table="source"] th:nth-child(-n + 4),
+.supportTable[data-support-table="source"] tbody tr:not(.supportGroup):not(.supportScope):not(.supportColumnHeader) td:nth-child(-n + 4) {
+  text-align: left !important;
+}
+
+.supportTable[data-support-table="source"] th:nth-child(5),
+.supportTable[data-support-table="source"] tbody tr:not(.supportGroup):not(.supportScope):not(.supportColumnHeader) td:nth-child(5) {
+  text-align: right !important;
+}
+
+.supportTable[data-support-table="source"] tbody tr:not(.supportGroup):not(.supportScope):not(.supportColumnHeader) td:nth-child(6) {
+  text-align: left !important;
+}
+
+.supportTable[data-support-table="source"] tbody tr:not(.supportGroup):not(.supportScope):not(.supportColumnHeader) .materialPrimary {
+  justify-content: flex-start;
 }
 
 .supportTable .supportColumnHeader th {
@@ -3989,6 +4146,9 @@
 }
 
 @media (max-width: 860px) {
+  .supportOverviewBody { align-items: stretch; flex-wrap: wrap; gap: 16px; }
+  .supportOverviewMetric { flex: 1; }
+
   .previewTask,
   .inventoryTask,
   .supportHead {
