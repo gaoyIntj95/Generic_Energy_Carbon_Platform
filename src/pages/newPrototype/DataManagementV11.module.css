@@ -179,6 +179,13 @@
   border-bottom: 1px solid #e4e9ef;
 }
 
+.requiredMark {
+  margin-left: 6px;
+  color: #d97706;
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .levelTabs button {
   height: 36px;
   padding: 0 14px;
@@ -1845,6 +1852,27 @@
   margin-top: 10px;
   color: #8a94a3;
   font-size: 12px;
+}
+
+.formSection {
+  padding: 14px 0 4px;
+  border-top: 1px solid #e8edf3;
+}
+
+.formSection h4 {
+  margin: 0 0 10px;
+  color: #172033;
+  font-size: 14px;
+}
+
+.inlineField {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inlineField input {
+  width: 120px;
 }
 
 .readonlyInfo {

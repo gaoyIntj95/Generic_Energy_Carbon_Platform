@@ -110,6 +110,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     energyUnitId: 'eu-compressed-air',
     organizationId: DEMO_ORGANIZATION_ID,
     energyUnitName: '空压系统',
+    conversionScenarios: ['空压产气/压缩空气'],
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
     unitType: '公辅系统',
@@ -120,6 +121,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     energyUnitId: 'eu-waste-heat-power',
     organizationId: DEMO_ORGANIZATION_ID,
     energyUnitName: '余热发电机组',
+    conversionScenarios: ['余热发电'],
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
     unitType: '公辅系统',
@@ -130,6 +132,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     energyUnitId: 'eu-waste-heat-utilization',
     organizationId: DEMO_ORGANIZATION_ID,
     energyUnitName: '余热回收利用系统',
+    conversionScenarios: ['回收利用'],
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
     unitType: '公辅系统',
@@ -140,6 +143,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     energyUnitId: 'eu-gas-boiler',
     organizationId: DEMO_ORGANIZATION_ID,
     energyUnitName: '锅炉系统',
+    conversionScenarios: ['锅炉产汽/产热'],
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
     unitType: '公辅系统',
@@ -181,8 +185,8 @@ const seedEnergyUnits: EnergyUnit[] = [
 let energyUnits = cloneUnits(seedEnergyUnits);
 let nextMockId = 100;
 
-function cloneUnits(units: EnergyUnit[]) {
-  return units.map((unit) => ({ ...unit }));
+function cloneUnits(units: EnergyUnit[]): EnergyUnit[] {
+  return units.map((unit) => ({ ...unit, conversionScenarios: unit.conversionScenarios ? [...unit.conversionScenarios] : undefined }));
 }
 
 function normalizeName(name: string) {
@@ -247,6 +251,7 @@ export function createEnergyUnit(input: EnergyUnitWriteInput): EnergyUnitMutatio
     unitType: input.unitType,
     displayOrder: nextDisplayOrder(null),
     remark: input.remark?.trim() ?? '',
+    conversionScenarios: input.conversionScenarios ? [...input.conversionScenarios] : undefined,
   };
   energyUnits.push(unit);
   return { ok: true, unit: { ...unit } };
@@ -274,6 +279,7 @@ export function addChildEnergyUnit(
     unitType: input.unitType,
     displayOrder: nextDisplayOrder(parentEnergyUnitId),
     remark: input.remark?.trim() ?? '',
+    conversionScenarios: input.conversionScenarios ? [...input.conversionScenarios] : undefined,
   };
   energyUnits.push(unit);
   return { ok: true, unit: { ...unit } };
@@ -293,6 +299,7 @@ export function updateEnergyUnit(
     energyUnitName: normalizeName(input.energyUnitName),
     unitType: input.unitType,
     remark: input.remark?.trim() ?? '',
+    conversionScenarios: input.conversionScenarios ? [...input.conversionScenarios] : undefined,
   });
   return { ok: true, unit: { ...unit } };
 }

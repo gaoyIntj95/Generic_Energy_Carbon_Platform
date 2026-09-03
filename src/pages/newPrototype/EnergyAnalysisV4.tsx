@@ -814,9 +814,9 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
 
 function ProductMetricDetail({ metric, objectName }: { metric: CalculatedIntensityMetric; objectName: string }) {
   return <>
-    <section className={styles.modalSection}><h3>指标结果</h3><DetailGrid items={[['分析对象', `${objectName}｜产品`], ['指标名称', metric.name], ['计算结果', metric.value === null ? '—' : `${format(metric.value, metricDigits(metric.value))} ${metric.unit}`], ['统计期间', metric.period]]} /></section>
+    <section className={styles.modalSection}><h3>指标结果</h3><DetailGrid items={[['分析对象', `${objectName}｜产品`], ['指标名称', metric.name], ['计算结果', metric.value === null ? '—' : `${format(metric.value, metricDigits(metric.value))} ${metric.unit}`], ['统计期间', metric.period], ['结果说明', '产品关联生产用能单元的能源消费统计，不代表产品独立能耗']]} /></section>
     <section className={styles.modalSection}><h3>计算依据</h3><DetailGrid items={[['分子数据', metric.numerator], ['分子来源', metric.numeratorSource ?? '能源数据—企业层级—全厂'], ['分母数据', metric.denominator], ['分母来源', metric.denominatorSource ?? '运营数据—产品产量'], ['计算公式', metric.formula]]} /></section>
-    <section className={styles.modalSection}><h3>数据来源</h3><DetailGrid items={[['能源数据来源', metric.numeratorSource ?? '能源数据—企业层级—全厂'], ['运营数据来源', metric.denominatorSource ?? '运营数据—产品产量'], ['最近计算时间', '2026-08-04']]} /></section>
+    <section className={styles.modalSection}><h3>数据来源</h3><DetailGrid items={[['能源数据来源', metric.numeratorSource ?? '能源数据—关联一级用能单元'], ['运营数据来源', metric.denominatorSource ?? '运营数据—一级用能单元—产品产量'], ['多产品规则', '一期不进行能源分配；同一生产单元关联多个产品时不计算单位产品综合能耗'], ['最近计算时间', '2026-08-04']]} /></section>
   </>;
 }
 
@@ -1071,10 +1071,10 @@ function IntensityPage() {
   const legacyScopeNote = applied.objectType === 'factory'
     ? '全厂指标只读取企业层级能源数据，产品产量和经济指标按企业年度数据匹配。'
     : applied.objectType === 'unit'
-      ? '一级用能单元指标一期只展示一级用能单元，读取当前单元能源数据并与已关联产品产量匹配，不跨层级重复汇总。'
-      : '产品 Tab 仅以企业边界能源消费和基准主产品产量计算单位主产品指标，不进行产品能耗分摊。';
-  const scopeNote = applied.objectType === 'product' ? '产品Tab读取企业层级能源数据和同计量单位产品产量合计，不进行产品能耗分配。' : legacyScopeNote;
-  const productScopeNote = '产品指标按照企业年度产品综合口径计算，仅支持相同计量单位产品产量汇总，不进行产品能源分摊。';
+      ? '一级用能单元指标一期只展示一级用能单元，仅读取当前一级单元能源数据，不读取或汇总二级能源消费记录。'
+      : '产品 Tab 按产品—一级用能单元展示关联生产单元综合能耗，不进行多产品能源分配。';
+  const scopeNote = applied.objectType === 'product' ? '产品Tab读取一级用能单元运营数据中的产品产量，并匹配关联生产单元能源数据；一期不进行多产品能源分配。' : legacyScopeNote;
+  const productScopeNote = '产品Tab展示产品关联生产用能单元的能源消费统计，不代表产品独立能耗；一期不进行多产品能源分配，同一生产单元关联多个产品时不计算单位产品综合能耗。';
   const metricObjectMap = new Map(resultViews.flatMap((resultView) => resultView.metrics.map((metric) => [metric.intensityMetricId, resultView.object])));
   const metricViewFor = (metric: CalculatedIntensityMetric) => resultViews.find((resultView) => resultView.object.objectId === metricObjectMap.get(metric.intensityMetricId)?.objectId) ?? view;
   const metricGroupFor = (metric: CalculatedIntensityMetric) => metricObjectMap.get(metric.intensityMetricId)?.unitKind === 'production' ? '生产类用能单元' : '非生产类用能单元';
@@ -1369,8 +1369,8 @@ function IntensityPage() {
           </section>)}
         </div> : <div className={styles.tableWrap}>
           <table className={styles.comparisonTable}>
-            <thead><tr><th>产品</th>{comparisonMetricNames.map((name) => <th key={name}>{name}</th>)}<th>环比变化</th><th>同比变化</th><th>操作</th></tr></thead>
-            <tbody>{comparisonViews.map((resultView) => { const primaryMetric = resultView.metrics.find((metric) => metric.resultType === 'ok') ?? resultView.metrics[0]; const changes = metricChanges(primaryMetric, resultView.object.objectId); return <tr key={resultView.object.objectId}><td>{resultView.object.objectName}</td>{comparisonMetricNames.map((name) => { const metric = resultView.metrics.find((item) => item.name === name && item.resultType === 'ok'); return <td key={name}>{metric ? <><strong>{format(metric.value, metricDigits(metric.value))}</strong><small>{metric.unit}</small></> : '—'}</td>; })}<td className={styles.changeCell}>{percent(changes.mom)}</td><td className={styles.changeCell}>{percent(changes.yoy)}</td><td><button type="button" className={styles.link} onClick={() => { setTrendMetricId(primaryMetric.intensityMetricId); openMetricDialog(primaryMetric, true, resultView); }}>{primaryMetric.resultType === 'ok' ? '查看详情' : '补充数据'}</button></td></tr>; })}</tbody>
+            <thead><tr><th>产品</th><th>关联一级用能单元</th>{comparisonMetricNames.map((name) => <th key={name}>{name}</th>)}<th>环比变化</th><th>同比变化</th><th>操作</th></tr></thead>
+            <tbody>{comparisonViews.map((resultView) => { const primaryMetric = resultView.metrics.find((metric) => metric.resultType === 'ok') ?? resultView.metrics[0]; const changes = metricChanges(primaryMetric, resultView.object.objectId); return <tr key={resultView.object.objectId}><td>{resultView.object.objectName}</td><td>{primaryMetric.relatedEnergyUnitNames?.join('、') || '—'}</td>{comparisonMetricNames.map((name) => { const metric = resultView.metrics.find((item) => item.name === name && item.resultType === 'ok'); return <td key={name}>{metric ? <><strong>{format(metric.value, metricDigits(metric.value))}</strong><small>{metric.unit}</small></> : '—'}</td>; })}<td className={styles.changeCell}>{percent(changes.mom)}</td><td className={styles.changeCell}>{percent(changes.yoy)}</td><td><button type="button" className={styles.link} onClick={() => { setTrendMetricId(primaryMetric.intensityMetricId); openMetricDialog(primaryMetric, true, resultView); }}>{primaryMetric.resultType === 'ok' ? '查看详情' : '补充数据'}</button></td></tr>; })}</tbody>
           </table>
         </div>}
         {applied.objectType === 'unit' && unitMetricGroups.length === 0 && <div className={styles.slimNote}><div><i>i</i><span>当前筛选对象暂无适用的能耗指标结果。</span></div></div>}
@@ -1700,7 +1700,7 @@ function BenchmarkPage() {
           {selectedAvailable ? <>
             <section className={`${styles.card} ${styles.benchmarkSummary}`} aria-label="指标摘要">
               <div><span>当前值</span><strong>{format(selected.actual, metricDigits(selected.actual))}<small>{selected.unit}</small></strong></div>
-              <div className={styles.benchmarkTargetSummaryItem}><span>目标值</span><strong>{targetConfigured ? <>{format(selected.target, metricDigits(selected.target))}<small>{selected.unit}</small></> : '未配置'}</strong><button type="button" className={styles.summaryAction} aria-label="指标目标配置" onClick={() => openTarget()}>{targetConfigured ? '调整目标' : '配置目标'}</button></div>
+              <div className={styles.benchmarkTargetSummaryItem}><span>目标值</span><strong>{targetConfigured ? <>{format(selected.target, metricDigits(selected.target))}<small>{selected.unit}</small></> : '未配置目标'}</strong><button type="button" className={styles.summaryAction} aria-label="指标目标配置" onClick={() => openTarget()}>{targetConfigured ? '调整目标' : '配置目标'}</button></div>
               <div><span>差距</span><strong className={targetConfigured ? good ? styles.down : styles.up : ''}>{targetConfigured ? <>{absoluteGap > 0 ? '+' : ''}{format(absoluteGap, metricDigits(Math.abs(absoluteGap)))}<small>{selected.unit}</small></> : '—'}</strong></div>
               <div className={styles.benchmarkSummaryDeviation}>
                 <span>{'相对偏差'}</span>
@@ -1711,7 +1711,7 @@ function BenchmarkPage() {
             <div className={styles.benchmarkMain}>
             <section className={`${styles.card} ${styles.benchmarkChart}`}>
               <div className={styles.benchmarkHead}>
-                <div><div className={styles.chartTitle}>实际值与目标值对标（{selected.metricName}）</div><div className={styles.chartSub}>{selected.objectName}｜单位：{selected.unit}{monthlyDataAvailable ? '｜真实月度数据' : '｜当前仅按年度对标'}</div></div>
+                <div><div className={styles.chartTitle}>实际值与目标值对标（{selected.metricName}）</div><div className={styles.chartSub}>{selected.objectName}｜单位：{selected.unit}｜{selected.direction === 'high' ? '效率类，越高越好' : selected.metricName.includes('能耗') || selected.metricName.includes('消费') ? '能耗强度/能源消费量类，越低越好' : '越低越好'}{monthlyDataAvailable ? '｜真实月度数据' : '｜当前仅按年度对标'}</div></div>
               </div>
               <div className={styles.benchmarkChartControls}>
                 <div className={styles.benchmarkLegend} aria-label="对标图例">
@@ -1803,7 +1803,7 @@ function BenchmarkPage() {
             <span>当前筛选条件下没有已形成能耗指标的数据。</span>
           </section>}
           <section className={`${styles.card} ${styles.tableCard}`}>
-            <div className={styles.tableToolbar}><div><div className={styles.chartTitle}>{applied.type === 'all' ? '全厂指标对标明细' : applied.type === 'product' ? '全部产品指标对标明细' : applied.type === 'device' ? '设备用能与能效对标明细' : '指标对标明细'}（{applied.year}年）</div><div className={styles.benchmarkRuleNote}>达标规则：能耗强度类指标实际值不高于目标值，效率类指标实际值不低于目标值；未配置目标的指标不参与达标判断。</div>{applied.type === 'product' && <div className={styles.chartSub}>点击产品行可联动切换上方单产品趋势与口径。</div>}{applied.type === 'device' && <div className={styles.chartSub}>设备消费量来自重点设备独立能源记录；具备运行时长、产量或供气量等分母前，不虚构设备效率指标。</div>}</div></div>
+            <div className={styles.tableToolbar}><div><div className={styles.chartTitle}>{applied.type === 'all' ? '全厂指标对标明细' : applied.type === 'product' ? '全部产品指标对标明细' : applied.type === 'device' ? '设备用能与能效对标明细' : '指标对标明细'}（{applied.year}年）</div><div className={styles.benchmarkRuleNote}>达标规则：能耗强度类指标实际值不高于目标值，效率类指标实际值不低于目标值；能源消费量类按实际值不高于目标值判断。规则依据指标定义方向，未配置目标的指标保留实际值，但不参与达标判断。</div>{applied.type === 'product' && <div className={styles.chartSub}>点击产品行可联动切换上方单产品趋势与口径。</div>}{applied.type === 'device' && <div className={styles.chartSub}>设备消费量来自重点设备独立能源记录；“单位产出能耗”属于能耗强度类，具备运行时长、产量或供气量等分母前不生成该指标。</div>}</div></div>
             <div className={styles.tableWrap}>
               <table>
                 <thead>{applied.type === 'device'

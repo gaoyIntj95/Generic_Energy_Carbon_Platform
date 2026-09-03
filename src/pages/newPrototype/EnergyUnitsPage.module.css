@@ -48,6 +48,14 @@
   white-space: nowrap;
 }
 
+.fieldHint {
+  display: block;
+  margin-top: 5px;
+  color: #7b8794;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .helpContent {
   display: grid;
   gap: 16px;
@@ -320,6 +328,12 @@
   font-size: 14px;
 }
 
+.rootTypeFields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
 .defaultTypeField,
 .typeSelectField {
   display: flex;
@@ -399,6 +413,20 @@
   border-radius: 6px;
 }
 
+.blockerAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.blockerAction button {
+  padding: 0;
+  color: #1677ff;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 13px;
+}
 .blockerList strong {
   color: #d92d20;
 }

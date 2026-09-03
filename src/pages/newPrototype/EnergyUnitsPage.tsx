@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   addChildEnergyUnit,
   createEnergyUnit,
@@ -21,6 +22,7 @@ import type {
   EnergyUnitReferenceSummary,
   EnergyUnitType,
   EnergyUnitWriteInput,
+  ConversionScenario,
 } from '../../types/energyUnit';
 import {
   Button,
@@ -37,6 +39,17 @@ import styles from './EnergyUnitsPage.module.css';
 const unitTypeOptions: EnergyUnitType[] = ['生产单元', '工序/环节', '公辅系统', '建筑/区域', '其他'];
 const rootUnitTypeOptions: EnergyUnitType[] = ['生产单元', '公辅系统', '建筑/区域', '其他'];
 const childUnitTypeOptions: EnergyUnitType[] = ['工序/环节', '公辅系统', '建筑/区域', '其他'];
+const conversionScenarioOptions: ConversionScenario[] = ['锅炉产汽/产热', '余热发电', '空压产气/压缩空气', '回收利用', '其他转换'];
+const rootCategoryOptions = ['生产类用能单元', '非生产类用能单元'] as const;
+const nonProductionTypeOptions: EnergyUnitType[] = ['公辅系统', '建筑/区域', '其他'];
+
+type RootCategory = typeof rootCategoryOptions[number];
+
+function rootCategoryOf(unitType: EnergyUnitType | ''): RootCategory | '' {
+  if (unitType === '生产单元') return '生产类用能单元';
+  if (nonProductionTypeOptions.includes(unitType as EnergyUnitType)) return '非生产类用能单元';
+  return '';
+}
 
 const childTypeRules: Record<EnergyUnitType, { defaultType: EnergyUnitType; options: EnergyUnitType[] }> = {
   生产单元: { defaultType: '工序/环节', options: ['工序/环节', '公辅系统', '其他'] },
@@ -325,6 +338,7 @@ export function EnergyUnitsPage() {
           >
             {yearOptions.map((year) => <option key={year}>{year}</option>)}
           </select>
+          <span className={styles.fieldHint}>业务年度上下文；主数据跨年度复用，切换年度不改变树形结果</span>
         </Field>
         <Field label="单元类型">
           <select
@@ -350,7 +364,7 @@ export function EnergyUnitsPage() {
 
       <Card className={styles.tableCard}>
         <div className={styles.notice}>
-          <div><strong>用能单元用于维护企业的用能层级和数据归属。</strong><span>一级为车间或区域，二级为工序、系统或环节。</span></div>
+          <div><strong>用能单元用于维护企业的用能层级和数据归属。</strong><span>一期仅支持两级；能流分析不汇总二级能源消费记录。</span></div>
           <button type="button" className={styles.noticeLink} onClick={() => setShowHelp(true)}>查看说明</button>
         </div>
         <div className={styles.tableArea}>
@@ -404,7 +418,8 @@ export function EnergyUnitsPage() {
           <div className={styles.helpContent}>
             <section>
               <strong>层级与归属</strong>
-              <p>一级用能单元通常对应车间或区域，二级用能单元对应工序、系统或环节。能源数据、运营数据和重点设备都需要关联到具体用能单元。</p>
+              <p>一期仅支持两级树形结构。一级用能单元通常对应车间或区域，二级用能单元对应工序、系统或环节；二级不能继续添加下级。能源数据、运营数据和重点设备都需要关联到具体用能单元。</p>
+              <p>生产类/非生产类仅为展示分组，正式业务属性以单元类型字典为准。不同一级单元下允许存在相同的二级类型，同一父级下名称必须唯一但类型可以重复。</p>
             </section>
             <section>
               <strong>排序</strong>
@@ -413,6 +428,10 @@ export function EnergyUnitsPage() {
             <section>
               <strong>其他能源业务</strong>
               <p>能源回收、转换与外供请前往“数据管理 &gt; 能源数据 &gt; 能源回收、转换与外供”维护。</p>
+            </section>
+            <section>
+              <strong>转换场景</strong>
+              <p>二级公辅系统可维护适用转换场景，转换页面仅从已配置对应场景的系统中筛选候选；该属性不表达能流关系。</p>
             </section>
           </div>
         </Modal>
@@ -461,8 +480,6 @@ export function EnergyUnitsPage() {
         >
           <div className={styles.confirmBox}>
             确认删除用能单元“<strong>{dialog.unit.energyUnitName}</strong>”吗？
-            <br />
-            删除后无法恢复。请确认该用能单元不再需要用于后续数据维护和分析。
           </div>
         </Modal>
       )}
@@ -571,6 +588,7 @@ function EnergyUnitFormDialog({
         ? target?.unitLevel ?? 'level1'
         : 'level2';
   const isAddingChild = dialog.type === 'addChild';
+  const isRootForm = level === 'level1' && !isAddingChild;
   const inheritedChildTypeRule = childTypeRule(parent);
   const availableTypes = isAddingChild ? inheritedChildTypeRule.options : formUnitTypes(level);
 
@@ -578,7 +596,16 @@ function EnergyUnitFormDialog({
     unitType: target?.unitType ?? (isAddingChild ? inheritedChildTypeRule.defaultType : ('' as EnergyUnitType)),
     energyUnitName: target?.energyUnitName ?? '',
     remark: target?.remark ?? '',
+    conversionScenarios: target?.conversionScenarios ?? [],
   });
+  const [rootCategory, setRootCategory] = useState<RootCategory | ''>(
+    isRootForm ? rootCategoryOf(target?.unitType ?? '') : '',
+  );
+  const [nonProductionType, setNonProductionType] = useState<EnergyUnitType | ''>(
+    isRootForm && target?.unitType && nonProductionTypeOptions.includes(target.unitType)
+      ? target.unitType
+      : '',
+  );
   const [error, setError] = useState('');
   const [isChangingChildType, setIsChangingChildType] = useState(false);
 
@@ -592,16 +619,21 @@ function EnergyUnitFormDialog({
           : '编辑下级用能单元';
   const save = () => {
     setError('');
-    if (!form.unitType || !form.energyUnitName.trim()) {
+    if ((isRootForm && (!rootCategory || (rootCategory === '非生产类用能单元' && !nonProductionType))) || (!isRootForm && !form.unitType) || !form.energyUnitName.trim()) {
       setError('请选择单元类型并填写用能单元名称。');
       return;
     }
+    const submitForm = isRootForm
+      ? { ...form, unitType: rootCategory === '生产类用能单元' ? '生产单元' as const : nonProductionType as EnergyUnitType, conversionScenarios: [] }
+      : level === 'level2' && form.unitType === '公辅系统'
+        ? form
+        : { ...form, conversionScenarios: [] };
     const result =
       dialog.type === 'addRoot'
-        ? createEnergyUnit(form)
+        ? createEnergyUnit(submitForm)
         : dialog.type === 'addChild'
           ? addChildEnergyUnit(dialog.parentEnergyUnitId, form)
-          : updateEnergyUnit(dialog.energyUnitId, form);
+          : updateEnergyUnit(dialog.energyUnitId, submitForm);
 
     if (!result.ok) {
       setError(
@@ -635,7 +667,29 @@ function EnergyUnitFormDialog({
           </div>
         )}
         <Field label="单元类型" required>
-          {isAddingChild && !isChangingChildType ? (
+          {isRootForm ? (
+            <div className={styles.rootTypeFields}>
+              <select aria-label="单元类型" required value={rootCategory} onChange={(event) => {
+                const category = event.target.value as RootCategory;
+                setRootCategory(category);
+                setNonProductionType('');
+                setForm((current) => ({ ...current, unitType: category === '生产类用能单元' ? '生产单元' : '' as EnergyUnitType }));
+              }}>
+                <option value="" disabled>请选择单元类型</option>
+                {rootCategoryOptions.map((category) => <option value={category} key={category}>{category}</option>)}
+              </select>
+              {rootCategory === '非生产类用能单元' && (
+                <select aria-label="非生产类用能单元类型" required value={nonProductionType} onChange={(event) => {
+                  const type = event.target.value as EnergyUnitType;
+                  setNonProductionType(type);
+                  setForm((current) => ({ ...current, unitType: type }));
+                }}>
+                  <option value="" disabled>请选择非生产类型</option>
+                  {nonProductionTypeOptions.map((type) => <option value={type} key={type}>{type}</option>)}
+                </select>
+              )}
+            </div>
+          ) : isAddingChild && !isChangingChildType ? (
             <div className={styles.defaultTypeField}>
               <div>
                 <span>系统默认</span>
@@ -695,6 +749,29 @@ function EnergyUnitFormDialog({
             }
           />
         </Field>
+        {level === 'level2' && form.unitType === '公辅系统' && (
+          <div className={styles.full}>
+            <Field label="适用转换场景">
+              <div className={styles.checkboxGroup}>
+                {conversionScenarioOptions.map((scenario) => (
+                  <label key={scenario}>
+                    <input
+                      type="checkbox"
+                      checked={form.conversionScenarios?.includes(scenario) ?? false}
+                      onChange={(event) => setForm((current) => ({
+                        ...current,
+                        conversionScenarios: event.target.checked
+                          ? [...(current.conversionScenarios ?? []), scenario]
+                          : (current.conversionScenarios ?? []).filter((item) => item !== scenario),
+                      }))}
+                    />
+                    {scenario}
+                  </label>
+                ))}
+              </div>
+            </Field>
+          </div>
+        )}
         <div className={styles.full}>
           <Field label="备注">
             <textarea
@@ -737,27 +814,34 @@ function DeleteBlockedDialog({
   references: EnergyUnitReferenceSummary;
   onClose: () => void;
 }) {
+  const navigate = useNavigate();
   const referenceItems = [
-    ['下级用能单元', references.childCount],
-    ['能源消费数据', references.energyRecordCount],
-    ['运营数据', references.operationRecordCount],
-    ['重点设备档案', references.deviceCount],
-    ['能源流转关系', references.conversionRelationCount],
-  ].filter(([, count]) => Number(count) > 0);
+    { label: '下级用能单元', count: references.childCount, path: '/data-management/units' },
+    { label: '能源消费数据', count: references.energyRecordCount, path: '/data-management/energy-data' },
+    { label: '运营数据', count: references.operationRecordCount, path: '/data-management/operations' },
+    { label: '重点设备档案', count: references.deviceCount, path: '/data-management/devices' },
+    { label: '能源流转关系', count: references.conversionRelationCount, path: '/data-management/energy-data?tab=recovery' },
+  ].filter((item) => item.count > 0);
 
   return (
     <Modal title="无法删除用能单元" width={560} cancelText="我知道了" onClose={onClose}>
       <p className={styles.blockerIntro}>
-        用能单元“{unit.energyUnitName}”存在以下关联内容。为保证历史数据和分析结果完整，暂不支持删除。
+        用能单元“{unit.energyUnitName}”已关联数据，无法删除。
       </p>
       <ul className={styles.blockerList}>
-        {referenceItems.map(([label, count]) => <li key={label}><span>{label}</span><strong>{count} 项</strong></li>)}
+        {referenceItems.map((item) => (
+          <li key={item.label}>
+            <span>{item.label}</span>
+            <span className={styles.blockerAction}>
+              <strong>{item.count} 项</strong>
+              <button type="button" onClick={() => navigate(item.path)}>去处理</button>
+            </span>
+          </li>
+        ))}
       </ul>
-      <p className={styles.blockerHint}>请先处理上述关联内容后再删除该用能单元。</p>
     </Modal>
   );
 }
-
 function unitCategory(unit: EnergyUnit) {
   return unit.unitType === '生产单元' || unit.unitType === '工序/环节' ? '生产类' : '非生产类';
 }

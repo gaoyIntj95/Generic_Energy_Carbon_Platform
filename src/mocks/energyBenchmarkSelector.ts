@@ -76,7 +76,7 @@ export interface BenchmarkDataset {
 
 function productSummaryBenchmarkMetric(year: number): BenchmarkMetric {
   const view = buildIntensityCalculationView(year, 'product', 'product-summary');
-  const metric = view.metrics.find((item) => item.name === '单位产品综合能耗') ?? view.metrics[0];
+  const metric = view.metrics.find((item) => item.name === '单位产品综合能耗' && item.benchmarkable !== false);
   const target = targetValue('product', 'product-summary', 'energy_per_product', year);
   const available = metric?.resultType === 'ok';
   return {
@@ -93,9 +93,9 @@ function productSummaryBenchmarkMetric(year: number): BenchmarkMetric {
     target: target?.value ?? 0,
     targetConfigured: Boolean(target),
     direction: 'low',
-    trend: metric.trend,
+    trend: metric?.trend ?? [],
     available,
-    unavailableReason: available ? '' : metric?.issue ?? '指标暂不可计算',
+    unavailableReason: available ? '' : metric?.issue ?? '一期未配置产品能源分配，无法形成产品独立能耗指标',
     availabilityLabel: available ? '可对标' : '待完善',
     energyUnitId: null,
     productId: null,
@@ -320,9 +320,10 @@ function unitMetric(
     targetConfigured: Boolean(target),
     direction: 'low',
     trend: ratioTrend(records.map((record) => ({ record, share: 1 })), [operation], types),
-    available: Boolean(target),
-    unavailableReason: target ? '' : '当前指标尚未配置目标值。',
-    availabilityLabel: target ? '可对标' : '待完善',
+    // 目标缺失不影响已计算实际值；仅影响达标判断。
+    available: true,
+    unavailableReason: '',
+    availabilityLabel: '可对标',
     energyUnitId,
     productId: null,
     energyRecordIds: records.map((record) => record.energyRecordId),
@@ -405,10 +406,6 @@ function productMetric(
   if (!productOperations.length || productOperations.every((record) => annualOperationAmount(record) <= 0)) {
     return unavailableProductMetric(product, year, '缺少当前年度产品产量。', scopeNames, target?.value ?? 0, Boolean(target), productOperations.map((item) => item.operationMetricId));
   }
-  if (!target) {
-    return unavailableProductMetric(product, year, '缺少当前年度指标目标值。', scopeNames, 0, false, productOperations.map((item) => item.operationMetricId));
-  }
-
   const allocatedEnergyRecords: AllocatedEnergyRecord[] = [];
   const allocationParts: string[] = [];
   for (const energyUnitId of product.linkedEnergyUnitIds) {
@@ -419,8 +416,8 @@ function productMetric(
         year,
         allocation.reason,
         scopeNames,
-        target.value,
-        true,
+        target?.value ?? 0,
+        Boolean(target),
         productOperations.map((item) => item.operationMetricId),
       );
     }
@@ -435,8 +432,8 @@ function productMetric(
         year,
         `生产单元“${unitNames.get(energyUnitId) ?? energyUnitId}”缺少同期能源数据。`,
         scopeNames,
-        target.value,
-        true,
+        target?.value ?? 0,
+        Boolean(target),
         productOperations.map((item) => item.operationMetricId),
       );
     }
@@ -459,8 +456,8 @@ function productMetric(
     metricName: '单位产品综合能耗',
     unit: `kgce/${product.unit}`,
     actual: totalEnergy * 1000 / totalOutput,
-    target: target.value,
-    targetConfigured: true,
+    target: target?.value ?? 0,
+    targetConfigured: Boolean(target),
     direction: 'low',
     trend: ratioTrend(allocatedEnergyRecords, productOperations, types),
     available: true,
@@ -595,7 +592,7 @@ export function buildBenchmarkDataset(year: number): BenchmarkDataset {
       objectType,
       'all',
       objectType === 'factory' ? 'factory' : undefined,
-    ).flatMap((view) => view.metrics.map((metric) => intensityBenchmarkMetric(
+    ).flatMap((view) => view.metrics.filter((metric) => metric.benchmarkable !== false).map((metric) => intensityBenchmarkMetric(
       year,
       view,
       metric,
