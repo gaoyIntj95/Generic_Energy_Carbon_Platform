@@ -2147,19 +2147,16 @@
 }
 
 .deviceTable th:nth-child(1),
-.deviceTable td:nth-child(1) { width: 31%; }
+.deviceTable td:nth-child(1) { width: 35%; }
 
 .deviceTable th:nth-child(2),
-.deviceTable td:nth-child(2) { width: 19%; }
+.deviceTable td:nth-child(2) { width: 22%; }
 
 .deviceTable th:nth-child(3),
-.deviceTable td:nth-child(3) { width: 17%; }
+.deviceTable td:nth-child(3) { width: 18%; }
 
 .deviceTable th:nth-child(4),
-.deviceTable td:nth-child(4) { width: 15%; }
-
-.deviceTable th:nth-child(5),
-.deviceTable td:nth-child(5) { width: 18%; }
+.deviceTable td:nth-child(4) { width: 25%; }
 
 .devicePageHeader {
   padding: 18px 20px 10px;

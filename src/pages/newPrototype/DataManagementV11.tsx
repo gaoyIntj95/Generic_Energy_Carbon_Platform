@@ -1294,7 +1294,6 @@ function DevicesPage() {
   const units = listEnergyUnits();
   const types = listV11EnergyTypes();
   const currentYear = new Date().getFullYear();
-  const deviceEnergyRecords = listV11EnergyRecords().filter((record) => record.year === currentYear && v11RecordScopeType(record) === 'device');
   const levelOneUnits = units.filter((unit) => unit.unitLevel === 'level1');
   const childUnits = units.filter((unit) => unit.unitLevel === 'level2' && unit.parentEnergyUnitId === levelOneUnitIdInput);
   const rows = listV11KeyDevices().filter((item) => {
@@ -1333,7 +1332,6 @@ function DevicesPage() {
   };
 
   const renderDeviceRow = (row: V11KeyDevice) => {
-    const energyRecords = deviceEnergyRecords.filter((record) => record.scopeId === row.deviceId);
     const energyType = types.find((type) => type.energyTypeId === row.mainEnergyTypeId);
     const requestDelete = () => {
       const inspection = inspectV11KeyDeviceDeletion(row.deviceId);
@@ -1344,8 +1342,7 @@ function DevicesPage() {
       <td><div className={styles.deviceNameCell}><span className={styles.deviceName}>{row.deviceName}</span></div></td>
       <td><span className={styles.deviceTypeText}>{row.deviceType}</span></td>
       <td><Tag tone="blue">{energyType?.energyTypeName}</Tag></td>
-      <td><Tag tone={energyRecords.length ? 'green' : 'gray'}>{energyRecords.length ? '已维护' : '未维护'}</Tag></td>
-      <td><div className={styles.actions}><button type="button" onClick={() => setEditing(row)}>编辑</button><button type="button" onClick={() => navigate(`/data-management/energy-data?scope=device&deviceId=${row.deviceId}&year=${currentYear}`)}>能源数据</button><button type="button" onClick={() => setConfiguringIndicator(row)}>配置指标</button><button type="button" className={styles.danger} onClick={requestDelete}>删除</button></div></td>
+      <td><div className={styles.actions}><button type="button" onClick={() => setEditing(row)}>编辑</button><button type="button" className={styles.danger} onClick={requestDelete}>删除</button></div></td>
     </tr>;
   };
 
@@ -1356,21 +1353,21 @@ function DevicesPage() {
       {levelOneUnitIdInput && <Field label="具体用能单元"><select value={unitIdInput} onChange={(event) => setUnitIdInput(event.target.value)}><option value="">全部</option><option value={levelOneUnitIdInput}>一级单元直属设备</option>{childUnits.map((unit) => <option key={unit.energyUnitId} value={unit.energyUnitId}>{unit.energyUnitName}</option>)}</select></Field>}
     </Toolbar>
     <div className={styles.devicePageHeader}><h2>重点设备</h2></div>
-    <div className={styles.tableWrap}><table className={styles.deviceTable}><thead><tr><th>重点设备</th><th>设备类型</th><th>主要能源品种</th><th>能源数据状态</th><th>操作</th></tr></thead><tbody>{groupedRows.length ? groupedRows.flatMap((group) => {
+    <div className={styles.tableWrap}><table className={styles.deviceTable}><thead><tr><th>重点设备</th><th>设备类型</th><th>主要能源品种</th><th>操作</th></tr></thead><tbody>{groupedRows.length ? groupedRows.flatMap((group) => {
       const collapsed = collapsedLevelOneIds.includes(group.unit.energyUnitId);
       const toggle = () => setCollapsedLevelOneIds((current) => current.includes(group.unit.energyUnitId) ? current.filter((id) => id !== group.unit.energyUnitId) : [...current, group.unit.energyUnitId]);
       const groupDevices = [...group.directDevices, ...group.childGroups.flatMap((childGroup) => childGroup.devices)];
-      return [<tr className={styles.deviceLevelOneRow} key={`level-one-${group.unit.energyUnitId}`}><td colSpan={5}><div className={styles.deviceLevelOneNode}><button type="button" aria-label={`${collapsed ? '展开' : '收起'}${group.unit.energyUnitName}`} className={styles.deviceToggle} onClick={toggle}>{collapsed ? '+' : '−'}</button><b>{group.unit.energyUnitName}</b><button type="button" className={`${styles.deviceAddButton} ${styles.deviceLevelOneAddButton}`} onClick={() => setEditing({ rootUnitId: group.unit.energyUnitId })}>＋ 新增设备</button></div></td></tr>,
+      return [<tr className={styles.deviceLevelOneRow} key={`level-one-${group.unit.energyUnitId}`}><td colSpan={4}><div className={styles.deviceLevelOneNode}><button type="button" aria-label={`${collapsed ? '展开' : '收起'}${group.unit.energyUnitName}`} className={styles.deviceToggle} onClick={toggle}>{collapsed ? '+' : '−'}</button><b>{group.unit.energyUnitName}</b><button type="button" className={`${styles.deviceAddButton} ${styles.deviceLevelOneAddButton}`} onClick={() => setEditing({ rootUnitId: group.unit.energyUnitId })}>＋ 新增设备</button></div></td></tr>,
         ...(!collapsed ? [
           ...group.directDevices.map((row) => renderDeviceRow(row)),
           ...group.childGroups.flatMap((childGroup) => {
             const childCollapsed = collapsedUnitIds.includes(childGroup.unit.energyUnitId);
             const childToggle = () => setCollapsedUnitIds((current) => current.includes(childGroup.unit.energyUnitId) ? current.filter((id) => id !== childGroup.unit.energyUnitId) : [...current, childGroup.unit.energyUnitId]);
-            return [<tr className={styles.deviceLevelTwoRow} key={`level-two-${childGroup.unit.energyUnitId}`}><td colSpan={5}><div className={styles.deviceLevelTwoNode}><button type="button" aria-label={`${childCollapsed ? '展开' : '收起'}${childGroup.unit.energyUnitName}`} className={styles.deviceToggle} onClick={childToggle}>{childCollapsed ? '+' : '−'}</button><span>{childGroup.unit.energyUnitName}</span><button type="button" className={`${styles.deviceAddButton} ${styles.deviceLevelTwoAddButton}`} onClick={() => setEditing({ rootUnitId: childGroup.unit.energyUnitId })}>＋ 新增设备</button></div></td></tr>, ...(childCollapsed ? [] : childGroup.devices.map((row) => renderDeviceRow(row)))];
+            return [<tr className={styles.deviceLevelTwoRow} key={`level-two-${childGroup.unit.energyUnitId}`}><td colSpan={4}><div className={styles.deviceLevelTwoNode}><button type="button" aria-label={`${childCollapsed ? '展开' : '收起'}${childGroup.unit.energyUnitName}`} className={styles.deviceToggle} onClick={childToggle}>{childCollapsed ? '+' : '−'}</button><span>{childGroup.unit.energyUnitName}</span><button type="button" className={`${styles.deviceAddButton} ${styles.deviceLevelTwoAddButton}`} onClick={() => setEditing({ rootUnitId: childGroup.unit.energyUnitId })}>＋ 新增设备</button></div></td></tr>, ...(childCollapsed ? [] : childGroup.devices.map((row) => renderDeviceRow(row)))];
           }),
         ] : []),
       ];
-    }) : <EmptyRow colSpan={5} />}</tbody></table></div>
+    }) : <EmptyRow colSpan={4} />}</tbody></table></div>
     <Pagination count={rows.length} />
   </section>
   {editing && <DeviceDialog item={editing !== 'new' && !('rootUnitId' in editing) ? editing : undefined} dialogPreset={editing !== 'new' && 'rootUnitId' in editing ? editing : undefined} onClose={() => setEditing(null)} onSaved={(message) => { setEditing(null); setVersion((value) => value + 1); notify(message); }} />}
@@ -1399,9 +1396,11 @@ function DeviceDialog({ item, dialogPreset, onClose, onSaved }: { item?: V11KeyD
   const selectableTypes = types.filter((type) => type.energyTypeId === item?.mainEnergyTypeId || isV11EnergyTypeEnabled(type.energyTypeId));
   const initialUnit = units.find((unit) => unit.energyUnitId === item?.energyUnitId);
   const initialPreset = deviceTypePresets.includes(item?.deviceType ?? '') ? item?.deviceType ?? '' : item ? '其他（自定义）' : '';
-  const [scopeLevel, setScopeLevel] = useState<'一级用能单元' | '二级用能单元'>(dialogPreset ? '二级用能单元' : initialUnit?.unitLevel === 'level1' ? '一级用能单元' : '二级用能单元');
-  const [unitId, setUnitId] = useState(item?.energyUnitId ?? '');
-  const [parentUnitId, setParentUnitId] = useState(dialogPreset?.rootUnitId ?? (initialUnit?.unitLevel === 'level2' ? initialUnit.parentEnergyUnitId ?? '' : ''));
+  const presetRootUnit = units.find((unit) => unit.energyUnitId === dialogPreset?.rootUnitId);
+  const presetRootIsLevelOne = presetRootUnit?.unitLevel === 'level1';
+  const [scopeLevel, setScopeLevel] = useState<'一级用能单元' | '二级用能单元'>(dialogPreset ? (presetRootIsLevelOne ? '一级用能单元' : '二级用能单元') : initialUnit?.unitLevel === 'level1' ? '一级用能单元' : '二级用能单元');
+  const [unitId, setUnitId] = useState(item?.energyUnitId ?? (dialogPreset && !presetRootIsLevelOne ? dialogPreset.rootUnitId : ''));
+  const [parentUnitId, setParentUnitId] = useState(dialogPreset && presetRootIsLevelOne ? dialogPreset.rootUnitId : (initialUnit?.unitLevel === 'level2' ? initialUnit.parentEnergyUnitId ?? '' : ''));
   const [preset, setPreset] = useState(initialPreset);
   const [customType, setCustomType] = useState(initialPreset === '其他（自定义）' ? item?.deviceType ?? '' : '');
   const [name, setName] = useState(item?.deviceName ?? '');
@@ -1418,14 +1417,15 @@ function DeviceDialog({ item, dialogPreset, onClose, onSaved }: { item?: V11KeyD
   const hasRootContext = Boolean(dialogPreset);
   return <Modal title={item ? '编辑重点设备档案' : '新增重点设备'} width={720} submitText="保存设备" onClose={onClose} onSubmit={() => {
     const deviceType = preset === '其他（自定义）' ? customType.trim() : preset;
-    const resolvedUnitId = hasRootContext && scopeLevel === '一级用能单元' ? parentUnitId : unitId;
+    const resolvedUnitId = hasRootContext ? (presetRootIsLevelOne ? parentUnitId : unitId) : unitId;
     if (!resolvedUnitId || !deviceType || !name.trim() || !typeId) return setError('请完整填写设备名称、设备类型、主要能源品种和归属用能单元。');
     const result = saveV11KeyDevice({ energyUnitId: resolvedUnitId, deviceType, deviceName: name.trim(), mainEnergyTypeId: typeId, remark }, item?.deviceId);
     if (!result.ok) return setError(result.error);
     onSaved(item ? '重点设备已更新' : '重点设备已新增');
   }}><div className={styles.deviceForm}>
     {(lockedOwnership || hasRootContext) && <div className={styles.contextStrip}>
-      {hasRootContext && <span>所属一级用能单元 <strong>{selectedParentUnit?.energyUnitName ?? '—'}</strong></span>}
+      {hasRootContext && presetRootIsLevelOne && <><span>所属一级用能单元 <strong>{presetRootUnit?.energyUnitName ?? '—'}</strong></span><span>归属方式 <strong>一级单元直属设备</strong></span></>}
+      {hasRootContext && !presetRootIsLevelOne && <><span>所属一级用能单元 <strong>{selectedParentUnit?.energyUnitName ?? '—'}</strong></span><span>所属二级用能单元 <strong>{presetRootUnit?.energyUnitName ?? '—'}</strong></span></>}
       {lockedOwnership && <>
         <span>归属层级 <strong>{scopeLevel}</strong></span>
         {scopeLevel === '二级用能单元' && <span>所属一级 <strong>{selectedParentUnit?.energyUnitName ?? '—'}</strong></span>}
@@ -1441,7 +1441,7 @@ function DeviceDialog({ item, dialogPreset, onClose, onSaved }: { item?: V11KeyD
         <Field label="主要能源品种" required><select value={typeId} onChange={(event) => setTypeId(event.target.value)}><option value="">请选择主要能源品种</option>{selectableTypes.map((type) => <option key={type.energyTypeId} value={type.energyTypeId}>{type.energyTypeName}</option>)}</select></Field>
       </div>
     </section>
-    {!lockedOwnership && <section className={styles.deviceFormSection}>
+    {!lockedOwnership && !hasRootContext && <section className={styles.deviceFormSection}>
       <h3>归属信息</h3>
       <div className={`${styles.deviceOwnershipFields} ${hasRootContext ? styles.deviceRootOwnership : ''}`}>
         {!hasRootContext && <Field label="归属层级" required><select aria-label="重点设备归属层级" value={scopeLevel} onChange={(event) => { setScopeLevel(event.target.value as '一级用能单元' | '二级用能单元'); setUnitId(''); if (!hasRootContext) setParentUnitId(''); }}><option>一级用能单元</option><option>二级用能单元</option></select></Field>}

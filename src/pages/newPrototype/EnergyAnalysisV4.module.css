@@ -480,9 +480,9 @@
 
 .deviceGroupToggle {
   display: flex;
-  width: 100%;
+  width: fit-content;
   align-items: center;
-  gap: 4px;
+  gap: 12px;
   padding: 0;
   color: inherit;
   background: transparent;
@@ -493,11 +493,13 @@
 }
 
 .deviceGroupToggle small {
-  margin-left: auto;
-  margin-right: 9%;
+  margin: 0;
+  padding: 3px 8px;
   color: var(--brand);
   font-size: 12px;
   font-weight: 600;
+  background: #eaf8f2;
+  border-radius: 4px;
 }
 
 .deviceStatusToolbar {
@@ -524,11 +526,6 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 6px 12px;
-}
-
-.deviceInlineActions small {
-  color: #d97706;
-  white-space: nowrap;
 }
 
 .deviceMetricTable {
