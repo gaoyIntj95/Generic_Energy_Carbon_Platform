@@ -248,7 +248,9 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     const productSelect = container.querySelector('select[aria-label="具体分析对象"]') as HTMLSelectElement;
     expect(productSelect.options.length).toBeGreaterThan(1);
     await click(button('查询'));
-    expect(container.textContent).toContain('单位产品综合能耗');
+    expect(container.textContent).toContain('关联生产单元综合能耗');
+    expect(container.textContent).toContain('产品关联生产用能单元的能源消费统计');
+    expect(container.textContent).toContain('一期不进行多产品能源分配');
     expect(container.textContent).not.toContain('单位产品电耗');
 
     await click(button('设备'));
@@ -265,8 +267,11 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
 
     const missingFactoryMetric = [...container.querySelectorAll('tr')].find((row) => row.textContent?.includes('单位增加值综合能耗'))!;
     await click(missingFactoryMetric.querySelector('button')!);
-    expect(container.querySelector('[data-testid="location"]')?.textContent).toContain('/data-management/operations');
-    expect(decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '')).toContain('returnTo=/energy-analysis/intensity?objectType=factory');
+    const factoryLocation = decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '');
+    expect(factoryLocation).toContain('/data-management/operations');
+    expect(factoryLocation).toContain('scopeLevel=企业');
+    expect(factoryLocation).not.toContain('keyword=');
+    expect(factoryLocation).toContain('returnTo=/energy-analysis/intensity?objectType=factory');
 
     await render('/energy-analysis/intensity');
     await click(button('产品'));
@@ -283,14 +288,84 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(dialog.getAttribute('aria-label')).toBe('设备指标详情');
     expect(dialog.textContent).toContain('修改能源消耗数据');
     expect(dialog.textContent).toContain('修改设备产出数据');
+    expect(dialog.textContent).toContain('设备产出数据');
     await click(button('关闭', dialog));
 
     await click(button('展开'));
-    await click(button('补充数据'));
+    const dualMissingRow = [...container.querySelectorAll('tr')].find((row) => row.textContent?.includes('2#螺杆空压机'))!;
+    expect(dualMissingRow.textContent).toContain('缺2项数据');
+    expect(dualMissingRow.textContent).toContain('补充能源数据');
+    expect(dualMissingRow.textContent).toContain('补充产出数据');
+    expect(container.querySelector('[aria-label="完善设备指标数据"]')).toBeNull();
+
+    await click(button('补充产出数据', dualMissingRow));
     dialog = container.querySelector('[role="dialog"]')!;
-    expect(dialog.getAttribute('aria-label')).toBe('完善设备指标数据');
-    expect(dialog.textContent).toContain('补充能源消耗数据');
-    expect(dialog.textContent).toContain('补充设备产出数据');
+    expect(dialog.getAttribute('aria-label')).toBe('修改供气量数据');
+    expect(dialog.textContent).not.toContain('请按实际来源补充能源消耗和设备产出数据');
+  });
+
+  it('shows supplement data only for a level-one unit with missing operation data', async () => {
+    await render('/energy-analysis/intensity');
+    await click(button('一级用能单元'));
+
+    const missingRow = [...container.querySelectorAll('tr')].find((row) => row.textContent?.includes('仓储物流区域'))!;
+    expect(missingRow.textContent).toContain('补充数据');
+    expect(missingRow.textContent).not.toContain('查看详情');
+    expect([...container.querySelectorAll('tr')].find((row) => row.textContent?.includes('办公区域'))?.textContent).toContain('查看详情');
+
+    await click(button('补充数据', missingRow));
+    const location = decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '');
+    expect(location).toContain('/data-management/operations');
+    expect(location).toContain('scopeLevel=一级用能单元');
+    expect(location).not.toContain('unitId=');
+    expect(location).not.toContain('keyword=');
+    expect(location).not.toContain('new=1');
+  });
+
+  it('routes a missing device energy action directly to device energy data', async () => {
+    await render('/energy-analysis/intensity?objectType=device');
+    expect(container.querySelector('table[class*="deviceMetricTable"]')).not.toBeNull();
+    await click(button('展开'));
+    const dualMissingRow = [...container.querySelectorAll('tr')].find((row) => row.textContent?.includes('2#螺杆空压机'))!;
+
+    await click(button('补充能源数据', dualMissingRow));
+    const location = decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '');
+    expect(location).toContain('/data-management/energy-data');
+    expect(location).toContain('scope=device');
+    expect(location).toContain('deviceId=v11-device-79');
+    expect(location).not.toContain('recordId=');
+    expect(location).not.toContain('new=1');
+    expect(container.querySelector('[aria-label="完善设备指标数据"]')).toBeNull();
+  });
+
+  it('routes conversion-based device output maintenance to the conversion ledger', async () => {
+    await render('/energy-analysis/intensity?objectType=device');
+    const conversionRow = [...container.querySelectorAll('tr')].find((row) => row.textContent?.includes('余热发电机组'))!;
+
+    await click(button('查看详情', conversionRow));
+    const dialog = container.querySelector('[role="dialog"]')!;
+    expect(dialog.textContent).toContain('修改转换产出数据');
+    await click(button('修改转换产出数据', dialog));
+
+    const location = decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '');
+    expect(location).toContain('/data-management/energy-data');
+    expect(location).toContain('tab=conversion');
+    expect(location).toContain('editConversionId=v11-output-200');
+    expect(location).not.toContain('new=1');
+  });
+
+  it('opens the populated level-one operation tab when supplementing a key product', async () => {
+    await render('/energy-analysis/intensity');
+    await click(button('重点产品'));
+
+    const missingProductRow = [...container.querySelectorAll('tr')].find((row) => row.textContent?.includes('产品C'))!;
+    await click(button('补充数据', missingProductRow));
+
+    const location = decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '');
+    expect(location).toContain('/data-management/operations');
+    expect(location).toContain('scopeLevel=一级用能单元');
+    expect(location).not.toContain('productId=');
+    expect(location).not.toContain('keyword=');
   });
 
   it('calculates waste heat generator unit electricity consumption from conversion output records', () => {
@@ -331,31 +406,20 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(container.textContent).not.toContain('记录ID');
 
     await click(button('产品'));
-    const productSelect = container.querySelector('select[aria-label="趋势指标"]') as HTMLSelectElement;
-    expect([...productSelect.options].map((option) => option.textContent)).toEqual([
-      '产品A｜单位产品综合能耗',
-      '产品B｜单位产品综合能耗',
-    ]);
-    await setSelect(productSelect, productSelect.options[1].value);
-    expect(container.textContent).toContain('产品B');
-    expect(container.textContent).toContain('实际值与目标值对标（单位产品综合能耗）');
-    const productSummary = container.querySelector('[aria-label="指标摘要"]');
-    expect(productSummary?.textContent).toContain('当前值');
-    expect(productSummary?.textContent).toContain('目标值26.0kgce/t');
-    expect(container.textContent).toContain('按能耗强度指标口径计算');
-    expect(container.textContent).toContain('全部产品指标对标明细');
-    expect(container.textContent).not.toContain('待完善');
+    expect(container.querySelector('select[aria-label="趋势指标"]')).toBeNull();
+    expect(container.textContent).toContain('当前企业尚未维护产品基础信息');
+    expect(container.textContent).not.toContain('关联生产单元综合能耗');
     expect(container.textContent).not.toContain('v11-er-');
     expect(container.textContent).not.toContain('v11-operation-');
 
     await click(button('设备'));
     const deviceSelect = container.querySelector('select[aria-label="趋势指标"]') as HTMLSelectElement;
     expect([...deviceSelect.options].map((option) => option.textContent)).toEqual(expect.arrayContaining([
-      '余热发电机组｜设备能源数据',
+      '余热发电机组｜单位产出能耗',
     ]));
     expect([...deviceSelect.options].every((option) => !option.textContent?.includes('待完善'))).toBe(true);
     expect(container.textContent).not.toContain('待完善设备');
-    expect(container.textContent).toContain('实际值与目标值对标（电力消费量）');
+    expect(container.textContent).toContain('实际值与目标值对标（单位产出能耗）');
     expect(container.textContent).toContain('当前指标读取1#数控加工中心独立设备能源记录');
     expect(container.textContent).toContain('未配置目标');
     expect(container.querySelector('[aria-label="指标趋势图"]')?.textContent).not.toContain('年度目标');
@@ -414,16 +478,9 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
 
   it('uses the intensity selector as the shared source for product benchmark rows', () => {
     const initial = buildBenchmarkDataset(2026);
-    const productA = initial.rows.find((row) => row.productId === 'product-a');
-    const productB = initial.rows.find((row) => row.productId === 'product-b');
-    const productC = initial.rows.find((row) => row.productId === 'product-c');
-
-    expect(productA).toMatchObject({ available: true, scopeNames: ['产品A'] });
-    expect(productB).toMatchObject({ available: true, scopeNames: ['产品B'] });
-    expect(productB?.operationMetricIds).toHaveLength(1);
-    expect(productC).toMatchObject({ available: false, unavailableReason: '未关联生产用能单元' });
-    expect(productA?.monthlyDataStatus).toBe('complete');
-    expect(productB?.monthlyDataStatus).toBe('complete');
+    const productRows = initial.rows.filter((row) => row.objectTypeKey === 'product');
+    expect(productRows).toHaveLength(0);
+    expect(initial.unavailableReasons.product).toContain('产品基础信息');
   });
 
   it('uses the intensity selector as the shared source for device benchmark rows', () => {

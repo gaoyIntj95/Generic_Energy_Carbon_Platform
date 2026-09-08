@@ -602,7 +602,7 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
       title: compact ? `修改${parameterLabel}数据` : '补充数据',
       body: <>
         {compact
-          ? <div className={styles.compactEditContext}>正在修改：<strong>{row.deviceName}</strong>｜{row.metricName}</div>
+          ? <><div className={styles.compactEditContext}>正在修改：<strong>{row.deviceName}</strong>｜{row.metricName}</div><div className={styles.modalNote}>设备产出数据仅用于本设备指标计算，不写入能源消费或能源回收、转换与外供台账。{row.deviceType === '能源转换设备' && '能源转换台账中的产出数据不会自动同步到本指标，请按当前指标口径填报。'}</div></>
           : <DetailGrid items={[['具体缺失原因', row.resultReason ?? '缺少计算参数'], ['设备名称', row.deviceName], ['所属用能单元', row.energyUnitName], ['分析年度', `${applied.year}年`], ['设备类型', row.deviceType], ['年度能源消费', `${format(row.annualEnergy)} ${row.energyUnit}`], ['数据进度', row.dataProgress], ['典型指标', row.metricName], ['计算公式', row.formula]]} />}
         <div className={styles.monthlyParameterField}>
           <span>{parameterLabel}｜月度录入（{parameterUnit}）</span>
@@ -635,9 +635,7 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
     let denominatorName = row?.templateConfig?.denominator.name ?? '设备作业量';
     let denominatorUnit = row?.templateConfig?.denominator.unit ?? 't';
     let resultUnit = row?.templateConfig?.resultUnit ?? 'kWh/t';
-    let denominatorSource: 'operation-data' | 'energy-conversion' = row?.templateConfig?.denominator.source === 'energy-conversion' ? 'energy-conversion' : 'operation-data';
     let denominatorMetricCode = row?.templateConfig?.denominator.metricCode ?? '';
-    let denominatorRecordType = row?.templateConfig?.denominator.recordType ?? '余热发电';
     const syncResultUnit = () => { resultUnit = `${energyTypeId === 'v11-energy-electricity' ? 'kWh' : 'kgce'}/${denominatorUnit}`; };
     setDialog({
       title: '配置设备指标口径',
@@ -645,13 +643,12 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
       body: <>
         <div className={styles.modalNote}>指标模板由系统预置，设备只绑定模板并配置数据来源；公式和计算方式由模板统一管理。</div>
         {row && <DetailGrid items={[['绑定设备', row.deviceName], ['设备类型', row.deviceType]]} />}
-        <label className={styles.modalField}><span className={styles.required}>指标模板</span><select aria-label="指标模板" defaultValue={templateId} onChange={(event) => { templateId = event.target.value as DeviceMetricTemplateId; energyTypeId = 'v11-energy-electricity'; denominatorName = '设备作业量'; denominatorUnit = 't'; denominatorSource = 'operation-data'; denominatorMetricCode = ''; syncResultUnit(); }}>
+        <label className={styles.modalField}><span className={styles.required}>指标模板</span><select aria-label="指标模板" defaultValue={templateId} onChange={(event) => { templateId = event.target.value as DeviceMetricTemplateId; energyTypeId = 'v11-energy-electricity'; denominatorName = '设备作业量'; denominatorUnit = 't'; denominatorMetricCode = ''; syncResultUnit(); }}>
           {DEVICE_METRIC_TEMPLATES.map((item) => <option key={item.templateId} value={item.templateId}>{item.label}</option>)}
         </select></label>
         <label className={styles.modalField}><span>指标名称</span><input aria-label="指标名称" value={metricName} readOnly /></label>
         <label className={styles.modalField}><span className={styles.required}>能源消耗</span><select aria-label="能源消耗" defaultValue={energyTypeId} onChange={(event) => { energyTypeId = event.target.value; syncResultUnit(); }}><option value="v11-energy-electricity">电力</option><option value="v11-energy-natural-gas">天然气折标综合能耗</option></select></label>
-        <label className={styles.modalField}><span className={styles.required}>分母来源</span><select aria-label="分母来源" defaultValue={denominatorSource} onChange={(event) => { denominatorSource = event.target.value as 'operation-data' | 'energy-conversion'; }}><option value="operation-data">运行数据</option><option value="energy-conversion">能源转换产出</option></select></label>
-        {denominatorSource === 'energy-conversion' && <label className={styles.modalField}><span className={styles.required}>转换场景</span><select aria-label="转换场景" defaultValue={denominatorRecordType} onChange={(event) => { denominatorRecordType = event.target.value; }}><option value="余热发电">余热发电</option><option value="锅炉产汽/产热">锅炉产汽/产热</option><option value="回收利用">回收利用</option></select></label>}
+        <div className={styles.modalNote}>设备产出数据统一在本页补录，能源回收、转换与外供台账仅用于能流和平衡分析，不作为设备指标的录入入口。</div>
         <label className={styles.modalField}><span className={styles.required}>产出口径</span><input aria-label="产出口径" value={denominatorName} readOnly /></label>
         <label className={styles.modalField}><span>产出计量单位（数据录入时维护）</span><input aria-label="分母单位" value={denominatorUnit} readOnly /></label>
         <label className={styles.modalField}><span>分母指标编码（选填）</span><input aria-label="分母指标编码" defaultValue={denominatorMetricCode} placeholder="例如：steam_output" onChange={(event) => { denominatorMetricCode = event.target.value; }} /></label>
@@ -664,7 +661,7 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
         if (!row) { notify('请从待配置设备进入指标口径配置'); return false; }
         const selected = DEVICE_METRIC_TEMPLATES.find((item) => item.templateId === templateId) ?? DEVICE_METRIC_TEMPLATES[0];
         const metricCode: DeviceIntensityMetricCode = row?.metricCode ?? 'device-output-energy';
-        const config: DeviceIntensityTemplateConfig = { templateId: selected.templateId, metricCode, metricName, calculationMethod: 'ratio', numerator: { source: 'device-energy', energyTypeId, name: '设备能源消耗', unit: energyTypeId === 'v11-energy-electricity' ? 'kWh' : 'kgce' }, denominator: { source: denominatorSource, recordType: denominatorSource === 'energy-conversion' ? denominatorRecordType : undefined, metricCode: denominatorMetricCode.trim() || undefined, name: denominatorName.trim(), unit: denominatorUnit.trim() }, resultUnit, factor: 1, formula: `设备能源消耗 ÷ ${denominatorName.trim()}` };
+        const config: DeviceIntensityTemplateConfig = { templateId: selected.templateId, metricCode, metricName, calculationMethod: 'ratio', numerator: { source: 'device-energy', energyTypeId, name: '设备能源消耗', unit: energyTypeId === 'v11-energy-electricity' ? 'kWh' : 'kgce' }, denominator: { source: 'operation-data', metricCode: denominatorMetricCode.trim() || undefined, name: denominatorName.trim(), unit: denominatorUnit.trim() }, resultUnit, factor: 1, formula: `设备能源消耗 ÷ ${denominatorName.trim()}` };
         saveDeviceIntensityTemplate({ deviceId: row.deviceId, year: applied.year, metricCode, config });
         setVersion((current) => current + 1);
         notify('设备指标口径已保存，设备已纳入待完善列表');
@@ -677,33 +674,19 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
     navigate(withReturnTo(energyPath, returnToIntensityPath()));
   };
   const openEnergyDataDialog = (row: ReturnType<typeof buildDeviceIntensityRows>[number]) => {
-    const energyPath = deviceEnergyDataPath(row.deviceId, applied.year, row.metricCode ?? 'device-output-energy', row.energyRecordId);
+    const energyPath = `/data-management/energy-data?scope=device&deviceId=${encodeURIComponent(row.deviceId)}&year=${applied.year}`;
     navigate(withReturnTo(energyPath, returnToIntensityPath()));
   };
-  const openDataCompletionDialog = (row: ReturnType<typeof buildDeviceIntensityRows>[number]) => {
-    setDialog({
-      title: '完善设备指标数据',
-      body: <>
-        <DetailGrid items={[['重点设备', row.deviceName], ['指标名称', row.metricName], ['分析年度', `${applied.year}年度`], ['当前状态', '数据待完善']]} />
-        <div className={styles.modalNote}>请按实际来源补充能源消耗和设备产出数据：</div>
-        <div className={styles.dataCompletionOptions}>
-          <div className={styles.dataCompletionOption}>
-            <div><strong>能源消耗</strong><span>补充设备的能源消费记录</span></div>
-            <EnergyButton primary onClick={() => { setDialog(null); openEnergyDataDialog(row); }}>补充能源消耗数据</EnergyButton>
-          </div>
-          <div className={styles.dataCompletionOption}>
-            <div><strong>设备产出</strong><span>{row.templateConfig?.denominator.source === 'energy-conversion' ? '补充关联的能源转换产出数据' : '补充设备产出数据和计量单位'}</span></div>
-            <EnergyButton primary onClick={() => { setDialog(null); row.templateConfig?.denominator.source === 'energy-conversion' ? openConversionOutputDialog(row) : openParameterDialog(row, true, true); }}>补充设备产出数据</EnergyButton>
-          </div>
-        </div>
-      </>,
-      cancelText: '暂不处理',
-    });
+  const hasDeviceOutputData = (row: ReturnType<typeof buildDeviceIntensityRows>[number]) => {
+    if (row.templateConfig?.denominator.source === 'energy-conversion') return (row.calculationInputs?.denominatorRaw ?? 0) > 0;
+    return (row.parameter?.annualValue ?? row.parameter?.value ?? 0) > 0;
   };
   const openDetail = (row: ReturnType<typeof buildDeviceIntensityRows>[number]) => {
     const config = row.templateConfig;
     const numeratorName = config?.numerator.name ?? '分子';
     const denominatorName = config?.denominator.name ?? '分母';
+    const isConversionOutput = config?.denominator.source === 'energy-conversion';
+    const denominatorLabel = isConversionOutput ? '转换产出' : '设备产出';
     const inputs = row.calculationInputs;
     const hasSourceInputs = inputs?.numeratorRaw !== undefined && inputs.denominatorRaw !== undefined;
     const numerator = `${format(inputs?.numerator ?? row.annualEnergy)} ${inputs?.unit ?? config?.numerator.unit ?? row.energyUnit}`;
@@ -713,13 +696,13 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
       ? '设备能源数据'
       : source === 'operation-data'
         ? '设备产出数据'
-        : source === 'energy-conversion'
-          ? '能源转换数据'
+      : source === 'energy-conversion'
+          ? '能源回收、转换与外供—转换与利用'
           : undefined;
     setDialog({
       title: '设备指标详情',
       body: (
-        <div className={styles.basisDialog}>
+        <div className={`${styles.basisDialog} ${styles.deviceDetailDialog}`}>
           <section className={styles.basisSection}>
             <h4>基本信息</h4>
             <div className={styles.basisInfoGrid}>
@@ -735,7 +718,7 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
             <h4>参与计算值</h4>
             <div className={styles.basisValueGrid}>
               <div><span>能源消耗</span><strong>{hasSourceInputs ? `${format(inputs.numeratorRaw ?? 0)} ${inputs.numeratorRawUnit ?? ''}` : numerator}</strong><small>具体口径：{numeratorName}｜来源：{sourceLabel(config?.numerator.source) ?? '数据来源未配置'}</small></div>
-              <div><span>设备产出</span><strong>{hasSourceInputs ? `${format(inputs.denominatorRaw ?? 0)} ${inputs.denominatorRawUnit ?? ''}` : denominator}</strong><small>具体口径：{denominatorName}｜来源：{sourceLabel(config?.denominator.source) ?? '数据来源未配置'}</small></div>
+              <div><span>{denominatorLabel}</span><strong>{hasSourceInputs ? `${format(inputs.denominatorRaw ?? 0)} ${inputs.denominatorRawUnit ?? ''}` : denominator}</strong><small>具体口径：{denominatorName}｜来源：{sourceLabel(config?.denominator.source) ?? '数据来源未配置'}</small></div>
             </div>
           </section>
 
@@ -746,24 +729,12 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
         </div>
       ),
       cancelText: '关闭',
+      wide: true,
       secondarySubmitText: config?.numerator.source === 'device-energy' ? '修改能源消耗数据' : undefined,
       onSecondarySubmit: config?.numerator.source === 'device-energy' ? () => openEnergyDataDialog(row) : undefined,
-      submitText: '修改设备产出数据',
+      submitText: isConversionOutput ? '修改转换产出数据' : '修改设备产出数据',
       onSubmit: () => window.setTimeout(() => config?.denominator.source === 'energy-conversion' ? openConversionOutputDialog(row) : openParameterDialog(row, true), 0),
     });
-  };
-  const openDeviceAction = (row: ReturnType<typeof buildDeviceIntensityRows>[number]) => {
-    if (row.resultStatus === '已计算') return openDetail(row);
-    if (row.resultStatus === '待完善') {
-      return openDataCompletionDialog(row);
-    }
-    if (row.resultStatus === '暂不可计算') return openDeviceMetricConfig(row);
-    return undefined;
-  };
-  const deviceActionLabel = (row: ReturnType<typeof buildDeviceIntensityRows>[number]) => {
-    if (row.resultStatus === '已计算') return '查看详情';
-    if (row.resultStatus === '待完善') return '补充数据';
-    return '配置指标口径';
   };
   const query = () => { const next = { year: Number(year) || 2026, energyUnitId, deviceId }; setApplied(next); window.sessionStorage.setItem('energy-intensity-device-filters', JSON.stringify(next)); };
   const reset = () => { setYear('2026'); setEnergyUnitId('all'); setDeviceId('all'); const next = { year: 2026, energyUnitId: 'all', deviceId: 'all' }; setApplied(next); window.sessionStorage.setItem('energy-intensity-device-filters', JSON.stringify(next)); };
@@ -797,7 +768,12 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
   const renderMetricRow = (row: ReturnType<typeof buildDeviceIntensityRows>[number]) => {
     const index = latestMetricIndex(row);
     const changes = index >= 0 ? changeFor(row, index) : { mom: null, yoy: null };
-    return <tr key={row.deviceId}><td>{row.deviceName}</td><td>{row.energyUnitName}</td><td>{row.metricName}</td><td>{row.value === null ? '—' : `${format(row.value, 3)} ${row.metricUnit}`}</td><td className={styles.changeCell}>{percent(changes.mom)}</td><td className={styles.changeCell}>{percent(changes.yoy)}</td><td><button type="button" className={styles.link} onClick={() => { setTrendDeviceId(row.deviceId); setShowDeviceMonthly(false); openDeviceAction(row); }}>{deviceActionLabel(row)}</button></td></tr>;
+    const needsEnergyData = row.resultStatus === '待完善' && !row.completeEnergy;
+    const needsOutputData = row.resultStatus === '待完善' && !hasDeviceOutputData(row);
+    const missingCount = Number(needsEnergyData) + Number(needsOutputData);
+    const selectRow = () => { setTrendDeviceId(row.deviceId); setShowDeviceMonthly(false); };
+    const outputActionLabel = row.templateConfig?.denominator.source === 'energy-conversion' ? '补充转换产出数据' : '补充产出数据';
+    return <tr key={row.deviceId}><td>{row.deviceName}</td><td>{row.energyUnitName}</td><td>{row.metricName}</td><td>{row.value === null ? '—' : `${format(row.value, 3)} ${row.metricUnit}`}</td><td className={styles.changeCell}>{percent(changes.mom)}</td><td className={styles.changeCell}>{percent(changes.yoy)}</td><td><div className={styles.deviceInlineActions}>{missingCount > 1 && <small>缺{missingCount}项数据</small>}{row.resultStatus === '已计算' && <button type="button" className={styles.link} onClick={() => { selectRow(); openDetail(row); }}>查看详情</button>}{needsEnergyData && <button type="button" className={styles.link} onClick={() => { selectRow(); openEnergyDataDialog(row); }}>补充能源数据</button>}{needsOutputData && <button type="button" className={styles.link} onClick={() => { selectRow(); row.templateConfig?.denominator.source === 'energy-conversion' ? openConversionOutputDialog(row) : openParameterDialog(row, true, true); }}>{outputActionLabel}</button>}{row.resultStatus === '暂不可计算' && <button type="button" className={styles.link} onClick={() => { selectRow(); openDeviceMetricConfig(row); }}>配置指标口径</button>}</div></td></tr>;
   };
   return <div className={styles.page}>
     <section className={`${styles.card} ${styles.filterCard}`}>
@@ -807,7 +783,7 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
       <FilterField label="具体设备" wide><select aria-label="具体设备" value={deviceId} onChange={(event) => setDeviceId(event.target.value)}><option value="all">全部重点设备</option>{deviceOptions.map((row) => <option key={row.deviceId} value={row.deviceId}>{row.deviceName}</option>)}</select></FilterField>
       <div className={styles.filterSpacer} /><EnergyButton primary onClick={query}>查询</EnergyButton><EnergyButton onClick={reset}>重置</EnergyButton>
     </section>
-    <section className={`${styles.card} ${styles.tableCard} ${styles.intensityResults}`}><div className={styles.tableToolbar}><div><div className={styles.chartTitle}>重点设备指标结果</div></div></div><div className={styles.tableWrap}><table><thead><tr><th>重点设备</th><th>所属用能单元</th><th>指标名称</th><th>指标值</th><th>环比变化</th><th>同比变化</th><th>操作</th></tr></thead><tbody>{calculatedRows.map(renderMetricRow)}</tbody>{pendingRows.length > 0 && <tbody><tr className={`${styles.deviceGroupRow} ${styles.deviceGroupPending}`}><th colSpan={7}><button type="button" className={styles.deviceGroupToggle} aria-expanded={showPendingDevices} onClick={() => setShowPendingDevices((current) => !current)}>待完善设备（{pendingRows.length}台）<small>{showPendingDevices ? '收起' : '展开'}</small></button></th></tr>{showPendingDevices && pendingRows.map(renderMetricRow)}</tbody>}</table></div>{trendRow && <section className={styles.intensityMonthlyDetail} aria-label="重点设备月度指标趋势"><div className={styles.intensityMonthlyHeader}><div><strong>{trendRow.deviceName}｜月度{trendRow.metricName}趋势</strong></div><FilterField label="趋势设备"><select aria-label="趋势设备" value={trendRow.deviceId} onChange={(event) => { setTrendDeviceId(event.target.value); setShowDeviceMonthly(false); }}>{trendCandidates.map((row) => <option key={row.deviceId} value={row.deviceId}>{row.deviceName}</option>)}</select></FilterField></div><div className={styles.intensityTrendChart} aria-label="重点设备月度指标趋势"><div className={styles.intensityTrendAxis} aria-hidden="true">{[deviceTrendDisplayMax, deviceTrendDisplayMax / 2, 0].map((tick) => <span key={tick}>{format(tick, metricDigits(tick))}</span>)}</div><div className={styles.intensityTrendPlot}><div className={styles.intensityTrendGrid} aria-hidden="true"><i /><i /><i /></div><div className={styles.intensityTrendOverlay} aria-hidden="true"><svg className={styles.intensityTrendLine} viewBox="0 0 100 100" preserveAspectRatio="none">{deviceTrendLineSegments.map((segment, segmentIndex) => segment.length > 1 && <polyline key={segmentIndex} points={segment.map((point) => `${point.x},${point.y}`).join(" ")} />)}</svg>{deviceTrendLineSegments.flatMap((segment) => segment).map((point, pointIndex) => <i key={pointIndex} className={styles.intensityTrendNode} style={{ left: `${point.x}%`, top: `${point.y}%` }} />)}</div><div className={styles.intensityTrendBars}>{trendRow.monthlyMetricValues.map((value, index) => { const reported = value !== null; const isLatest = index === deviceLatestIndex; const tone = !reported ? styles.trendBarEmpty : isLatest ? styles.trendBarCurrent : styles.trendBarNormal; return <div key={index} className={styles.intensityTrendBar} title={`${index + 1}月：${reported ? `${format(value, metricDigits(value))} ${trendRow.metricUnit}` : '—'}`}><strong className={styles.intensityTrendValue}>{reported ? format(value, metricDigits(value)) : '—'}</strong><div className={styles.intensityTrendBarTrack}><i className={tone} style={{ height: `${reported ? Math.max(8, value / deviceTrendDisplayMax * 100) : 0}%` }} /></div><small>{index + 1}月</small></div>; })}</div></div></div><div className={styles.monthlyDetailToggle}><span>月度指标明细{!trendRow.completeEnergy ? '｜部分月份缺失' : ''}</span><button type="button" className={styles.link} aria-expanded={showDeviceMonthly} onClick={() => setShowDeviceMonthly((current) => !current)}>{showDeviceMonthly ? '收起明细' : '查看明细'}</button></div>{showDeviceMonthly && <div className={styles.tableWrap}><table className={styles.intensityMonthlyTable}><thead><tr><th>月份</th><th>能源消费量{trendRow.energyUnit ? `（${trendRow.energyUnit}）` : ''}</th><th>设备产出量{trendRow.denominatorUnit && trendRow.denominatorUnit !== '—' ? `（${trendRow.denominatorUnit}）` : ''}</th><th>指标值{trendRow.metricUnit && trendRow.metricUnit !== '—' ? `（${trendRow.metricUnit}）` : ''}</th><th>环比变化</th><th>同比变化</th></tr></thead><tbody>{trendRow.monthlyMetricValues.map((value, index) => { const changes = changeFor(trendRow, index); const energy = trendRow.reportedMonths[index] ? trendRow.monthlyEnergy[index] : null; const output = trendRow.monthlyDenominator[index]; return <tr key={index}><td>{index + 1}月</td><td>{energy === null ? '—' : format(energy, 2)}</td><td>{output === null ? '—' : format(output, 2)}</td><td>{value === null ? '—' : format(value, metricDigits(value))}</td><td className={styles.changeCell}>{percent(changes.mom)}</td><td className={styles.changeCell}>{percent(changes.yoy)}</td></tr>; })}</tbody></table></div>}</section>}</section>
+    <section className={`${styles.card} ${styles.tableCard} ${styles.intensityResults}`}><div className={styles.tableToolbar}><div><div className={styles.chartTitle}>重点设备指标结果</div></div></div><div className={styles.tableWrap}><table className={styles.deviceMetricTable}><thead><tr><th>重点设备</th><th>所属用能单元</th><th>指标名称</th><th>指标值</th><th>环比变化</th><th>同比变化</th><th>操作</th></tr></thead><tbody>{calculatedRows.map(renderMetricRow)}</tbody>{pendingRows.length > 0 && <tbody><tr className={`${styles.deviceGroupRow} ${styles.deviceGroupPending}`}><th colSpan={7}><button type="button" className={styles.deviceGroupToggle} aria-expanded={showPendingDevices} onClick={() => setShowPendingDevices((current) => !current)}>待完善设备（{pendingRows.length}台）<small>{showPendingDevices ? '收起' : '展开'}</small></button></th></tr>{showPendingDevices && pendingRows.map(renderMetricRow)}</tbody>}</table></div>{trendRow && <section className={styles.intensityMonthlyDetail} aria-label="重点设备月度指标趋势"><div className={styles.intensityMonthlyHeader}><div><strong>{trendRow.deviceName}｜月度{trendRow.metricName}趋势</strong></div><FilterField label="趋势设备"><select aria-label="趋势设备" value={trendRow.deviceId} onChange={(event) => { setTrendDeviceId(event.target.value); setShowDeviceMonthly(false); }}>{trendCandidates.map((row) => <option key={row.deviceId} value={row.deviceId}>{row.deviceName}</option>)}</select></FilterField></div><div className={styles.intensityTrendChart} aria-label="重点设备月度指标趋势"><div className={styles.intensityTrendAxis} aria-hidden="true">{[deviceTrendDisplayMax, deviceTrendDisplayMax / 2, 0].map((tick) => <span key={tick}>{format(tick, metricDigits(tick))}</span>)}</div><div className={styles.intensityTrendPlot}><div className={styles.intensityTrendGrid} aria-hidden="true"><i /><i /><i /></div><div className={styles.intensityTrendOverlay} aria-hidden="true"><svg className={styles.intensityTrendLine} viewBox="0 0 100 100" preserveAspectRatio="none">{deviceTrendLineSegments.map((segment, segmentIndex) => segment.length > 1 && <polyline key={segmentIndex} points={segment.map((point) => `${point.x},${point.y}`).join(" ")} />)}</svg>{deviceTrendLineSegments.flatMap((segment) => segment).map((point, pointIndex) => <i key={pointIndex} className={styles.intensityTrendNode} style={{ left: `${point.x}%`, top: `${point.y}%` }} />)}</div><div className={styles.intensityTrendBars}>{trendRow.monthlyMetricValues.map((value, index) => { const reported = value !== null; const isLatest = index === deviceLatestIndex; const tone = !reported ? styles.trendBarEmpty : isLatest ? styles.trendBarCurrent : styles.trendBarNormal; return <div key={index} className={styles.intensityTrendBar} title={`${index + 1}月：${reported ? `${format(value, metricDigits(value))} ${trendRow.metricUnit}` : '—'}`}><strong className={styles.intensityTrendValue}>{reported ? format(value, metricDigits(value)) : '—'}</strong><div className={styles.intensityTrendBarTrack}><i className={tone} style={{ height: `${reported ? Math.max(8, value / deviceTrendDisplayMax * 100) : 0}%` }} /></div><small>{index + 1}月</small></div>; })}</div></div></div><div className={styles.monthlyDetailToggle}><span>月度指标明细{!trendRow.completeEnergy ? '｜部分月份缺失' : ''}</span><button type="button" className={styles.link} aria-expanded={showDeviceMonthly} onClick={() => setShowDeviceMonthly((current) => !current)}>{showDeviceMonthly ? '收起明细' : '查看明细'}</button></div>{showDeviceMonthly && <div className={styles.tableWrap}><table className={styles.intensityMonthlyTable}><thead><tr><th>月份</th><th>能源消费量{trendRow.energyUnit ? `（${trendRow.energyUnit}）` : ''}</th><th>设备产出量{trendRow.denominatorUnit && trendRow.denominatorUnit !== '—' ? `（${trendRow.denominatorUnit}）` : ''}</th><th>指标值{trendRow.metricUnit && trendRow.metricUnit !== '—' ? `（${trendRow.metricUnit}）` : ''}</th><th>环比变化</th><th>同比变化</th></tr></thead><tbody>{trendRow.monthlyMetricValues.map((value, index) => { const changes = changeFor(trendRow, index); const energy = trendRow.reportedMonths[index] ? trendRow.monthlyEnergy[index] : null; const output = trendRow.monthlyDenominator[index]; return <tr key={index}><td>{index + 1}月</td><td>{energy === null ? '—' : format(energy, 2)}</td><td>{output === null ? '—' : format(output, 2)}</td><td>{value === null ? '—' : format(value, metricDigits(value))}</td><td className={styles.changeCell}>{percent(changes.mom)}</td><td className={styles.changeCell}>{percent(changes.yoy)}</td></tr>; })}</tbody></table></div>}</section>}</section>
       <div className={styles.slimNote}><div><i>i</i><span>所有重点设备统一按“单位产出能耗”展示；已维护设备产出口径的设备直接纳入分析，缺少能源消耗或设备产出数据时显示“待完善”。趋势分析仅支持已计算设备。</span></div></div><EnergyDialog state={dialog} close={() => setDialog(null)} /><EnergyToast message={toast} />
   </div>;
 }
@@ -1188,7 +1164,7 @@ function IntensityPage() {
         ? deviceEnergyDataPath(metricView.object.objectId, year, metric.intensityMetricId.includes('boiler') ? 'boiler-standard-coal' : 'compressed-air-electricity', metric.energyRecordIds[0])
         : `/data-management/energy-data?year=${year}${metric.energyRecordIds[0] ? `&recordId=${encodeURIComponent(metric.energyRecordIds[0])}` : ''}`;
     const operationScopeParams = metricView.object.objectType === 'unit'
-      ? `&new=1&scopeLevel=${encodeURIComponent(metricView.object.unitLevel === 'level2' ? '二级用能单元' : '一级用能单元')}&unitId=${encodeURIComponent(metricView.object.energyUnitId ?? '')}`
+      ? `&scopeLevel=${encodeURIComponent(metricView.object.unitLevel === 'level2' ? '二级用能单元' : '一级用能单元')}&unitId=${encodeURIComponent(metricView.object.energyUnitId ?? '')}`
       : '';
     const officeMetric = metricView.object.objectId === 'eu-office' || metric.name.includes('建筑面积');
     const operationKeyword = officeMetric
@@ -1208,43 +1184,21 @@ function IntensityPage() {
           : metric.name.includes('产品')
             ? '产品产量'
             : metricView.object.objectName;
-    const operationPath = `/data-management/operations?year=${year}&keyword=${encodeURIComponent(operationKeyword)}${metric.operationMetricIds[0] ? `&recordId=${encodeURIComponent(metric.operationMetricIds[0])}` : ''}${operationScopeParams}`;
+    const operationPath = `/data-management/operations?year=${year}&keyword=${encodeURIComponent(operationKeyword)}${operationScopeParams}`;
     const operationCategory = officeMetric || metric.name.includes('供能量') || metric.name.includes('单位') ? (metric.name.includes('单位产品') ? '产量' : '运行指标') : undefined;
     const operationEntryPath = metric.issue === '缺少工业增加值' && metric.name.includes('增加值')
-      ? `/data-management/operations?new=1&year=${year}&scopeLevel=企业&category=${encodeURIComponent('经济指标')}&metricName=${encodeURIComponent('工业增加值')}`
+      ? `/data-management/operations?year=${year}&scopeLevel=${encodeURIComponent('企业')}`
       : metricView.object.objectType === 'unit' && operationCategory
-        ? `/data-management/operations?new=1&year=${year}${operationScopeParams}&category=${encodeURIComponent(operationCategory)}&metricName=${encodeURIComponent(operationKeyword)}`
-        : operationPath;
+        ? `/data-management/operations?year=${year}&scopeLevel=${encodeURIComponent(metricView.object.unitLevel === 'level2' ? '二级用能单元' : '一级用能单元')}`
+        : metricView.object.objectType === 'product'
+          ? `/data-management/operations?year=${year}&scopeLevel=${encodeURIComponent('一级用能单元')}`
+          : operationPath;
     if (action && metric.resultType !== 'ok') {
       const energyReasons = ['缺少能源数据', '能源数据未录入', '能源数据部分录入'];
-      const needsEnergy = energyReasons.includes(status.reason) || status.reason === '数据缺失';
       const needsOperation = !energyReasons.includes(status.reason) || status.reason === '数据缺失';
-      if (needsEnergy && !needsOperation) {
-        navigate(withReturnTo(energyPath, returnTo));
-        return;
-      }
-      if (!needsEnergy && needsOperation) {
-        navigate(withReturnTo(operationEntryPath, returnTo));
-        return;
-      }
-      setDialog({
-        title: '完善指标数据',
-        body: <>
-          <DetailGrid items={[
-            ['分析对象', metricView.object.objectName],
-            ['指标名称', metric.name],
-            ['结果状态', status.label],
-            [status.label === '数据缺失' ? '缺失数据' : '具体原因', status.reason],
-            ...(metricView.object.objectType === 'unit' ? ([['补录内容', operationKeyword], ['补录范围', metricView.object.unitLevel === 'level2' ? '二级用能单元' : '一级用能单元']] as Array<[string, ReactNode]>) : []),
-          ]} />
-          <div className={styles.modalNote}>当前指标缺少多类数据，请按实际来源分别补充；保存后系统会重新计算。</div>
-          <div className={styles.dataCompletionOptions}>
-            <div className={styles.dataCompletionOption}><div><strong>能源数据</strong><span>补充参与计算的能源消费记录</span></div><EnergyButton primary onClick={() => { setDialog(null); navigate(withReturnTo(energyPath, returnTo)); }}>补充能源数据</EnergyButton></div>
-            <div className={styles.dataCompletionOption}><div><strong>运营数据</strong><span>补充产品产量、运行量或经济指标</span></div><EnergyButton primary onClick={() => { setDialog(null); navigate(withReturnTo(operationEntryPath, returnTo)); }}>补充运营数据</EnergyButton></div>
-          </div>
-        </>,
-        cancelText: '暂不处理',
-      });
+      // 补充数据统一直接进入数据管理菜单页；多类数据缺失时优先进入运营数据页，
+      // 由用户在数据管理中按实际来源补录，避免在指标页再次弹出选择框。
+      navigate(withReturnTo(needsOperation ? operationEntryPath : energyPath, returnTo));
       return;
     }
     const objectLevel = metricView.object.objectType === 'factory'

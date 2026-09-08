@@ -519,6 +519,52 @@
   border-radius: 5px;
 }
 
+.deviceInlineActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.deviceInlineActions small {
+  color: #d97706;
+  white-space: nowrap;
+}
+
+.deviceMetricTable {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.deviceMetricTable th:nth-child(1),
+.deviceMetricTable td:nth-child(1),
+.deviceMetricTable th:nth-child(2),
+.deviceMetricTable td:nth-child(2) {
+  width: 16%;
+}
+
+.deviceMetricTable th:nth-child(3),
+.deviceMetricTable td:nth-child(3) {
+  width: 12%;
+}
+
+.deviceMetricTable th:nth-child(4),
+.deviceMetricTable td:nth-child(4) {
+  width: 14%;
+}
+
+.deviceMetricTable th:nth-child(5),
+.deviceMetricTable td:nth-child(5),
+.deviceMetricTable th:nth-child(6),
+.deviceMetricTable td:nth-child(6) {
+  width: 10%;
+}
+
+.deviceMetricTable th:nth-child(7),
+.deviceMetricTable td:nth-child(7) {
+  width: 22%;
+}
+
 .unavailableDevices {
   margin-top: 10px;
   padding: 10px 12px;
@@ -1681,6 +1727,77 @@
 .basisDialog {
   display: grid;
   gap: 14px;
+}
+
+/* 设备详情是高频核查弹窗，信息区采用轻卡片层级，避免口径说明产生过强的框选感。 */
+.deviceDetailDialog {
+  gap: 16px;
+}
+
+.deviceDetailDialog .basisSection {
+  padding: 18px 20px;
+  border-color: #e8edf3;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgb(30 41 59 / 3%);
+}
+
+.deviceDetailDialog .basisSection h4 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 16px;
+  font-size: 16px;
+  letter-spacing: .01em;
+}
+
+.deviceDetailDialog .basisSection h4::before {
+  width: 3px;
+  height: 16px;
+  content: '';
+  background: #16a66b;
+  border-radius: 2px;
+}
+
+.deviceDetailDialog .basisInfoGrid {
+  gap: 16px 32px;
+}
+
+.deviceDetailDialog .basisInfoGrid strong {
+  margin-top: 6px;
+  font-size: 14px;
+}
+
+.deviceDetailDialog .basisValueGrid {
+  gap: 16px;
+}
+
+.deviceDetailDialog .basisValueGrid > div {
+  padding: 16px 18px 14px;
+  background: linear-gradient(135deg, #f7fafc 0%, #f4f8fb 100%);
+  border: 1px solid #edf1f5;
+  border-radius: 10px;
+}
+
+.deviceDetailDialog .basisValueGrid strong {
+  margin-top: 7px;
+  font-size: 18px;
+}
+
+.deviceDetailDialog .basisValueGrid small {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #e5ebf0;
+  color: #8492a6;
+  font-size: 12px;
+}
+
+.deviceDetailDialog .basisFormula {
+  background: linear-gradient(135deg, #f5fbf8 0%, #f1f8f5 100%);
+  border-color: #dcebe4;
+}
+
+.deviceDetailDialog .basisFormula > strong {
+  font-size: 16px;
 }
 
 .basisSection {

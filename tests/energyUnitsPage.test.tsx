@@ -1,5 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getEnergyUnit, listEnergyUnits, resetEnergyUnitMockStore } from '../src/mocks/energyUnitMockStore';
 import { EnergyUnitsPage } from '../src/pages/newPrototype/EnergyUnitsPage';
@@ -57,7 +58,7 @@ describe('EnergyUnitsPage behavior', () => {
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
-    await act(async () => root.render(<EnergyUnitsPage />));
+    await act(async () => root.render(<MemoryRouter><EnergyUnitsPage /></MemoryRouter>));
   });
 
   afterEach(async () => {
@@ -89,7 +90,7 @@ describe('EnergyUnitsPage behavior', () => {
   it('creates a level-one unit and rejects a duplicate name in the actual dialog', async () => {
     await click(findButton('新增一级用能单元'));
     let form = modalForm();
-    await setSelect(form.querySelector('select[aria-label="单元类型"]')!, '生产单元');
+    await setSelect(form.querySelector('select[aria-label="单元类型"]')!, '生产类用能单元');
     await setInput(form.querySelector('input[aria-label="用能单元名称"]')!, '生产车间C');
     await click(findButton('保存', form));
 
@@ -97,7 +98,10 @@ describe('EnergyUnitsPage behavior', () => {
 
     await click(findButton('新增一级用能单元'));
     form = modalForm();
-    await setSelect(form.querySelector('select[aria-label="单元类型"]')!, '建筑/区域');
+    await setSelect(form.querySelector('select[aria-label="单元类型"]')!, '非生产类用能单元');
+    const nonProductionType = form.querySelector('select[aria-label="非生产类用能单元类型"]') as HTMLSelectElement;
+    expect([...nonProductionType.options].map((option) => option.value)).toEqual(['', '公辅系统', '建筑/区域', '其他']);
+    await setSelect(nonProductionType, '建筑/区域');
     await setInput(form.querySelector('input[aria-label="用能单元名称"]')!, '办公区域');
     await click(findButton('保存', form));
 
@@ -105,7 +109,7 @@ describe('EnergyUnitsPage behavior', () => {
   });
 
   it('uses the two-level structure from the latest prototype', async () => {
-    expect(container.textContent).toContain('一期采用两级结构');
+    expect(container.textContent).toContain('一期仅支持两级');
 
     const levelOneRow = findRow('动力中心');
     expect(levelOneRow.textContent).toContain('添加下级');
@@ -124,6 +128,13 @@ describe('EnergyUnitsPage behavior', () => {
     await click(findButton('修改类型', form));
     const typeSelect = form.querySelector('select[aria-label="单元类型"]') as HTMLSelectElement;
     expect([...typeSelect.options].map((option) => option.value)).toEqual(['工序/环节', '公辅系统', '其他']);
+  });
+
+  it('exposes conversion scenarios only for secondary auxiliary systems', async () => {
+    await click(findButton('添加下级', findRow('动力中心')));
+    const form = modalForm();
+    expect(form.textContent).toContain('适用转换场景');
+    expect(form.querySelectorAll('input[type="checkbox"]')).toHaveLength(5);
   });
 
   it('reorders sibling units without changing their parent relationship', async () => {
@@ -164,7 +175,8 @@ describe('EnergyUnitsPage behavior', () => {
   it('shows deletion blockers and deletes an unreferenced record after confirmation', async () => {
     await click(findButton('删除', findRow('动力中心')));
     expect(modalForm().textContent).toContain('无法删除用能单元');
-    expect(modalForm().textContent).toContain('包含下级用能单元，请先处理下级用能单元后再删除');
+    expect(modalForm().textContent).toContain('下级用能单元')
+    expect(modalForm().textContent).toContain('去处理');
     expect(modalForm().textContent).not.toContain('能源记录引用');
     await click(findButton('我知道了', modalForm()));
 

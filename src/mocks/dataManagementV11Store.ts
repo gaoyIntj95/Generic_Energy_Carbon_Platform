@@ -1,7 +1,7 @@
 import { listEnergyUnits } from './energyUnitMockStore';
 import { countBenchmarkTargets, resetBenchmarkTargetStore } from './benchmarkTargetStore';
 import { resetProductMasterStore } from './productMasterStore';
-import { resetDeviceIntensityParameters } from './deviceIntensityParameterStore';
+import { countDeviceIntensityTemplates, resetDeviceIntensityParameters } from './deviceIntensityParameterStore';
 
 export type AnalysisCategory =
   | '电力'
@@ -167,11 +167,11 @@ const seedEnergyRecords: V11EnergyRecord[] = [
   { energyRecordId: 'v11-er-35', year: 2026, scopeLevel: '企业', energyUnitId: null, energyRole: '能源消费', energyTypeId: 'v11-energy-rdf', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [1600,1550,1680,1750,1800,1850,1900,1880,1820,1780,1850,1940] },
   { energyRecordId: 'v11-er-36', year: 2026, scopeLevel: '二级用能单元', energyUnitId: 'eu-gas-boiler', energyRole: '能源消费', energyTypeId: 'v11-energy-natural-gas', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [112000,108000,118000,121000,126000,129000,132000,131000,128000,125000,127000,136000] },
   { energyRecordId: 'v11-er-51', year: 2026, scopeLevel: '二级用能单元', energyUnitId: 'eu-compressed-air', energyRole: '能源消费', energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [146000,140000,151000,154000,159000,163000,168000,165000,160000,157000,164000,171000] },
-  { energyRecordId: 'v11-er-49', year: 2026, scopeLevel: '二级用能单元', energyUnitId: 'eu-production-processing', energyRole: '回收能源', energyTypeId: 'v11-energy-waste-heat', entryMode: 'monthly', annualAmount: 0, sourceDeviceId: 'v11-device-74', monthlyAmounts: [6500,6200,7000,7200,7400,7600,7800,7600,7200,7000,7600,5900] },
+  { energyRecordId: 'v11-er-49', year: 2026, scopeLevel: '二级用能单元', energyUnitId: 'eu-production-processing', energyRole: '回收能源', energyTypeId: 'v11-energy-waste-heat', entryMode: 'monthly', annualAmount: 0, sourceDeviceId: 'v11-device-74', sourceProcess: '烘干/固化段', monthlyAmounts: [6500,6200,7000,7200,7400,7600,7800,7600,7200,7000,7600,5900] },
   // 回收能源来源示例：这些是中央能源记录，后续可被能源直接利用与转换记录关联。
-  { energyRecordId: 'v11-er-recovery-device-70', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-cement-grinding-line', energyRole: '回收能源', energyTypeId: 'v11-energy-waste-heat', entryMode: 'monthly', annualAmount: 0, sourceDeviceId: 'v11-device-70', monthlyAmounts: [1250,1180,1320,1380,1450,1510,1580,1540,1460,1390,1500,1620] },
+  { energyRecordId: 'v11-er-recovery-device-70', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-cement-grinding-line', energyRole: '回收能源', energyTypeId: 'v11-energy-waste-heat', entryMode: 'monthly', annualAmount: 0, sourceDeviceId: 'v11-device-70', sourceProcess: '冷却系统', monthlyAmounts: [1250,1180,1320,1380,1450,1510,1580,1540,1460,1390,1500,1620] },
   { energyRecordId: 'v11-er-recovery-device-62', year: 2026, scopeLevel: '二级用能单元', energyUnitId: 'eu-compressed-air', energyRole: '回收能源', energyTypeId: 'v11-energy-waste-heat', entryMode: 'monthly', annualAmount: 0, sourceDeviceId: 'v11-device-62', monthlyAmounts: [980,930,1040,1090,1160,1210,1280,1240,1170,1110,1200,1300] },
-  { energyRecordId: 'v11-er-recovery-device-82', year: 2026, scopeLevel: '二级用能单元', energyUnitId: 'eu-gas-boiler', energyRole: '回收能源', energyTypeId: 'v11-energy-waste-heat', entryMode: 'monthly', annualAmount: 0, sourceDeviceId: 'v11-device-82', monthlyAmounts: [1680,1590,1780,1860,1950,2040,2140,2080,1980,1880,2020,2200] },
+  { energyRecordId: 'v11-er-recovery-device-82', year: 2026, scopeLevel: '二级用能单元', energyUnitId: 'eu-gas-boiler', energyRole: '回收能源', energyTypeId: 'v11-energy-waste-heat', entryMode: 'monthly', annualAmount: 0, sourceDeviceId: 'v11-device-82', sourceProcess: '排烟', monthlyAmounts: [1680,1590,1780,1860,1950,2040,2140,2080,1980,1880,2020,2200] },
   { energyRecordId: 'v11-er-37', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-clinker-line-1', energyRole: '能源消费', energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [8000000,7800000,8100000,8200000,8300000,8400000,8500000,8400000,8300000,8200000,8400000,9400000] },
   { energyRecordId: 'v11-er-38', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-clinker-line-1', energyRole: '能源消费', energyTypeId: 'v11-energy-steam', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [2500,2500,2500,2500,2500,2500,2500,2500,2500,2500,2500,2500] },
   { energyRecordId: 'v11-er-39', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-cement-grinding-line', energyRole: '能源消费', energyTypeId: 'v11-energy-natural-gas', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [25000,25000,25000,25000,25000,25000,25000,25000,25000,25000,25000,25000] },
@@ -291,7 +291,7 @@ const seedOperations: V11OperationMetric[] = [
   { operationMetricId: 'v11-operation-product-b-monthly', metricCode: 'product_output', productId: 'product-b', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-cement-grinding-line', metricCategory: '产量', aggregationMethod: '月度求和', metricName: '产品产量', metricUnit: 't', entryMode: 'monthly', annualValue: 0, monthlyValues: [7600,7350,7800,7900,8000,7400,8200,8100,8000,7900,8100,8400] },
   { operationMetricId: 'v11-operation-utility-volume', metricCode: 'energy_supply', productId: null, year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-utilities', metricCategory: '运行指标', aggregationMethod: '月度求和', metricName: '动力中心供能量', metricUnit: 'GJ', entryMode: 'monthly', annualValue: 0, monthlyValues: [420,405,438,450,465,480,495,488,472,460,478,510] },
   { operationMetricId: 'v11-operation-office-area', metricCode: 'building_area', productId: null, year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-office', metricCategory: '运行指标', aggregationMethod: '年度单值', metricName: '办公建筑面积', metricUnit: 'm²', entryMode: 'annual', annualValue: 18500, monthlyValues: [] },
-  { operationMetricId: 'v11-operation-warehouse-volume', metricCode: 'logistics_throughput', productId: null, year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-public-support', metricCategory: '运行指标', aggregationMethod: '月度求和', metricName: '货物吞吐量', metricUnit: 't', entryMode: 'monthly', annualValue: 0, monthlyValues: [205,198,214,220,230,238,245,240,232,225,236,252] },
+  // 仓储物流区域暂不提供“货物吞吐量”，用于展示指标待补充及跳转运营数据的场景。
   // 2025 年保留同一产量口径，用于同比计算；异常应由真实数据变化触发，而不是由断崖式 mock 值制造。
   { operationMetricId: 'v11-operation-product-b-2025-baseline', metricCode: 'product_output', productId: 'product-b', year: 2025, scopeLevel: '一级用能单元', energyUnitId: 'eu-cement-grinding-line', metricCategory: '产量', aggregationMethod: '月度求和', metricName: '产品产量', metricUnit: 't', entryMode: 'monthly', annualValue: 0, monthlyValues: [7600,7350,7800,7900,8000,8000,8200,8100,8000,7900,8100,8400] },
 ];
@@ -510,6 +510,11 @@ export function listV11EnergyTypeReferences(id: string): V11EnergyTypeReferenceS
 export function disableV11EnergyType(id: string) {
   if (!energyTypes.some((item) => item.energyTypeId === id)) return { ok: false as const, error: '能源品种不存在。' };
   disabledEnergyTypeIds.add(id);
+  return { ok: true as const };
+}
+export function enableV11EnergyType(id: string) {
+  if (!energyTypes.some((item) => item.energyTypeId === id)) return { ok: false as const, error: '能源品种不存在。' };
+  disabledEnergyTypeIds.delete(id);
   return { ok: true as const };
 }
 export function isV11EnergyTypeEnabled(id: string) { return !disabledEnergyTypeIds.has(id); }
@@ -843,6 +848,24 @@ export function deleteV11ConversionOutput(id: string) {
 }
 
 export function saveV11OperationMetric(input: Omit<V11OperationMetric, 'operationMetricId'>, id?: string) {
+  if (input.metricCode === 'product_output' && input.scopeLevel === '二级用能单元') {
+    return { ok: false as const, error: '最终产品产量仅支持企业或一级生产用能单元维护。' };
+  }
+  if (input.metricCode === 'product_output' && input.energyUnitId) {
+    const unit = listEnergyUnits().find((item) => item.energyUnitId === input.energyUnitId);
+    if (unit?.unitLevel !== 'level1' || unit.unitType !== '生产单元') {
+      return { ok: false as const, error: '产品产量只能关联一级生产用能单元。' };
+    }
+  }
+  if (input.metricCode === 'product_output' && input.energyUnitId === null) {
+    const enterpriseRecords = operations.filter((item) => item.operationMetricId !== id && item.year === input.year && item.metricCode === 'product_output' && item.energyUnitId === null);
+    const legacyRecord = enterpriseRecords.find((item) => item.productId === null);
+    if (legacyRecord && input.productId) {
+      operations[operations.findIndex((item) => item.operationMetricId === legacyRecord.operationMetricId)] = { ...input, operationMetricId: legacyRecord.operationMetricId, monthlyValues: [...input.monthlyValues], monthlyReportedMonths: input.monthlyReportedMonths ? [...input.monthlyReportedMonths] : undefined };
+      return { ok: true as const };
+    }
+    if (enterpriseRecords.length) return { ok: false as const, error: '企业层级每个年度只能维护一款主产品产量。' };
+  }
   if (input.metricCode === 'product_output' && input.productId) {
     const productRecords = operations.filter((item) => item.operationMetricId !== id && item.year === input.year && item.metricCode === 'product_output' && item.productId === input.productId);
     const hasEnterpriseRecord = productRecords.some((item) => item.energyUnitId === null);
@@ -886,11 +909,13 @@ export function inspectV11KeyDeviceDeletion(id: string) {
     return record.scopeType === 'device' && record.scopeId === id;
   }).length;
   const targetCount = countBenchmarkTargets('device', id);
-  const references = { energyRecordCount, benchmarkTargetCount: targetCount };
-  if (energyRecordCount || targetCount) {
+  const indicatorBindingCount = countDeviceIntensityTemplates(id);
+  const recoverySourceCount = energyRecords.filter((item) => item.energyRole === '回收能源' && item.sourceDeviceId === id).length;
+  const references = { energyRecordCount, recoverySourceCount, benchmarkTargetCount: targetCount, indicatorBindingCount };
+  if (energyRecordCount || recoverySourceCount || targetCount || indicatorBindingCount) {
     return {
       ok: false as const,
-      error: '该重点设备已关联能源数据或指标目标，暂不能删除。请先处理关联数据。',
+      error: '该重点设备已关联能源数据、指标配置或指标目标，暂不能删除。请先处理关联数据。',
       references,
     };
   }

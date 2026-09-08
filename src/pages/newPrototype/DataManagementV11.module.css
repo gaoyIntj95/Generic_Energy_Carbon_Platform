@@ -360,21 +360,6 @@
   gap: 10px;
 }
 
-.deviceLevelBadge {
-  display: inline-flex;
-  height: 21px;
-  align-items: center;
-  padding: 0 7px;
-  color: #007b55;
-  background: #d9f2e7;
-  border: 1px solid #b8e4d2;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: .02em;
-  white-space: nowrap;
-}
-
 .deviceToggle {
   display: grid;
   width: 22px;
@@ -2162,22 +2147,60 @@
 }
 
 .deviceTable th:nth-child(1),
-.deviceTable td:nth-child(1) { width: 25%; }
+.deviceTable td:nth-child(1) { width: 31%; }
 
 .deviceTable th:nth-child(2),
-.deviceTable td:nth-child(2) { width: 18%; }
+.deviceTable td:nth-child(2) { width: 19%; }
 
 .deviceTable th:nth-child(3),
-.deviceTable td:nth-child(3) { width: 16%; }
+.deviceTable td:nth-child(3) { width: 17%; }
 
 .deviceTable th:nth-child(4),
-.deviceTable td:nth-child(4) { width: 14%; }
+.deviceTable td:nth-child(4) { width: 15%; }
 
 .deviceTable th:nth-child(5),
-.deviceTable td:nth-child(5) { width: 17%; }
+.deviceTable td:nth-child(5) { width: 18%; }
 
-.deviceTable th:nth-child(6),
-.deviceTable td:nth-child(6) { width: 10%; }
+.devicePageHeader {
+  padding: 18px 20px 10px;
+}
+
+.devicePageHeader h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 18px;
+}
+
+.deviceLevelTwoRow td {
+  position: relative;
+  height: 42px;
+  padding-inline: 28px;
+  background: #f3faf8;
+  border-bottom: 1px solid #deefea;
+}
+
+.deviceLevelTwoRow td::before {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: 42px;
+  width: 1px;
+  content: '';
+  background: #d7ebe4;
+}
+
+.deviceLevelTwoNode {
+  display: flex;
+  height: 42px;
+  align-items: center;
+  gap: 10px;
+  padding-left: 18px;
+}
+
+.deviceLevelTwoNode > span:nth-child(2) {
+  color: #52666b;
+  font-weight: 650;
+}
 
 .deviceTable thead th {
   height: 48px;
@@ -2231,11 +2254,26 @@
 }
 
 .deviceRow td {
+  position: relative;
   height: 50px;
   padding-inline: 16px;
   color: #40545a;
   border-top-color: #e8efed;
   transition: background-color .18s ease, box-shadow .18s ease;
+}
+
+.deviceRow td:first-child {
+  padding-left: 74px;
+}
+
+.deviceRow td:first-child::before {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: 48px;
+  width: 1px;
+  content: '';
+  background: #e0eee9;
 }
 
 .deviceRow:hover td {

@@ -47,6 +47,9 @@ describe('navigation manifest', () => {
       expect.objectContaining({ label: '供应链碳管理', planned: true, badge: '规划中' }),
       expect.objectContaining({ label: '碳足迹核算', planned: true, badge: '规划中' }),
     ]);
+    expect(carbonDisplay?.find((entry) => entry.label === '碳因子参数')).toEqual(
+      expect.objectContaining({ label: '碳因子参数', disabled: true }),
+    );
     expect(allNavItems.some((item) => item.label === '供应链碳管理')).toBe(false);
     expect(allNavItems.some((item) => item.label === '碳足迹核算')).toBe(false);
   });

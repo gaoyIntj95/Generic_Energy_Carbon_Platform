@@ -88,6 +88,21 @@ function MenuLink({ item, nested = false }: { item: NavItem; nested?: boolean })
   const location = useLocation();
   const isItemActive = navItemMatches(item, location.pathname, location.search);
 
+  if (item.disabled) {
+    return (
+      <div
+        className={`${styles.item} ${nested ? styles.nestedItem : ''} ${styles.plannedItem}`}
+        aria-disabled="true"
+        title={`${item.label}（一期延用）`}
+      >
+        <span className={styles.branchDot} />
+        <span className={styles.itemIcon}><MenuIcon name={item.label} /></span>
+        <span className={styles.itemLabel}>{item.label}</span>
+        <span className={styles.plannedBadge}>一期延用</span>
+      </div>
+    );
+  }
+
   return (
     <NavLink
       to={item.path}

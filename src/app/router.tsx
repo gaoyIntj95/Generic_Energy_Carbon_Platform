@@ -2,7 +2,7 @@ import { createBrowserRouter, createHashRouter, Navigate } from 'react-router-do
 import { AppShell } from '../layouts/AppShell';
 import { PlatformPage } from '../pages/PlatformPage';
 
-export type NavItem = { label: string; path: string; description: string; pageTitle?: string };
+export type NavItem = { label: string; path: string; description: string; pageTitle?: string; disabled?: boolean };
 export type NavPlaceholder = { label: string; key: string; description: string; planned: true; badge: string };
 export type NavSection = { label: string; key: string; items: Array<NavItem | NavPlaceholder> };
 export type NavDisplayEntry = NavItem | NavSection | NavPlaceholder;
@@ -42,7 +42,7 @@ const carbonAccountingItems: NavItem[] = [
   { label: '碳核算清单', path: '/carbon-accounting/inventory', description: '按排放类别维护排放源活动数据、计算参数与排放结果。' },
   { label: '碳核查支撑', path: '/carbon-accounting/support', description: '维护核算基础材料和排放源支撑材料。' },
   { label: '碳排放报告', path: '/carbon-accounting/report', description: '基于正式核算清单生成企业温室气体排放报告，并导出报告及核查凭证资料。' },
-  { label: '碳因子参数', path: '/carbon-accounting/factors', description: '管理综合因子、基础参数、参数组、企业实测值和历史版本。' },
+  { label: '碳因子参数', path: '/carbon-accounting/factors', description: '管理综合因子、基础参数、参数组、企业实测值和历史版本。', disabled: true },
 ];
 
 const carbonFootprintPlanning: NavPlaceholder = {

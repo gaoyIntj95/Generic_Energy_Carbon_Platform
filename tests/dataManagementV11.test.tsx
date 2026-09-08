@@ -185,6 +185,14 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(dialog?.textContent).not.toContain('数据角色');
   });
 
+  it('shows the populated device energy tab without opening a dialog', async () => {
+    await render('/data-management/energy-data?scope=device&deviceId=v11-device-79&year=2026');
+
+    expect(container.textContent).toContain('重点设备能源数据');
+    expect(container.textContent).toContain('2#螺杆空压机');
+    expect(container.querySelector('form')).toBeNull();
+  });
+
   it('opens an existing device energy record directly in the edit dialog', async () => {
     await render('/data-management/energy-data?scope=device&deviceId=v11-device-79&year=2026&energyTypeId=v11-energy-electricity&recordId=v11-er-device-79');
 
@@ -297,8 +305,11 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(container.textContent).toContain('18,300,000');
     expect(container.textContent).toContain('52,000');
     expect(container.textContent).toContain('余热发电机组');
+    expect(container.textContent).toContain('关联重点设备：余热发电机组');
     expect(container.textContent).toContain('锅炉系统');
+    expect(container.textContent).toContain('关联重点设备：2t/h天然气蒸汽锅炉');
     expect(container.textContent).toContain('空压系统');
+    expect(container.textContent).toContain('关联重点设备：1#螺杆空压机、2#螺杆空压机');
     expect(container.textContent).toContain('压缩空气 · 11,490,000 Nm³');
     expect(container.textContent).toContain('电力 · 18,300,000 kWh');
     expect(container.textContent).toContain('余热 · 85,000 GJ');
@@ -359,13 +370,27 @@ describe('DataManagementV11 fidelity and data behavior', () => {
 
     expect(container.textContent).toContain('新增回收能源');
     expect(container.textContent).toContain('余热产生设备');
+    expect(container.textContent).toContain('余热产生部位（选填）');
     expect(container.textContent).toContain('连续式热处理炉');
+    expect(container.textContent).toContain('1#注塑机');
+    expect(container.textContent).toContain('自动喷涂线');
+    expect(container.textContent).toContain('2t/h天然气蒸汽锅炉');
     expect(container.textContent).toContain('1#螺杆空压机');
     expect(container.textContent).toContain('余热');
     expect(container.textContent).not.toContain('加工工段工艺余热');
     expect(container.textContent).not.toContain('前处理烘干/热水工艺');
     expect(container.textContent).not.toContain('来源介质');
     expect(container.textContent).not.toContain('请选择能源品种');
+  });
+
+  it('derives recovery-source labels from the linked key-device profile', async () => {
+    const device = listV11KeyDevices().find((item) => item.deviceId === 'v11-device-62');
+    expect(device).toBeDefined();
+    if (!device) return;
+    expect(saveV11KeyDevice({ ...device, deviceName: '1#螺杆空压机（改名）' }, device.deviceId).ok).toBe(true);
+
+    await render('/data-management/energy-data?tab=recovery');
+    expect(container.textContent).toContain('1#螺杆空压机（改名）');
   });
 
   it('keeps V11 records centrally mutable with stable IDs and monthly values', () => {
@@ -521,7 +546,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(container.textContent).not.toContain('熟料产量');
     expect(container.textContent).not.toContain('水泥产量');
 
-    await click(button('企业（'));
+    await click(button('企业'));
     await click(button('新增运营数据'));
     let dialog = container.querySelector('form');
     expect(dialog?.textContent).toContain('新增运营数据');
@@ -550,7 +575,19 @@ describe('DataManagementV11 fidelity and data behavior', () => {
       annualValue: 0,
     });
     expect(saved).toMatchObject({ ok: false });
-    if (!saved.ok) expect(saved.error).toContain('不能同时维护');
+    if (!saved.ok) expect(saved.error).toContain('只能维护一款主产品产量');
+  });
+
+  it('defaults enterprise product output to one main product', async () => {
+    await render('/data-management/operations');
+    await click(button('企业'));
+    await click(button('新增运营数据'));
+    const dialog = container.querySelector('form');
+    const productSelect = [...(dialog?.querySelectorAll('select') ?? [])].find((select) => select.options.namedItem('产品A') || [...select.options].some((option) => option.textContent === '产品A')) as HTMLSelectElement;
+    expect(productSelect?.value).toBe('product-a');
+    expect(productSelect?.disabled).toBe(true);
+    expect(dialog?.textContent).toContain('主产品');
+    expect(dialog?.textContent).toContain('默认按主产品录入');
   });
 
   it('uses the queried year for new operation records and keeps tab counts in sync with filters', async () => {
@@ -560,9 +597,27 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     await click(button('查询'));
     expect(container.textContent).toContain('层级总览（9）');
 
-    await click(button('企业（'));
+    await click(button('企业'));
     await click(button('新增运营数据'));
     expect(container.querySelector('form')?.textContent).toContain('2025年度');
+  });
+
+  it('opens operation data at the requested scope without opening a new-record dialog', async () => {
+    await render('/data-management/operations?year=2026&scopeLevel=企业');
+    expect(button('企业').className).toContain('activeLevel');
+    expect(container.textContent).toContain('工业增加值');
+    expect(container.textContent).toContain('工业总产值');
+    expect(container.querySelector('form')).toBeNull();
+  });
+
+  it('opens a requested level-one unit without opening a new-record dialog', async () => {
+    await render('/data-management/operations?year=2026&scopeLevel=一级用能单元');
+    const unitTab = [...container.querySelectorAll('button')].find((item) => item.textContent?.startsWith('一级用能单元（'));
+    expect(unitTab?.className).toContain('activeLevel');
+    expect(container.textContent).toContain('生产车间A');
+    expect(container.textContent).toContain('生产车间B');
+    expect(container.textContent).toContain('产品产量');
+    expect(container.querySelector('form')).toBeNull();
   });
 
   it('uses the configured energy-unit tree when assigning operation data and key devices', async () => {
