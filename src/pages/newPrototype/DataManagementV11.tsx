@@ -1405,6 +1405,7 @@ function DeviceDialog({ item, dialogPreset, onClose, onSaved }: { item?: V11KeyD
   const [customType, setCustomType] = useState(initialPreset === '其他（自定义）' ? item?.deviceType ?? '' : '');
   const [name, setName] = useState(item?.deviceName ?? '');
   const [typeId, setTypeId] = useState(item?.mainEnergyTypeId ?? '');
+  const [outputBasis, setOutputBasis] = useState(item?.outputBasis ?? '');
   const [remark, setRemark] = useState(item?.remark ?? '');
   const [error, setError] = useState('');
   const levelOneUnits = units.filter((unit) => unit.unitLevel === 'level1');
@@ -1418,8 +1419,8 @@ function DeviceDialog({ item, dialogPreset, onClose, onSaved }: { item?: V11KeyD
   return <Modal title={item ? '编辑重点设备档案' : '新增重点设备'} width={720} submitText="保存设备" onClose={onClose} onSubmit={() => {
     const deviceType = preset === '其他（自定义）' ? customType.trim() : preset;
     const resolvedUnitId = hasRootContext ? (presetRootIsLevelOne ? parentUnitId : unitId) : unitId;
-    if (!resolvedUnitId || !deviceType || !name.trim() || !typeId) return setError('请完整填写设备名称、设备类型、主要能源品种和归属用能单元。');
-    const result = saveV11KeyDevice({ energyUnitId: resolvedUnitId, deviceType, deviceName: name.trim(), mainEnergyTypeId: typeId, remark }, item?.deviceId);
+    if (!resolvedUnitId || !deviceType || !name.trim() || !typeId || !outputBasis.trim()) return setError('请完整填写设备名称、设备类型、主要能源品种、设备产出口径和归属用能单元。');
+    const result = saveV11KeyDevice({ energyUnitId: resolvedUnitId, deviceType, deviceName: name.trim(), mainEnergyTypeId: typeId, outputBasis: outputBasis.trim(), remark }, item?.deviceId);
     if (!result.ok) return setError(result.error);
     onSaved(item ? '重点设备已更新' : '重点设备已新增');
   }}><div className={styles.deviceForm}>
@@ -1439,6 +1440,7 @@ function DeviceDialog({ item, dialogPreset, onClose, onSaved }: { item?: V11KeyD
         <Field label="设备类型" required><select value={preset} onChange={(event) => { setPreset(event.target.value); if (event.target.value !== '其他（自定义）') setCustomType(''); }}><option value="">请选择设备类型</option>{deviceTypePresets.map((value) => <option key={value}>{value}</option>)}</select></Field>
         {preset === '其他（自定义）' && <Field label="自定义设备类型" required><input value={customType} onChange={(event) => setCustomType(event.target.value)} placeholder="请输入具体设备类型" /></Field>}
         <Field label="主要能源品种" required><select value={typeId} onChange={(event) => setTypeId(event.target.value)}><option value="">请选择主要能源品种</option>{selectableTypes.map((type) => <option key={type.energyTypeId} value={type.energyTypeId}>{type.energyTypeName}</option>)}</select></Field>
+        <Field label="设备产出口径" required><input value={outputBasis} onChange={(event) => setOutputBasis(event.target.value)} placeholder="例如：供气量、发电量、产品产量" /></Field>
       </div>
     </section>
     {!lockedOwnership && !hasRootContext && <section className={styles.deviceFormSection}>
