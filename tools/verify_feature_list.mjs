@@ -1,0 +1,13 @@
+import fs from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
+const { FileBlob, SpreadsheetFile } = await import(pathToFileURL('C:/Users/340710/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/@oai/artifact-tool/dist/artifact_tool.mjs').href);
+const path = 'D:/Project/Generic_Energy_Carbon_Platform/artifacts/feature-list-update/功能清单_按当前项目修订版.xlsx';
+const wb = await SpreadsheetFile.importXlsx(await FileBlob.load(path));
+const sheet = wb.worksheets.getItemAt(0);
+const used = sheet.getUsedRange();
+console.log(`USED_ROWS=${used.values.length}; USED_COLS=${used.values[0].length}`);
+console.log(JSON.stringify(used.values.slice(180, 190), null, 2));
+const errors = await wb.inspect({ kind: 'match', searchTerm: '#REF!|#DIV/0!|#VALUE!|#NAME\\?|#N/A', options: { useRegex: true, maxResults: 100 }, summary: 'final formula error scan' });
+console.log(errors.ndjson);
+const preview = await wb.render({ sheetName: sheet.name, range: 'A1:E248', scale: 1, format: 'png' });
+await fs.writeFile('D:/Project/Generic_Energy_Carbon_Platform/artifacts/feature-list-update/功能清单最终预览.png', new Uint8Array(await preview.arrayBuffer()));
