@@ -40,11 +40,6 @@ import {
   type DeviceIntensityMetricCode,
 } from '../../mocks/deviceIntensityParameterStore';
 import {
-  listV11EnergyRecords,
-  listV11EnergyTypes,
-  saveV11EnergyRecord,
-} from '../../mocks/dataManagementV11Store';
-import {
   buildFlowAnalysisDataset,
   type FlowAnalysisDataset,
   type FlowDetailRow as ClosedLoopFlowDetailRow,
@@ -89,6 +84,10 @@ function deviceEnergyTypeId(metricCode: string) {
 function deviceEnergyDataPath(deviceId: string, year: number | string, metricCode: string, recordId?: string | null) {
   const recordQuery = recordId ? `&recordId=${encodeURIComponent(recordId)}` : '&new=1';
   return `/data-management/energy-data?scope=device&deviceId=${encodeURIComponent(deviceId)}&year=${year}&energyTypeId=${deviceEnergyTypeId(metricCode)}${recordQuery}`;
+}
+
+function deviceEnergyDataTabPath(deviceId: string, year: number | string, metricCode: string) {
+  return `/data-management/energy-data?scope=device&deviceId=${encodeURIComponent(deviceId)}&year=${year}&energyTypeId=${deviceEnergyTypeId(metricCode)}`;
 }
 
 function intensityStatus(metric: CalculatedIntensityMetric) {
@@ -679,39 +678,7 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
     navigate(withReturnTo(energyPath, returnToIntensityPath()));
   };
   const openEnergyDataDialog = (row: ReturnType<typeof buildDeviceIntensityRows>[number]) => {
-    const energyTypeId = row.templateConfig?.numerator.energyTypeId ?? deviceEnergyTypeId(row.metricCode ?? '');
-    const record = listV11EnergyRecords().find((item) => item.year === applied.year && item.energyRole === '能源消费' && item.scopeType === 'device' && item.scopeId === row.deviceId && item.energyTypeId === energyTypeId);
-    const energyType = listV11EnergyTypes().find((item) => item.energyTypeId === energyTypeId);
-    let monthlyValues = record?.monthlyAmounts ? [...record.monthlyAmounts] : Array(12).fill(0);
-    let reported = record?.monthlyReportedMonths ? [...record.monthlyReportedMonths] : monthlyValues.map((value) => value > 0);
-    let annualValue = record?.annualAmount ?? 0;
-    setDialog({
-      title: record ? '修改能源消费数据' : '补充能源消费数据',
-      wide: true,
-      body: <>
-        <div className={styles.compactEditContext}>正在修改：<strong>{row.deviceName}</strong>｜{energyType?.energyTypeName ?? row.energyUnit}</div>
-        <div className={styles.modalNote}>设备能源消费数据仅用于本设备指标计算，设备级记录不会重复计入企业或用能单元汇总。</div>
-        <div className={styles.monthlyParameterField}>
-          <span>能源消费｜月度录入（{energyType?.measurementUnit ?? row.energyUnit}）</span>
-          <div className={styles.monthlyParameterGrid}>{monthlyValues.map((value, index) => <label key={index}><span>{index + 1}月</span><input aria-label={`${index + 1}月能源消费`} type="number" min="0" step="0.001" defaultValue={reported[index] ? value : ''} onChange={(event) => { const nextValue = event.target.value.trim(); monthlyValues[index] = nextValue === '' ? 0 : Number(nextValue); reported[index] = nextValue !== ''; }} /></label>)}</div>
-          <div className={styles.monthlyParameterHint}>按实际已取得月份填报；月度数据不完整时，可补录年度总量，系统不会自动分摊缺失月份。</div>
-        </div>
-        <div className={styles.monthlyAnnualSummary}><span className={reported.every(Boolean) ? undefined : styles.required}>{reported.every(Boolean) ? '年度合计（完整月度数据时自动汇总）' : '年度能源消费（月度不全时必填）'}</span><input aria-label="年度能源消费" type="number" min="0" step="0.001" defaultValue={annualValue || ''} onChange={(event) => { annualValue = Number(event.target.value); }} /></div>
-      </>,
-      cancelText: '取消',
-      submitText: record ? '保存并重新计算' : '保存并计算',
-      onSubmit: () => {
-        const monthlyTotal = monthlyValues.reduce((total, value) => total + (Number.isFinite(value) ? value : 0), 0);
-        const complete = reported.every(Boolean);
-        const normalizedAnnual = complete ? 0 : Number(annualValue || 0);
-        if (!monthlyTotal && !normalizedAnnual) { notify('请至少填写一个月度数据，或补录年度总量'); return false; }
-        if (normalizedAnnual > 0 && normalizedAnnual < monthlyTotal) { notify('年度总量不能小于已填报月份合计'); return false; }
-        const result = saveV11EnergyRecord({ year: applied.year, energyRole: '能源消费', scopeLevel: record?.scopeLevel ?? '二级用能单元', scopeType: 'device', scopeId: row.deviceId, energyUnitId: row.energyUnitId, energyTypeId, entryMode: monthlyTotal > 0 ? 'monthly' : 'annual', monthlyAmounts: monthlyValues, monthlyReportedMonths: reported, annualAmount: normalizedAnnual }, record?.energyRecordId);
-        if (!result.ok) { notify(result.error); return false; }
-        setVersion((current) => current + 1);
-        notify(record ? '能源消费数据已更新，设备指标已重新计算' : '能源消费数据已补充，设备指标已重新计算');
-      },
-    });
+    navigate(withReturnTo(deviceEnergyDataTabPath(row.deviceId, applied.year, row.metricCode ?? 'custom-device-work'), returnToIntensityPath()));
   };
   const hasDeviceOutputData = (row: ReturnType<typeof buildDeviceIntensityRows>[number]) => {
     if (row.templateConfig?.denominator.source === 'energy-conversion') return (row.calculationInputs?.denominatorRaw ?? 0) > 0;

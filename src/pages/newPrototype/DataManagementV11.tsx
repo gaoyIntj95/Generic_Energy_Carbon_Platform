@@ -1341,6 +1341,7 @@ function DevicesPage() {
     return <tr className={styles.deviceRow} key={row.deviceId}>
       <td><div className={styles.deviceNameCell}><span className={styles.deviceName}>{row.deviceName}</span></div></td>
       <td><span className={styles.deviceTypeText}>{row.deviceType}</span></td>
+      <td>{row.outputBasis || '—'}</td>
       <td><Tag tone="blue">{energyType?.energyTypeName}</Tag></td>
       <td><div className={styles.actions}><button type="button" onClick={() => setEditing(row)}>编辑</button><button type="button" className={styles.danger} onClick={requestDelete}>删除</button></div></td>
     </tr>;
@@ -1353,21 +1354,21 @@ function DevicesPage() {
       {levelOneUnitIdInput && <Field label="具体用能单元"><select value={unitIdInput} onChange={(event) => setUnitIdInput(event.target.value)}><option value="">全部</option><option value={levelOneUnitIdInput}>一级单元直属设备</option>{childUnits.map((unit) => <option key={unit.energyUnitId} value={unit.energyUnitId}>{unit.energyUnitName}</option>)}</select></Field>}
     </Toolbar>
     <div className={styles.devicePageHeader}><h2>重点设备</h2></div>
-    <div className={styles.tableWrap}><table className={styles.deviceTable}><thead><tr><th>重点设备</th><th>设备类型</th><th>主要能源品种</th><th>操作</th></tr></thead><tbody>{groupedRows.length ? groupedRows.flatMap((group) => {
+    <div className={styles.tableWrap}><table className={styles.deviceTable}><thead><tr><th>重点设备</th><th>设备类型</th><th>设备产出口径</th><th>主要能源品种</th><th>操作</th></tr></thead><tbody>{groupedRows.length ? groupedRows.flatMap((group) => {
       const collapsed = collapsedLevelOneIds.includes(group.unit.energyUnitId);
       const toggle = () => setCollapsedLevelOneIds((current) => current.includes(group.unit.energyUnitId) ? current.filter((id) => id !== group.unit.energyUnitId) : [...current, group.unit.energyUnitId]);
       const groupDevices = [...group.directDevices, ...group.childGroups.flatMap((childGroup) => childGroup.devices)];
-      return [<tr className={styles.deviceLevelOneRow} key={`level-one-${group.unit.energyUnitId}`}><td colSpan={4}><div className={styles.deviceLevelOneNode}><button type="button" aria-label={`${collapsed ? '展开' : '收起'}${group.unit.energyUnitName}`} className={styles.deviceToggle} onClick={toggle}>{collapsed ? '+' : '−'}</button><b>{group.unit.energyUnitName}</b><button type="button" className={`${styles.deviceAddButton} ${styles.deviceLevelOneAddButton}`} onClick={() => setEditing({ rootUnitId: group.unit.energyUnitId })}>＋ 新增设备</button></div></td></tr>,
+      return [<tr className={styles.deviceLevelOneRow} key={`level-one-${group.unit.energyUnitId}`}><td colSpan={5}><div className={styles.deviceLevelOneNode}><button type="button" aria-label={`${collapsed ? '展开' : '收起'}${group.unit.energyUnitName}`} className={styles.deviceToggle} onClick={toggle}>{collapsed ? '+' : '−'}</button><b>{group.unit.energyUnitName}</b><button type="button" className={`${styles.deviceAddButton} ${styles.deviceLevelOneAddButton}`} onClick={() => setEditing({ rootUnitId: group.unit.energyUnitId })}>＋ 新增设备</button></div></td></tr>,
         ...(!collapsed ? [
           ...group.directDevices.map((row) => renderDeviceRow(row)),
           ...group.childGroups.flatMap((childGroup) => {
             const childCollapsed = collapsedUnitIds.includes(childGroup.unit.energyUnitId);
             const childToggle = () => setCollapsedUnitIds((current) => current.includes(childGroup.unit.energyUnitId) ? current.filter((id) => id !== childGroup.unit.energyUnitId) : [...current, childGroup.unit.energyUnitId]);
-            return [<tr className={styles.deviceLevelTwoRow} key={`level-two-${childGroup.unit.energyUnitId}`}><td colSpan={4}><div className={styles.deviceLevelTwoNode}><button type="button" aria-label={`${childCollapsed ? '展开' : '收起'}${childGroup.unit.energyUnitName}`} className={styles.deviceToggle} onClick={childToggle}>{childCollapsed ? '+' : '−'}</button><span>{childGroup.unit.energyUnitName}</span><button type="button" className={`${styles.deviceAddButton} ${styles.deviceLevelTwoAddButton}`} onClick={() => setEditing({ rootUnitId: childGroup.unit.energyUnitId })}>＋ 新增设备</button></div></td></tr>, ...(childCollapsed ? [] : childGroup.devices.map((row) => renderDeviceRow(row)))];
+            return [<tr className={styles.deviceLevelTwoRow} key={`level-two-${childGroup.unit.energyUnitId}`}><td colSpan={5}><div className={styles.deviceLevelTwoNode}><button type="button" aria-label={`${childCollapsed ? '展开' : '收起'}${childGroup.unit.energyUnitName}`} className={styles.deviceToggle} onClick={childToggle}>{childCollapsed ? '+' : '−'}</button><span>{childGroup.unit.energyUnitName}</span><button type="button" className={`${styles.deviceAddButton} ${styles.deviceLevelTwoAddButton}`} onClick={() => setEditing({ rootUnitId: childGroup.unit.energyUnitId })}>＋ 新增设备</button></div></td></tr>, ...(childCollapsed ? [] : childGroup.devices.map((row) => renderDeviceRow(row)))];
           }),
         ] : []),
       ];
-    }) : <EmptyRow colSpan={4} />}</tbody></table></div>
+    }) : <EmptyRow colSpan={5} />}</tbody></table></div>
     <Pagination count={rows.length} />
   </section>
   {editing && <DeviceDialog item={editing !== 'new' && !('rootUnitId' in editing) ? editing : undefined} dialogPreset={editing !== 'new' && 'rootUnitId' in editing ? editing : undefined} onClose={() => setEditing(null)} onSaved={(message) => { setEditing(null); setVersion((value) => value + 1); notify(message); }} />}
