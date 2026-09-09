@@ -700,7 +700,7 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(container.querySelector('th')?.parentElement?.textContent).not.toContain('状态');
     expect(container.textContent).not.toContain('数据性质');
     expect(container.textContent).toContain('全部能流阶段');
-    await click(button('查看追溯'));
+    await click(button('查看'));
     expect(container.textContent).toContain('能源流向追溯');
     expect(container.textContent).toContain('数据说明');
     expect(container.textContent).toContain('折标系数');

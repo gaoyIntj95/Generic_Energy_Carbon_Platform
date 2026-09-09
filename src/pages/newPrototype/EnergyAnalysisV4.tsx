@@ -2447,7 +2447,7 @@ function ClosedLoopFlowDetailTable({
       <div className={styles.tableToolbar}>
         <div>
           <div className={styles.chartTitle}>流向记录 <span className={styles.detailCount}>（共 {rows.length} 条）</span></div>
-          <div className={styles.subtleCount}>展示能源从来源到去向的路径关系；点击“查看追溯”可查看原始记录或差额说明。</div>
+          <div className={styles.subtleCount}>展示能源从来源到去向的路径关系；点击“查看”可查看原始记录或差额说明。</div>
         </div>
         <EnergyButton onClick={() => notify('已按当前期间和展示层级导出能源流向明细')}>⇩ 导出当前明细</EnergyButton>
       </div>
@@ -2476,7 +2476,7 @@ function ClosedLoopFlowDetailTable({
               <td>{row.target}</td>
               <td>{row.energyTypeName}</td>
               <td className={row.abnormal ? styles.up : ''}>{format(row.standardCoalAmount, row.standardCoalAmount < 10 ? 2 : 1)}</td>
-              <td><button type="button" className={styles.link} onClick={() => open(row)}>{row.traceRecords.length ? '查看追溯' : '查看说明'}</button></td>
+              <td><button type="button" className={styles.link} onClick={() => open(row)}>查看</button></td>
             </tr>)}</tbody>;
           })}
         </table>
