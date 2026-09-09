@@ -403,8 +403,8 @@ function utilityMetrics(object: IntensityObjectOption, year: number, energy: V11
   const result = baseMetric(`${object.objectId}-utility`, typeName, unit, isBoiler ? '年度折标综合能耗 ÷ 蒸汽产量' : `年度综合能耗 ÷ ${denominatorLabel}`, missing ? null : coal * 1000 / annualOutputAmount, `${object.objectName}综合能耗 ${coal.toLocaleString('zh-CN')} tce`, output ? `${output.metricName} ${annualOutputAmount.toLocaleString('zh-CN')} ${output.metricUnit}` : '未匹配到当前对象的运营数据', year, energy.map((record) => record.energyRecordId), output ? [output.operationMetricId] : [], missing);
   return [{
     ...result,
-    denominatorSource: output?.metricCode === 'energy_supply_derived' ? '能源回收、转换与外供—动力中心下属二级系统有效内部供能汇总' : '运营数据',
-    source: output?.metricCode === 'energy_supply_derived' ? '能源数据与能源回收、转换与外供（按动力中心及年度匹配）' : result.source,
+    denominatorSource: output?.metricCode === 'energy_supply_derived' ? '能源转换与流向—动力中心下属二级系统有效内部供能汇总' : '运营数据',
+    source: output?.metricCode === 'energy_supply_derived' ? '能源数据与能源转换与流向（按动力中心及年度匹配）' : result.source,
   }];
 }
 

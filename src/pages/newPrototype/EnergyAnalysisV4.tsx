@@ -645,7 +645,7 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
         </select></label>
         <label className={styles.modalField}><span>指标名称</span><input aria-label="指标名称" value={metricName} readOnly /></label>
         <label className={styles.modalField}><span className={styles.required}>能源消耗</span><select aria-label="能源消耗" defaultValue={energyTypeId} onChange={(event) => { energyTypeId = event.target.value; syncResultUnit(); }}><option value="v11-energy-electricity">电力</option><option value="v11-energy-natural-gas">天然气折标综合能耗</option></select></label>
-        <div className={styles.modalNote}>设备产出数据统一在本页补录，能源回收、转换与外供台账仅用于能流和平衡分析，不作为设备指标的录入入口。</div>
+        <div className={styles.modalNote}>设备产出统一在设备产出数据中维护，能源类产出同时供设备指标和能流分析引用。</div>
         <label className={styles.modalField}><span className={styles.required}>产出口径</span><input aria-label="产出口径" value={denominatorName} readOnly /></label>
         <label className={styles.modalField}><span>产出计量单位（数据录入时维护）</span><input aria-label="分母单位" value={denominatorUnit} readOnly /></label>
         <label className={styles.modalField}><span>分母指标编码（选填）</span><input aria-label="分母指标编码" defaultValue={denominatorMetricCode} placeholder="例如：steam_output" onChange={(event) => { denominatorMetricCode = event.target.value; }} /></label>
@@ -693,7 +693,7 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
       : source === 'operation-data'
         ? '设备产出数据'
       : source === 'energy-conversion'
-          ? '能源回收、转换与外供—转换与利用'
+          ? '能源转换与流向'
           : undefined;
     setDialog({
       title: '设备指标详情',
@@ -2510,6 +2510,8 @@ function FlowTraceDrawer({ row, close }: { row: ClosedLoopFlowDetailRow | null; 
               ['去向', row.target],
               ['能源品种', row.energyTypeName],
               ['数据期间', singleTrace?.periodLabel ?? '当前分析期间'],
+              ['数据来源', singleTrace?.recordType ?? row.traceDescription],
+              ...(singleTrace?.sourceType.startsWith('设备产出换算依据') ? [['换算依据', singleTrace.sourceType] as [string, ReactNode]] : []),
             ]} />
           </section>
           {singleTrace ? (

@@ -427,7 +427,7 @@ export function EnergyUnitsPage() {
             </section>
             <section>
               <strong>其他能源业务</strong>
-              <p>能源回收、转换与外供请前往“数据管理 &gt; 能源数据 &gt; 能源回收、转换与外供”维护。</p>
+              <p>能源转换与流向请前往“数据管理 &gt; 能源数据 &gt; 能源转换与流向”维护。</p>
             </section>
             <section>
               <strong>转换场景</strong>

@@ -2,7 +2,6 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { listEnergyUnits } from '../../mocks/energyUnitMockStore';
 import {
-  deleteV11ConversionOutput,
   deleteV11EnergyCost,
   deleteV11EnergyRecord,
   deleteV11EnergyType,
@@ -11,35 +10,26 @@ import {
   isV11EnergyTypeEnabled,
   deleteV11KeyDevice,
   deleteV11OperationMetric,
-  deleteV11ExternalSupplyRecord,
   inspectV11KeyDeviceDeletion,
   enableV11EnergyType,
-  listV11ConversionOutputs,
-  listV11ExternalSupplyRecords,
   listV11EnergyCosts,
   listV11EnergyRecords,
   listV11EnergyTypes,
   listV11KeyDevices,
   listV11OperationMetrics,
-  saveV11ConversionOutput,
   saveV11EnergyCost,
   saveV11EnergyRecord,
   saveV11EnergyType,
   saveV11KeyDevice,
   saveV11OperationMetric,
-  saveV11ExternalSupplyRecord,
   v11RecordScopeType,
   v11ScopeName,
   type AnalysisCategory,
-  type ConversionInputMode,
-  type ConversionOutputType,
   type EnergyRole,
   type ScopeLevel,
-  type V11ConversionOutput,
   type V11EnergyCost,
   type V11EnergyRecord,
   type V11EnergyType,
-  type V11ExternalSupplyRecord,
   type V11KeyDevice,
   type V11OperationMetric,
 } from '../../mocks/dataManagementV11Store';
@@ -61,6 +51,7 @@ import {
 } from '../../mocks/deviceIntensityParameterStore';
 import type { ProductMaster } from '../../types/product';
 import { Button, Field, Modal, Tag, Toast } from './PrototypeUI';
+import { EnergyFlowMaintenance } from './EnergyFlowMaintenance';
 import { EnergyUnitsPage } from './EnergyUnitsPage';
 import styles from './DataManagementV11.module.css';
 
@@ -119,31 +110,6 @@ const energyPresets: Record<AnalysisCategory, Array<[string, string, number, str
   其他能源: [['压缩空气', 'Nm³', 0, 'kgce/Nm³'], ['其他（自定义）', '', 0, '']],
 };
 
-const conversionOutputTypes: ConversionOutputType[] = ['锅炉产汽/产热', '余热发电', '空压产气/压缩空气', '回收利用'];
-type ConversionBusinessPath = 'normal-conversion' | 'recovered-conversion' | 'recovered-direct-use';
-const conversionBusinessPaths: Array<{ value: ConversionBusinessPath; label: string; description: string; types: ConversionOutputType[] }> = [
-  { value: 'normal-conversion', label: '常规能源转换', description: '外购或自产能源经过设备转换，形成蒸汽、热力或压缩空气。', types: ['锅炉产汽/产热', '空压产气/压缩空气'] },
-  { value: 'recovered-conversion', label: '回收能源转换', description: '已回收的余热、余压等继续转换为电力或其他能源。', types: ['余热发电'] },
-  { value: 'recovered-direct-use', label: '回收能源直接利用', description: '回收能源不再改变能源形态，直接形成厂内可用能源。', types: ['回收利用'] },
-];
-const conversionSceneCopy: Record<string, string> = {
-  '锅炉产汽/产热': '记录燃料投入、蒸汽/热力产出和使用去向',
-  '余热发电': '记录余热/余压投入、发电量和电力去向',
-  '空压产气/压缩空气': '记录空压机电力投入、压缩空气产出和厂内用气去向',
-  '回收利用': '记录余热、余压、回收蒸汽等直接回用的数量和去向',
-};
-function conversionSceneLabel(type: ConversionOutputType) {
-  return type === '回收利用' ? '回收能源直接利用' : type;
-}
-function conversionBusinessPathFor(type: ConversionOutputType): ConversionBusinessPath {
-  if (type === '余热发电') return 'recovered-conversion';
-  if (type === '回收利用') return 'recovered-direct-use';
-  return 'normal-conversion';
-}
-function conversionBusinessPathLabel(path: ConversionBusinessPath) {
-  return conversionBusinessPaths.find((item) => item.value === path)?.label ?? '常规能源转换';
-}
-const recoveryEnergyOptions = ['余热', '回收蒸汽', '冷凝水', '回收热水', '可燃尾气', '压力能'];
 const currentYear = new Date().getFullYear();
 const yearOptions = [currentYear, currentYear - 1, currentYear - 2].map(String);
 
@@ -205,12 +171,12 @@ export function DataManagementV11({ pathname }: { pathname: string }) {
   if (page === 'energy-types') return <EnergyTypesPage />;
   if (page === 'energy-data') {
     if (energyTab === 'costs') return <EnergyCostsPage />;
-    if (energyTab === 'recovery' || energyTab === 'conversion' || energyTab === 'external') return <EnergyConversionOutputPage />;
+    if (energyTab === 'flow' || energyTab === 'recovery' || energyTab === 'conversion' || energyTab === 'external') return <EnergyFlowMaintenance />;
     return <EnergyQuantityPage />;
   }
   if (page === 'energy-consumption') return <EnergyQuantityPage />;
   if (page === 'energy-costs') return <EnergyCostsPage />;
-  if (page === 'energy-relations') return <EnergyConversionOutputPage />;
+  if (page === 'energy-relations') return <EnergyFlowMaintenance />;
   if (page === 'operations') return <OperationsPage />;
   if (page === 'device-output') return <DeviceOutputPage />;
   return <DevicesPage />;
@@ -230,7 +196,7 @@ function EnergyTypesPage() {
   const [editing, setEditing] = useState<V11EnergyType | 'new' | null>(null);
   const [deleting, setDeleting] = useState<V11EnergyType | null>(null);
   const [blocked, setBlocked] = useState<{ item: V11EnergyType; references: ReturnType<typeof listV11EnergyTypeReferences> } | null>(null);
-  // 回收能源由“能源回收、转换与外供”维护，不作为能源消费/购入品种展示。
+  // 回收能源由“能源转换与流向”维护，不作为能源消费/购入品种展示。
   const rows = listV11EnergyTypes().filter((item) => item.analysisCategory !== '回收能源' && (!keyword || item.energyTypeName.includes(keyword)) && (!category || item.analysisCategory === category) && (!status || (status === 'enabled') === isV11EnergyTypeEnabled(item.energyTypeId)));
   void version;
   return <Page toast={toast}>
@@ -241,7 +207,7 @@ function EnergyTypesPage() {
         <Field label="能源分析类别"><select aria-label="能源分析类别" value={categoryInput} onChange={(event) => setCategoryInput(event.target.value)}><option value="">全部</option>{categories.map((item) => <option key={item}>{item}</option>)}</select></Field>
         <Field label="状态"><select value={statusInput} onChange={(event) => setStatusInput(event.target.value as 'enabled' | 'disabled' | '')}><option value="">全部</option><option value="enabled">启用</option><option value="disabled">停用</option></select></Field>
       </Toolbar>
-      <Notice><strong>说明：</strong>能源分析类别用于能耗查询和结构汇总；能源品种只维护基础属性，能源回收、转换和外供去向统一在“能源回收、转换与外供”中维护。</Notice>
+      <Notice><strong>说明：</strong>能源分析类别用于能耗查询和结构汇总；能源品种只维护基础属性，能源回收、转换和外供去向统一在“能源转换与流向”中维护。</Notice>
       <div className={styles.tableWrap}><table><thead><tr><th>能源分析类别</th><th>能源品种</th><th>计量单位</th><th>折标系数</th><th>折标单位</th><th>状态</th><th className={styles.operationColumn}>操作</th></tr></thead>
         <tbody>{rows.map((row) => <tr key={row.energyTypeId}><td><Tag tone="blue">{row.analysisCategory}</Tag></td><td className={styles.strong}>{row.energyTypeName}</td><td>{row.measurementUnit}</td><td>{row.standardCoalFactor.toFixed(4)}</td><td>{row.standardCoalFactorUnit}</td><td><Tag tone={isV11EnergyTypeEnabled(row.energyTypeId) ? 'green' : 'gray'}>{isV11EnergyTypeEnabled(row.energyTypeId) ? '启用' : '停用'}</Tag></td><td><div className={styles.actions}><button type="button" onClick={() => setEditing(row)}>编辑</button>{isV11EnergyTypeEnabled(row.energyTypeId) ? <button type="button" onClick={() => { const result = disableV11EnergyType(row.energyTypeId); if (result.ok) { setVersion((value) => value + 1); notify('能源品种已停用，历史数据仍会保留'); } }}>停用</button> : <button type="button" onClick={() => { const result = enableV11EnergyType(row.energyTypeId); if (result.ok) { setVersion((value) => value + 1); notify('能源品种已重新启用'); } }}>重新启用</button>}<button type="button" className={styles.danger} onClick={() => { const references = listV11EnergyTypeReferences(row.energyTypeId); if (references.length) setBlocked({ item: row, references }); else setDeleting(row); }}>删除</button></div></td></tr>)}</tbody>
       </table></div>
@@ -438,7 +404,7 @@ function EnergyQuantityPage() {
         ? <><strong>回收能源：</strong>在产生余热、余压等回收能源的实际二级用能单元录入来源数据；该数据不会计入企业外购能源消费，后续由余热发电或回收利用记录关联。</>
         : level === '重点设备'
         ? <><strong>重点设备能源数据：</strong>设备数据用于设备用能分析和能效对标，是所属用能单元能源量的明细拆分，不重复增加企业或用能单元总能耗。</>
-        : <><strong>能源消费：</strong>企业级记录用于边界总量控制，一级和二级用能单元按实际计量条件分别录入。系统依据归属层级自动识别能源输入、分配和利用阶段；回收、转换及外供请在“能源回收、转换与外供”中维护。</>}</Notice>
+        : <><strong>能源消费：</strong>企业级记录用于边界总量控制，一级和二级用能单元按实际计量条件分别录入。系统依据归属层级自动识别能源输入、分配和利用阶段；回收、转换及外供请在“能源转换与流向”中维护。</>}</Notice>
       {level === '重点设备' ? <div className={styles.tableWrap}><table className={styles.wideTable}><thead><tr><th>重点设备</th><th>所属用能单元</th><th>设备类型</th><th>能源分析类别</th><th>能源品种</th><th>数据进度</th><th>年度合计</th><th>操作</th></tr></thead>
         <tbody>{pageRows.length ? pageRows.flatMap((row) => {
           const type = types.find((item) => item.energyTypeId === row.energyTypeId);
@@ -633,423 +599,6 @@ function EnergyCostDialog({ item, dataYear, onClose, onSaved }: { item?: V11Ener
   </div></Modal>;
 }
 
-function listConversionSystemCandidates() {
-  return listEnergyUnits().filter(
-    (unit) => unit.unitLevel === 'level2' && ['公辅系统', '其他'].includes(unit.unitType),
-  );
-}
-
-function listScenarioConversionSystems(recordType: ConversionOutputType) {
-  const candidates = listConversionSystemCandidates();
-  if (recordType === '锅炉产汽/产热') return candidates.filter((unit) => unit.conversionScenarios?.includes('锅炉产汽/产热'));
-  if (recordType === '余热发电') return candidates.filter((unit) => unit.conversionScenarios?.includes('余热发电'));
-  if (recordType === '空压产气/压缩空气') return candidates.filter((unit) => unit.conversionScenarios?.includes('空压产气/压缩空气'));
-  if (recordType === '回收利用') return candidates.filter((unit) => unit.conversionScenarios?.includes('回收利用'));
-  if (recordType === '其他转换') return candidates.filter((unit) => unit.conversionScenarios?.includes('其他转换'));
-  return [];
-}
-
-function conversionQuantityLabel(recordType: ConversionOutputType, energyName: string) {
-  if (recordType === '锅炉产汽/产热') return energyName === '蒸汽' ? '本次产汽量' : '本次供热量';
-  if (recordType === '余热发电') return '本次发电量';
-  if (recordType === '空压产气/压缩空气') return '本次压缩空气产量';
-  if (recordType === '回收利用') return '本次回收利用量';
-  return '本次产出量';
-}
-
-function conversionOutputDescription(recordType: ConversionOutputType, energyName: string, outputUnit: string, outputCategory: AnalysisCategory) {
-  if (recordType === '锅炉产汽/产热') return `本场景产出已确定为：${outputCategory} · ${energyName} · ${outputUnit}。上述信息由场景自动带出，无需修改。`;
-  if (recordType === '余热发电') return `本场景产出已确定为：电力 · ${energyName} · ${outputUnit}。上述信息由场景自动带出，无需修改。`;
-  if (recordType === '空压产气/压缩空气') return `本场景产出已确定为：其他能源 · 压缩空气 · ${outputUnit}。折标系数按能源品种配置，可使用参考值或企业实测值。`;
-  return `本场景产出介质为：${energyName} · ${outputUnit}。如需调整，应选择其他转换场景。`;
-}
-
-function monthlyConversionFields(values?: number[]) {
-  return Array.from({ length: 12 }, (_, index) => values?.[index] == null ? '' : String(values[index]));
-}
-
-function conversionExternalAmount(item: V11ConversionOutput) {
-  return listV11ExternalSupplyRecords()
-    .filter((record) => record.conversionOutputId === item.conversionOutputId)
-    .reduce((sum, record) => sum + record.amount, 0);
-}
-
-function normalizeMonthlyConversion(values: string[]) {
-  if (values.every((value) => value === '')) return undefined;
-  if (values.some((value) => value === '')) return null;
-  return values.map(Number);
-}
-
-function conversionInputText(item: V11ConversionOutput, records: V11EnergyRecord[], types: V11EnergyType[]) {
-  if (item.inputMode === 'linked' || item.inputMode === 'direct') {
-    const source = records.find((record) => record.energyRecordId === item.inputEnergyRecordId);
-    const energy = types.find((type) => type.energyTypeId === source?.energyTypeId);
-    return source
-      ? { main: `${energy?.energyTypeName ?? '能源数据'} · ${format(annual(source.monthlyAmounts, source.annualAmount), 2)} ${energy?.measurementUnit ?? ''}`, source: v11ScopeName(source.energyUnitId) }
-      : { main: '来源记录不可用', source: '请编辑该记录' };
-  }
-  if (item.inputMode === 'manual') {
-    const energy = types.find((type) => type.energyTypeId === item.inputEnergyTypeId);
-    return { main: `${energy?.energyTypeName ?? '手工投入'} · ${format(item.inputAmount ?? 0, 2)} ${item.inputUnit ?? ''}`, source: '手工补充' };
-  }
-  const amount = item.recoveryAmount == null ? '未计量' : `${format(item.recoveryAmount, 2)} ${item.recoveryUnit ?? ''}`;
-  return {
-    main: `${item.recoveryEnergyName ?? '回收来源'} · ${amount}`,
-    source: item.recoverySourceEnergyUnitId ? v11ScopeName(item.recoverySourceEnergyUnitId) : '未补充来源',
-  };
-}
-
-function EnergyConversionOutputPage() {
-  const { toast, notify } = useNotice();
-  const navigate = useNavigate();
-  const { search } = useLocation();
-  const params = new URLSearchParams(search);
-  const returnTo = params.get('returnTo');
-  const editConversionId = params.get('editConversionId');
-  const returnToIntensity = () => {
-    if (returnTo?.startsWith('/energy-analysis/intensity')) navigate(returnTo);
-  };
-  const [version, setVersion] = useState(0);
-  const [yearInput, setYearInput] = useState('2026');
-  const [recordTypeInput, setRecordTypeInput] = useState('');
-  const [keywordInput, setKeywordInput] = useState('');
-  const [entryTab, setEntryTab] = useState<'conversion' | 'recovery' | 'external'>(params.get('tab') === 'conversion' ? 'conversion' : 'recovery');
-  const [filters, setFilters] = useState({ year: '2026', recordType: '', keyword: '' });
-  const [editing, setEditing] = useState<V11ConversionOutput | V11ExternalSupplyRecord | V11EnergyRecord | 'new' | 'recovery-new' | 'recovery-source-new' | 'external-new' | null>(null);
-  const [viewing, setViewing] = useState<V11EnergyRecord | null>(null);
-  const [viewingConversion, setViewingConversion] = useState<V11ConversionOutput | null>(null);
-  const [viewingExternal, setViewingExternal] = useState<V11ExternalSupplyRecord | null>(null);
-  const [deleting, setDeleting] = useState<V11ConversionOutput | V11EnergyRecord | null>(null);
-  const [deletingExternal, setDeletingExternal] = useState<V11ExternalSupplyRecord | null>(null);
-  const switchEntryTab = (tab: 'conversion' | 'recovery' | 'external') => {
-    setEntryTab(tab);
-    setRecordTypeInput(tab === 'recovery' ? '回收利用' : '');
-    setKeywordInput('');
-    setFilters({ year: yearInput, recordType: tab === 'recovery' ? '回收利用' : '', keyword: '' });
-  };
-  useEffect(() => {
-    if (!editConversionId) return;
-    const record = listV11ConversionOutputs().find((item) => item.conversionOutputId === editConversionId);
-    if (record) {
-      setEntryTab(record.recordType === '回收利用' ? 'recovery' : 'conversion');
-      setYearInput(String(record.year));
-      setFilters({ year: String(record.year), recordType: '', keyword: '' });
-      setEditing(record);
-    }
-  }, [editConversionId]);
-  const records = listV11EnergyRecords();
-  const types = listV11EnergyTypes();
-  const devices = listV11KeyDevices();
-  const units = listEnergyUnits();
-  const conversionUnitLabel = (energyUnitId: string | null) => {
-    const linkedDevices = devices.filter((device) => device.energyUnitId === energyUnitId).map((device) => device.deviceName);
-    return linkedDevices.length ? `${v11ScopeName(energyUnitId)}（关联重点设备：${linkedDevices.join('、')}）` : v11ScopeName(energyUnitId);
-  };
-  const conversionRows = listV11ConversionOutputs().filter((item) =>
-    item.year === Number(filters.year)
-    && conversionOutputTypes.includes(item.recordType)
-    && item.recordType !== '回收利用'
-    && (!filters.recordType || (filters.recordType === 'recovery' ? item.inputMode === 'recovery' : item.inputMode !== 'recovery'))
-    && (!filters.keyword || `${v11ScopeName(item.conversionEnergyUnitId)}${v11ScopeName(item.recoverySourceEnergyUnitId ?? null)}`.includes(filters.keyword)),
-  );
-  const recoveryRows = listV11ConversionOutputs().filter((item) =>
-    item.year === Number(filters.year)
-    && item.recordType === '回收利用'
-    && (!filters.keyword || `${v11ScopeName(item.conversionEnergyUnitId)}${v11ScopeName(item.recoverySourceEnergyUnitId ?? null)}`.includes(filters.keyword)),
-  );
-  const recoverySourceRows = records.filter((item) =>
-    item.year === Number(filters.year)
-    && item.energyRole === '回收能源'
-    && (!filters.keyword || `${v11ScopeName(item.energyUnitId)}${types.find((type) => type.energyTypeId === item.energyTypeId)?.energyTypeName ?? ''}`.includes(filters.keyword)),
-  );
-  const externalRows = listV11ConversionOutputs().filter((item) => item.year === Number(filters.year) && item.recordType === '直接外供');
-  const externalLedgerRows = listV11ExternalSupplyRecords().filter((item) => item.year === Number(filters.year));
-  void version;
-  return <Page toast={toast}><section className={styles.card}>
-        <div className={styles.energySubmenu} role="tablist" aria-label="能源回收、转换与利用、外供"><button type="button" className={entryTab === 'recovery' ? styles.activeSubmenuItem : ''} role="tab" aria-selected={entryTab === 'recovery'} onClick={() => switchEntryTab('recovery')}>能源回收</button><button type="button" className={entryTab === 'conversion' ? styles.activeSubmenuItem : ''} role="tab" aria-selected={entryTab === 'conversion'} onClick={() => switchEntryTab('conversion')}>转换与利用</button><button type="button" className={entryTab === 'external' ? styles.activeSubmenuItem : ''} role="tab" aria-selected={entryTab === 'external'} onClick={() => switchEntryTab('external')}>能源外供</button></div>
-    {entryTab === 'conversion' && <>
-    <Toolbar actions={<><Button primary onClick={() => setFilters({ year: yearInput, recordType: recordTypeInput, keyword: keywordInput.trim() })}>查询</Button><Button onClick={() => { setYearInput('2026'); setRecordTypeInput(''); setKeywordInput(''); setFilters({ year: '2026', recordType: '', keyword: '' }); }}>重置</Button>{returnTo && <Button onClick={returnToIntensity}>返回能耗指标</Button>}<Button primary onClick={() => setEditing('new')}>＋ 新增转换与利用记录</Button></>}>
-      <Field label="数据年度"><select value={yearInput} onChange={(event) => setYearInput(event.target.value)}><option>2026</option><option>2025</option></select></Field>
-      <Field label="能源来源"><select value={recordTypeInput} onChange={(event) => setRecordTypeInput(event.target.value)}><option value="">全部</option><option value="normal">常规能源</option><option value="recovery">回收能源</option></select></Field>
-      <Field label="转换单元"><input value={keywordInput} onChange={(event) => setKeywordInput(event.target.value)} placeholder="输入转换单元名称" /></Field>
-    </Toolbar>
-    <Notice><strong>记录实际业务事实：</strong>先选择具体业务场景，再填写投入、产出和去向。已有能源消费或回收来源会优先自动关联；分析结果由系统在后台生成。</Notice>
-    <div className={styles.sectionToolbar}><div><h3>能源转换记录</h3><p>维护常规能源转换和回收能源转换业务，能源来源由关联的上游记录确定。</p></div></div>
-    <div className={styles.tableWrap}><table className={styles.conversionTable}><thead><tr><th>转换单元</th><th>投入能源</th><th>能源来源</th><th>来源单元</th><th>产出能源</th><th>厂内可供分配</th><th>操作</th></tr></thead>
-      <tbody>{conversionRows.length ? conversionRows.map((row) => {
-        const input = conversionInputText(row, records, types);
-        const source = records.find((record) => record.energyRecordId === row.inputEnergyRecordId);
-        const sourceType = types.find((type) => type.energyTypeId === source?.energyTypeId);
-        const outputName = row.recordType === '直接外供' ? sourceType?.energyTypeName ?? '外供能源' : row.outputEnergyName ?? types.find((type) => type.energyTypeId === row.outputEnergyTypeId)?.energyTypeName ?? '—';
-        const outputUnit = row.recordType === '直接外供' ? sourceType?.measurementUnit ?? '' : row.outputUnit ?? '';
-        const outputAmount = row.recordType === '直接外供' ? row.externalAmount : row.outputAmount ?? 0;
-        const externalAmount = conversionExternalAmount(row);
-        const availableAmount = Math.max((row.outputAmount ?? 0) - externalAmount - (row.lossAmount ?? 0), 0);
-        const recoveredSource = row.inputMode === 'recovery' || source?.energyRole === '回收能源';
-        return <tr key={row.conversionOutputId}><td><b className={styles.conversionSourceMain}>{conversionUnitLabel(row.conversionEnergyUnitId)}</b></td><td>{input.main}</td><td><Tag tone={recoveredSource ? 'orange' : 'blue'}>{recoveredSource ? '回收能源' : '常规能源'}</Tag></td><td>{input.source}</td><td>{outputName} · {format(outputAmount, 2)} {outputUnit}</td><td>{format(availableAmount, 2)} {outputUnit}</td><td><Actions onView={() => setViewingConversion(row)} onEdit={() => setEditing(row)} onDelete={() => setDeleting(row)} /></td></tr>;
-      }) : <EmptyRow colSpan={7} />}</tbody>
-    </table></div><Pagination count={conversionRows.length} />
-    <div className={styles.sectionToolbar}><div><h3>回收能源直接利用记录</h3><p>回收能源经独立的回收利用系统直接转为蒸汽、热水等厂内可用能源，不经过余热发电机组。</p></div></div>
-    <div className={styles.tableWrap}><table className={styles.conversionTable}><thead><tr><th>处理单元</th><th>回收能源</th><th>能源来源</th><th>来源单元</th><th>利用量</th><th>厂内利用去向</th><th>操作</th></tr></thead>
-      <tbody>{recoveryRows.length ? recoveryRows.map((row) => { const input = conversionInputText(row, records, types); const outputName = row.outputEnergyName ?? types.find((type) => type.energyTypeId === row.outputEnergyTypeId)?.energyTypeName ?? '回收能源'; const outputUnit = row.outputUnit ?? ''; return <tr key={row.conversionOutputId}><td><b className={styles.conversionSourceMain}>{conversionUnitLabel(row.conversionEnergyUnitId)}</b></td><td>{input.main}</td><td><Tag tone="green">回收能源</Tag></td><td>{input.source}</td><td>{outputName} · {format(row.outputAmount ?? 0, 2)} {outputUnit}</td><td>{format(row.internalAmount ?? 0, 2)} {outputUnit}</td><td><Actions onView={() => setViewingConversion(row)} onEdit={() => setEditing(row)} onDelete={() => setDeleting(row)} /></td></tr>; }) : <EmptyRow colSpan={7} />}</tbody>
-    </table></div><Pagination count={recoveryRows.length} />
-    </>}
-    {entryTab === 'recovery' && <>
-    <Toolbar actions={<><Button primary onClick={() => setFilters({ year: yearInput, recordType: '回收利用', keyword: keywordInput.trim() })}>查询</Button><Button onClick={() => { setYearInput('2026'); setKeywordInput(''); setFilters({ year: '2026', recordType: '回收利用', keyword: '' }); }}>重置</Button>{returnTo && <Button onClick={returnToIntensity}>返回能耗指标</Button>}<Button primary onClick={() => setEditing('recovery-source-new')}>＋ 新增回收能源来源</Button></>}>
-      <Field label="数据年度"><select value={yearInput} onChange={(event) => setYearInput(event.target.value)}><option>2026</option><option>2025</option></select></Field>
-      <Field label="回收来源"><input value={keywordInput} onChange={(event) => setKeywordInput(event.target.value)} placeholder="输入回收来源或利用单元" /></Field>
-    </Toolbar>
-    <div className={styles.sectionToolbar}><div><h3>回收能源来源记录</h3><p>维护生产设备和动力公辅设备实际产生的余热、余压等回收能源量；这是回收来源数据，不在本页维护能源利用或转换结果。</p></div><div className={styles.flowLedgerActions}><span>共 {recoverySourceRows.length} 条</span></div></div>
-    <div className={styles.tableWrap}><table className={`${styles.conversionTable} ${styles.recoverySourceTable}`}><thead><tr><th>余热产生设备</th><th>二级用能单元</th><th>一级用能单元</th><th>回收能源</th><th>数据进度</th><th>年度总量</th><th>操作</th></tr></thead><tbody>{recoverySourceRows.length ? recoverySourceRows.map((row) => { const type = types.find((item) => item.energyTypeId === row.energyTypeId); const sourceDevice = devices.find((device) => device.deviceId === row.sourceDeviceId); const sourceUnit = units.find((unit) => unit.energyUnitId === (sourceDevice?.energyUnitId ?? row.energyUnitId)); const levelTwoUnit = sourceUnit?.unitLevel === 'level2' ? sourceUnit : undefined; const levelOneUnit = levelTwoUnit ? units.find((unit) => unit.energyUnitId === levelTwoUnit.parentEnergyUnitId) : sourceUnit; return <tr key={row.energyRecordId}><td><b className={styles.conversionSourceMain}>{sourceDevice?.deviceName ?? row.sourceProcess ?? '—'}</b>{row.sourceProcess && <small className={styles.subText}>产生部位：{row.sourceProcess}</small>}</td><td>{levelTwoUnit?.energyUnitName ?? '—'}</td><td>{levelOneUnit?.energyUnitName ?? '—'}</td><td>{type?.energyTypeName ?? '回收能源'}</td><td>{energyDataProgress(row)}</td><td>{format(annual(row.monthlyAmounts, row.annualAmount), 2)} {type?.measurementUnit ?? ''}</td><td><Actions onView={() => setViewing(row)} onEdit={() => setEditing(row)} onDelete={() => setDeleting(row)} /></td></tr>; }) : <EmptyRow colSpan={7} />}</tbody></table></div>
-    </>}
-    {entryTab === 'external' && <>
-    <Toolbar actions={<><Button primary onClick={() => setFilters({ year: yearInput, recordType: '', keyword: keywordInput.trim() })}>查询</Button><Button onClick={() => { setYearInput('2026'); setKeywordInput(''); setFilters({ year: '2026', recordType: '', keyword: '' }); }}>重置</Button>{returnTo && <Button onClick={returnToIntensity}>返回能耗指标</Button>}<Button primary onClick={() => setEditing('external-new')}>＋ 新增供能登记</Button></>}>
-      <Field label="数据年度"><select value={yearInput} onChange={(event) => setYearInput(event.target.value)}><option>2026</option><option>2025</option></select></Field>
-      <Field label="来源能源/单元"><input value={keywordInput} onChange={(event) => setKeywordInput(event.target.value)} placeholder="输入来源能源或单元" /></Field>
-    </Toolbar>
-    <Notice><strong>记录能源外供事实：</strong>转换产出外供是主要场景；企业级能源直接转供仅适用于能源转售、园区分销或有独立外供计量的情况，不代表厂内燃料消耗。两类外供都会进入能流图的外部输出。</Notice>
-    <div className={styles.sectionToolbar}><div><h3>能源外供登记</h3><p>转换产出在能源转换页维护；本页只维护来源、外供量、接收方和外供凭证。</p></div><span>共 {externalLedgerRows.length} 条</span></div>
-    {externalLedgerRows.length > 0 ? <div className={styles.tableWrap}><table className={styles.conversionTable}><thead><tr><th>来源类型</th><th>来源能源/转换</th><th>外供量</th><th>接收方</th><th>操作</th></tr></thead><tbody>{externalLedgerRows.map((row) => { const source = records.find((record) => record.energyRecordId === row.inputEnergyRecordId); const conversion = listV11ConversionOutputs().find((item) => item.conversionOutputId === row.conversionOutputId); const type = types.find((item) => item.energyTypeId === (row.energyTypeId ?? source?.energyTypeId ?? conversion?.outputEnergyTypeId)); return <tr key={row.externalSupplyId}><td>{row.conversionOutputId ? '转换产出外供' : '直接外供'}</td><td>{type?.energyTypeName ?? '—'}<small className={styles.subText}>{row.conversionOutputId ? conversion?.recordType ?? '转换记录' : v11ScopeName(source?.energyUnitId ?? null)}</small></td><td>{format(row.amount, 2)} {row.unit ?? type?.measurementUnit}</td><td>{row.receiver || '—'}</td><td><Actions onView={() => setViewingExternal(row)} onEdit={() => setEditing(row)} onDelete={() => setDeletingExternal(row)} /></td></tr>; })}</tbody></table></div> : <div className={styles.empty}>暂无外供登记</div>}
-    </>}
-  </section>
-  {viewing && <EnergyRecordDialog key={`view-${viewing.energyRecordId}`} item={viewing} dataYear={viewing.year} energyRole="回收能源" lockedScopeLevel="二级用能单元" readOnly onClose={() => setViewing(null)} onSaved={() => setViewing(null)} />}
-  {viewingConversion && <ConversionOutputDialog key={`view-${viewingConversion.conversionOutputId}`} item={viewingConversion} readOnly onClose={() => setViewingConversion(null)} onSaved={() => setViewingConversion(null)} />}
-  {viewingExternal && <ExternalSupplyDialog key={`view-${viewingExternal.externalSupplyId}`} item={viewingExternal} readOnly onClose={() => setViewingExternal(null)} onSaved={() => setViewingExternal(null)} />}
-  {editing === 'external-new' ? <ExternalSupplyDialog onClose={() => { setEditing(null); if (returnTo) returnToIntensity(); }} onSaved={(message) => { setEditing(null); setVersion((value) => value + 1); if (returnTo) returnToIntensity(); else notify(message); }} /> : editing === 'recovery-source-new' ? <EnergyRecordDialog dataYear={Number(yearInput)} energyRole="回收能源" lockedScopeLevel="二级用能单元" onClose={() => setEditing(null)} onSaved={(message) => { setEditing(null); setVersion((value) => value + 1); notify(message); }} /> : editing === 'new' ? <ConversionOutputDialog onClose={() => { setEditing(null); if (returnTo) returnToIntensity(); }} onSaved={(message) => { setEditing(null); setVersion((value) => value + 1); if (returnTo) returnToIntensity(); else notify(message); }} /> : editing === 'recovery-new' ? <ConversionOutputDialog initialRecordType="回收利用" onClose={() => { setEditing(null); if (returnTo) returnToIntensity(); }} onSaved={(message) => { setEditing(null); setVersion((value) => value + 1); if (returnTo) returnToIntensity(); else notify(message); }} /> : editing && 'energyRecordId' in editing ? <EnergyRecordDialog key={editing.energyRecordId} item={editing} dataYear={editing.year} energyRole="回收能源" lockedScopeLevel="二级用能单元" onClose={() => setEditing(null)} onSaved={(message) => { setEditing(null); setVersion((value) => value + 1); notify(message); }} /> : editing && 'recordType' in editing ? <ConversionOutputDialog key={editing.conversionOutputId} item={editing} onClose={() => { setEditing(null); if (returnTo) returnToIntensity(); }} onSaved={(message) => { setEditing(null); setVersion((value) => value + 1); if (returnTo) returnToIntensity(); else notify(message); }} /> : editing ? <ExternalSupplyDialog key={editing.externalSupplyId} item={editing} onClose={() => { setEditing(null); if (returnTo) returnToIntensity(); }} onSaved={(message) => { setEditing(null); setVersion((value) => value + 1); if (returnTo) returnToIntensity(); else notify(message); }} /> : null}
-  {deleting && 'energyRecordId' in deleting ? <Modal title="删除回收能源来源" width={520} submitText="确认删除" onClose={() => setDeleting(null)} onSubmit={() => { const result = deleteV11EnergyRecord(deleting.energyRecordId); if (!result.ok) return notify(result.error); setDeleting(null); setVersion((value) => value + 1); notify('回收能源来源已删除'); }}><div className={styles.warning}>确认删除当前回收能源来源吗？</div></Modal> : deleting && <Modal title="删除能源转换记录" width={560} submitText="确认删除" onClose={() => setDeleting(null)} onSubmit={() => { deleteV11ConversionOutput(deleting.conversionOutputId); setDeleting(null); setVersion((value) => value + 1); notify('能源转换记录已删除'); }}><div className={styles.warning}>确认删除该能源转换记录吗？</div></Modal>}
-    {deletingExternal && <Modal title="删除能源外供记录" width={520} submitText="确认删除" onClose={() => setDeletingExternal(null)} onSubmit={() => { deleteV11ExternalSupplyRecord(deletingExternal.externalSupplyId); setDeletingExternal(null); setVersion((value) => value + 1); notify('能源外供记录已删除'); }}><div className={styles.warning}>确认删除这笔能源外供记录吗？</div></Modal>}
-  </Page>;
-}
-
-function ExternalSupplyDialog({ item, readOnly = false, onClose, onSaved }: { item?: V11ExternalSupplyRecord; readOnly?: boolean; onClose: () => void; onSaved: (message: string) => void }) {
-  const records = listV11EnergyRecords();
-  const types = listV11EnergyTypes();
-  const conversions = listV11ConversionOutputs().filter((record) => record.recordType !== '直接外供');
-  const [sourceKind, setSourceKind] = useState<'direct' | 'conversion'>(item ? (item.conversionOutputId ? 'conversion' : 'direct') : 'conversion');
-  const [year, setYear] = useState(String(item?.year ?? 2026));
-  const [inputEnergyRecordId, setInputEnergyRecordId] = useState(item?.inputEnergyRecordId ?? '');
-  const [conversionOutputId, setConversionOutputId] = useState(item?.conversionOutputId ?? '');
-  const [amount, setAmount] = useState(item ? String(item.amount) : '');
-  const [monthlyAmounts, setMonthlyAmounts] = useState(monthlyConversionFields(item?.monthlyAmounts));
-  const [receiver, setReceiver] = useState(item?.receiver ?? '');
-  const [evidenceNames, setEvidenceNames] = useState(item?.evidenceNames ?? []);
-  const [remark, setRemark] = useState(item?.remark ?? '');
-  const [error, setError] = useState('');
-  const directCandidates = records.filter((record) => record.year === Number(year) && record.scopeLevel === '企业');
-  const conversionCandidates = conversions.filter((record) => record.year === Number(year));
-  const selectedSource = directCandidates.find((record) => record.energyRecordId === inputEnergyRecordId);
-  const selectedConversion = conversionCandidates.find((record) => record.conversionOutputId === conversionOutputId);
-  const selectedTypeId = sourceKind === 'direct' ? selectedSource?.energyTypeId : selectedConversion?.outputEnergyTypeId;
-  const selectedType = types.find((type) => type.energyTypeId === (item?.energyTypeId ?? selectedTypeId));
-  const monthlyComplete = monthlyAmounts.every((value) => value !== '');
-  const monthlyTotal = monthlyAmounts.reduce((sum, value) => sum + Number(value || 0), 0);
-  const save = () => {
-    setError('');
-    if (sourceKind === 'direct' && !inputEnergyRecordId) return setError('请选择企业级能源数据作为直接转供来源。');
-    if (sourceKind === 'conversion' && !conversionOutputId) return setError('请选择一条转换产出作为外供来源。');
-    if (!receiver.trim()) return setError('请填写外供接收方，便于能流图追溯外部去向。');
-    if (!monthlyComplete && !(Number(amount) > 0)) return setError('月度数据不完整时，请填写年度外供量。');
-    const result = saveV11ExternalSupplyRecord({
-      year: Number(year),
-      inputEnergyRecordId: sourceKind === 'direct' ? inputEnergyRecordId : undefined,
-      conversionOutputId: sourceKind === 'conversion' ? conversionOutputId : undefined,
-      energyTypeId: selectedTypeId,
-      amount: monthlyComplete ? monthlyTotal : Number(amount),
-      unit: selectedType?.measurementUnit,
-      monthlyAmounts: monthlyComplete ? monthlyAmounts.map((value) => Number(value)) : undefined,
-      receiver: receiver.trim(),
-      evidenceNames,
-      remark: remark.trim(),
-    }, item?.externalSupplyId);
-    if (!result.ok) return setError(result.error);
-    onSaved(item ? '能源供能记录已更新' : '能源供能记录已新增');
-  };
-  return <Modal title={readOnly ? '查看能源外供记录' : item ? '编辑能源外供记录' : '新增能源外供登记'} width={860} onClose={onClose} onSubmit={readOnly ? undefined : save} submitText={item ? '保存修改' : '保存登记'}>
-    <div className={styles.conversionFormSection}><h3>外供来源</h3><div className={`${styles.conversionFormBody} ${styles.compactGrid}`}>
-      <Field label="数据年度"><select value={year} onChange={(event) => { setYear(event.target.value); setInputEnergyRecordId(''); setConversionOutputId(''); }} disabled={Boolean(item) || readOnly}><option>2026</option><option>2025</option></select></Field>
-      <Field label="外供来源类型"><select value={sourceKind} onChange={(event) => { setSourceKind(event.target.value as 'direct' | 'conversion'); setInputEnergyRecordId(''); setConversionOutputId(''); }} disabled={Boolean(item) || readOnly}><option value="conversion">转换产出外供（主要场景）</option><option value="direct">企业级能源直接转供（特殊场景）</option></select></Field>
-      {sourceKind === 'direct' ? <Field label="关联企业级来源数据" required><select value={inputEnergyRecordId} onChange={(event) => setInputEnergyRecordId(event.target.value)} disabled={Boolean(item) || readOnly}><option value="">请选择企业级能源输入</option>{directCandidates.map((record) => { const type = types.find((value) => value.energyTypeId === record.energyTypeId); return <option key={record.energyRecordId} value={record.energyRecordId}>{type?.energyTypeName ?? '能源'}｜企业输入｜{format(annual(record.monthlyAmounts, record.annualAmount), 2)} {type?.measurementUnit ?? ''}</option>; })}</select></Field> : <Field label="关联转换产出" required><select value={conversionOutputId} onChange={(event) => setConversionOutputId(event.target.value)} disabled={Boolean(item) || readOnly}><option value="">请选择转换产出</option>{conversionCandidates.map((record) => <option key={record.conversionOutputId} value={record.conversionOutputId}>{record.recordType}｜{record.outputEnergyName ?? '能源'}｜{format(record.outputAmount ?? 0, 2)} {record.outputUnit ?? ''}</option>)}</select></Field>}
-      <div className={styles.helpText}>{sourceKind === 'direct' ? '仅当企业级能源存在独立转供/转售事实时使用；厂内生产燃料消耗不要登记为直接外供。' : '转换产出外供是主要场景，外供量会从对应转换产出的厂内可供分配量中扣除。'}来源关联用于生成能流分析追溯关系，凭证用于证明外供事实。</div>
-    </div></div>
-    <div className={styles.conversionFormSection}><h3>外供数量</h3><div className={styles.conversionFormBody}><div className={styles.monthlyHint}>按实际取得月份填写；月度数据不完整时补录年度总量，系统不会自动分摊缺失月份。</div><div className={`${styles.monthGrid} ${styles.full}`}>{months.map((month, index) => <Field key={month} label={month}><input aria-label={`${month}外供量`} type="number" min="0" value={monthlyAmounts[index]} onChange={(event) => setMonthlyAmounts((current) => current.map((value, itemIndex) => itemIndex === index ? event.target.value : value))} readOnly={readOnly} /></Field>)}</div><Field label={`${monthlyComplete ? '年度合计' : '年度外供量补录'}（${selectedType?.measurementUnit ?? '原单位'}）`} required={!monthlyComplete}><input type="number" min="0" value={monthlyComplete ? String(monthlyTotal) : amount} readOnly={monthlyComplete || readOnly} placeholder={monthlyComplete ? '' : '月度不完整时填写年度外供量'} onChange={(event) => setAmount(event.target.value)} /></Field></div></div>
-    <div className={styles.compactGrid}><Field label="接收方"><input value={receiver} onChange={(event) => setReceiver(event.target.value)} placeholder="例如：电网、园区蒸汽用户" readOnly={readOnly} /></Field></div><div className={styles.conversionFormSection}><h3>依据凭证</h3><div className={styles.conversionFormBody}><input type="file" multiple onChange={(event) => setEvidenceNames(Array.from(event.target.files ?? []).map((file) => file.name))} disabled={readOnly} /><div className={styles.helpText}>可上传计量表、销售/结算单、并网报表或供能合同；当前原型保存文件名，正式环境将保存附件。</div>{evidenceNames.length > 0 && <div className={styles.helpText}>已选择：{evidenceNames.join('、')}</div>}</div></div><div className={styles.conversionRemark}><Field label="备注"><textarea value={remark} onChange={(event) => setRemark(event.target.value)} placeholder="补充说明外供事实或计量口径" readOnly={readOnly} /></Field></div>{error && <div className={styles.error}>{error}</div>}
-  </Modal>;
-}
-
-function ConversionOutputDialog({ item, initialRecordType, readOnly = false, onClose, onSaved }: { item?: V11ConversionOutput; initialRecordType?: ConversionOutputType; readOnly?: boolean; onClose: () => void; onSaved: (message: string) => void }) {
-  const navigate = useNavigate();
-  const units = listEnergyUnits();
-  const records = listV11EnergyRecords();
-  const types = listV11EnergyTypes();
-  const [recordType, setRecordType] = useState<ConversionOutputType>(item?.recordType ?? initialRecordType ?? '锅炉产汽/产热');
-  const [businessPath, setBusinessPath] = useState<ConversionBusinessPath>(conversionBusinessPathFor(item?.recordType ?? initialRecordType ?? '锅炉产汽/产热'));
-  const [step, setStep] = useState(item || initialRecordType ? 1 : 0);
-  const entryMode = 'monthly';
-  const [year, setYear] = useState(String(item?.year ?? 2026));
-  const [unitId, setUnitId] = useState(item?.conversionEnergyUnitId ?? (initialRecordType ? listScenarioConversionSystems(initialRecordType)[0]?.energyUnitId ?? '' : ''));
-  const [inputMode, setInputMode] = useState<ConversionInputMode>(item?.inputMode === 'manual' ? 'linked' : item?.inputMode ?? 'linked');
-  const [inputRecordId, setInputRecordId] = useState(item?.inputEnergyRecordId ?? '');
-  const [recoverySourceId, setRecoverySourceId] = useState(item?.recoverySourceEnergyUnitId ?? '');
-  const [recoveryEnergy, setRecoveryEnergy] = useState(item?.recoveryEnergyName ?? '余热');
-  const [recoveryUnit, setRecoveryUnit] = useState(item?.recoveryUnit ?? 'GJ');
-  const [outputCategory, setOutputCategory] = useState<AnalysisCategory>(item?.outputAnalysisCategory ?? '热力');
-  const [outputEnergyName, setOutputEnergyName] = useState(item?.outputEnergyName ?? '蒸汽');
-  const [outputUnit, setOutputUnit] = useState(item?.outputUnit ?? 'GJ');
-  const [outputAmount, setOutputAmount] = useState(String(item?.outputAmount ?? 0));
-  const [lossAmount, setLossAmount] = useState(item?.lossAmount == null ? '' : String(item.lossAmount));
-  const [externalAmount, setExternalAmount] = useState(String(item?.externalAmount ?? 0));
-  const [monthlyInputAmounts, setMonthlyInputAmounts] = useState(monthlyConversionFields(item?.monthlyInputAmounts));
-  const [monthlyOutputAmounts, setMonthlyOutputAmounts] = useState(monthlyConversionFields(item?.monthlyOutputAmounts));
-  const [monthlyExternalAmounts, setMonthlyExternalAmounts] = useState(item ? monthlyConversionFields(item.monthlyExternalAmounts) : Array.from({ length: 12 }, () => '0'));
-  const [receiver, setReceiver] = useState(item?.receiver ?? '');
-  const [remark, setRemark] = useState(item?.remark ?? '');
-  const [error, setError] = useState('');
-  const conversionUnits = recordType === '直接外供' ? [] : listScenarioConversionSystems(recordType);
-  const existingRecord = !item ? listV11ConversionOutputs().find((record) => record.year === Number(year) && record.recordType === recordType && record.conversionEnergyUnitId === (recordType === '直接外供' ? null : unitId)) : undefined;
-  const linkedCandidates = records.filter((record) => record.year === Number(year)
-    && record.energyUnitId === unitId
-    && v11RecordScopeType(record) !== 'device'
-    && ['能源消费', '回收能源'].includes(record.energyRole)
-    && (recordType !== '锅炉产汽/产热' || ['化石燃料', '可再生及替代能源'].includes(types.find((type) => type.energyTypeId === record.energyTypeId)?.analysisCategory ?? ''))
-    && (recordType !== '空压产气/压缩空气' || types.find((type) => type.energyTypeId === record.energyTypeId)?.energyTypeName === '电力'));
-  const recoveryCandidates = records.filter((record) => record.year === Number(year)
-    && (!recoverySourceId || record.energyUnitId === recoverySourceId)
-    && record.energyRole === '回收能源'
-    && (recoveryEnergy === '余热' || types.find((type) => type.energyTypeId === record.energyTypeId)?.energyTypeName === recoveryEnergy));
-  const recoveryCandidate = recoveryCandidates.length === 1 ? recoveryCandidates[0] : undefined;
-  const selectedRecoveryCandidate = recoveryCandidate ?? records.find((record) => record.energyRecordId === inputRecordId && record.energyRole === '回收能源');
-  const directCandidates = records.filter((record) => record.year === Number(year) && record.scopeLevel === '企业');
-  const outputValue = Number(outputAmount || 0);
-  const monthlyOutputValue = monthlyOutputAmounts.reduce((sum, value) => sum + Number(value || 0), 0);
-  const monthlyOutputComplete = monthlyOutputAmounts.every((value) => value !== '');
-  const effectiveOutputValue = monthlyOutputComplete ? monthlyOutputValue : outputValue;
-  const effectiveRecoveryAmount = item?.recoveryAmount ?? (selectedRecoveryCandidate ? annual(selectedRecoveryCandidate.monthlyAmounts, selectedRecoveryCandidate.annualAmount) : null);
-  const conversionSupplies = item ? listV11ExternalSupplyRecords().filter((record) => record.conversionOutputId === item.conversionOutputId) : [];
-  const effectiveExternalValue = conversionSupplies.reduce((sum, record) => sum + record.amount, 0);
-  const confirmedLossValue = Math.max(Number(lossAmount || 0), 0);
-  const internalValue = Math.max(effectiveOutputValue - effectiveExternalValue - confirmedLossValue, 0);
-  const unallocatedAmount = Math.max(effectiveExternalValue + confirmedLossValue - effectiveOutputValue, 0);
-  const hasOverAllocated = unallocatedAmount > 1e-8;
-  const source = records.find((record) => record.energyRecordId === inputRecordId);
-  const sourceType = types.find((type) => type.energyTypeId === source?.energyTypeId);
-  const linkedCandidate = linkedCandidates.length === 1 ? linkedCandidates[0] : undefined;
-  useEffect(() => {
-    if (recordType === '直接外供') return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Keep the dependent unit selection valid after its source changes.
-    if (conversionUnits.length === 1 && unitId !== conversionUnits[0].energyUnitId) setUnitId(conversionUnits[0].energyUnitId);
-    if (conversionUnits.length > 1 && unitId && !conversionUnits.some((unit) => unit.energyUnitId === unitId)) setUnitId('');
-    if (conversionUnits.length === 0 && unitId) setUnitId('');
-  }, [recordType, unitId, conversionUnits]);
-  useEffect(() => {
-    if (recordType !== '锅炉产汽/产热' && recordType !== '空压产气/压缩空气' && recordType !== '其他转换') return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Keep the linked energy record in sync with the selected conversion context.
-    if (linkedCandidate && inputRecordId !== linkedCandidate.energyRecordId) setInputRecordId(linkedCandidate.energyRecordId);
-    if (linkedCandidates.length !== 1 && inputRecordId && !linkedCandidates.some((record) => record.energyRecordId === inputRecordId)) setInputRecordId('');
-  }, [recordType, year, unitId, inputRecordId, linkedCandidate, linkedCandidates]);
-  useEffect(() => {
-    if (inputMode !== 'recovery') return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Keep the recovery trace linked to the unique source ledger row.
-    if (recoveryCandidate && recoverySourceId !== recoveryCandidate.energyUnitId) setRecoverySourceId(recoveryCandidate.energyUnitId ?? '');
-    if (recoveryCandidate && inputRecordId !== recoveryCandidate.energyRecordId) setInputRecordId(recoveryCandidate.energyRecordId);
-    if (recoveryCandidates.length !== 1 && inputRecordId && !recoveryCandidates.some((record) => record.energyRecordId === inputRecordId)) setInputRecordId('');
-  }, [inputMode, inputRecordId, recoverySourceId, recoveryCandidate, recoveryCandidates]);
-  const selectType = (next: ConversionOutputType) => {
-    setRecordType(next);
-    setError('');
-    setUnitId(listScenarioConversionSystems(next)[0]?.energyUnitId ?? '');
-    setInputMode(next === '余热发电' || next === '回收利用' ? 'recovery' : next === '直接外供' ? 'direct' : 'linked');
-    setInputRecordId('');
-    // 回收能源是转换/利用的投入来源；“回收蒸汽”等属于后续产出，不能用作来源筛选条件。
-    setRecoveryEnergy('余热');
-    setRecoveryUnit('GJ');
-    const nextCategory: AnalysisCategory = next === '锅炉产汽/产热' ? '热力' : next === '余热发电' ? '电力' : next === '空压产气/压缩空气' ? '其他能源' : next === '回收利用' ? '回收能源' : '电力';
-    const nextName = next === '锅炉产汽/产热' ? '蒸汽' : next === '余热发电' ? '电力' : next === '空压产气/压缩空气' ? '压缩空气' : next === '回收利用' ? '回收热水' : '电力';
-    setOutputCategory(nextCategory); setOutputEnergyName(nextName); setOutputUnit(next === '锅炉产汽/产热' ? 'GJ' : next === '回收利用' ? 'GJ' : next === '空压产气/压缩空气' ? 'Nm³' : 'kWh');
-  };
-  const save = () => {
-    if (!item && step === 0) { setStep(1); return; }
-    setError('');
-    if (existingRecord) return;
-    if (recordType === '直接外供') {
-      const directSource = records.find((record) => record.energyRecordId === inputRecordId);
-      if (!directSource || Number(externalAmount) <= 0) return setError('请选择外供来源能源数据并填写外供量。');
-      const result = saveV11ConversionOutput({ year: Number(year), recordType, conversionEnergyUnitId: null, inputMode: 'direct', inputEnergyRecordId: inputRecordId, externalAmount: Number(externalAmount), receiver, remark: '' }, item?.conversionOutputId);
-      if (!result.ok) return setError(result.error);
-      return onSaved(item ? '能源转换/输出记录已更新' : '能源转换/输出记录已新增');
-    }
-    if (!unitId || effectiveOutputValue <= 0) return setError('请选择实际转换/来源单元，并填写产出或回收总量。');
-    if (!monthlyOutputComplete && outputValue <= 0) return setError('月度数据不完整时，请补录年度总量。');
-    if (inputMode === 'recovery' && !inputRecordId) return setError('请先补录并关联一条回收能源来源。');
-    if (hasOverAllocated) return setError('外供量与转换损失合计不能大于产出量，请检查外供台账或损失数据。');
-    if ((recordType === '锅炉产汽/产热' || recordType === '空压产气/压缩空气' || recordType === '其他转换') && !inputRecordId) return setError('当前系统暂无可关联的能源数据，请先补录后再保存。');
-    const outputType = types.find((type) => type.energyTypeName === outputEnergyName && type.analysisCategory === outputCategory);
-    const monthlyInput = normalizeMonthlyConversion(monthlyInputAmounts);
-    const monthlyOutput = monthlyOutputComplete ? normalizeMonthlyConversion(monthlyOutputAmounts) : undefined;
-    const monthlyExternal: undefined = undefined;
-    const monthlyInternal = monthlyOutputComplete
-      ? monthlyOutputAmounts.map((value) => Number(value) - effectiveExternalValue / 12 - confirmedLossValue / 12)
-      : undefined;
-    const result = saveV11ConversionOutput({
-      year: Number(year), recordType, conversionEnergyUnitId: unitId, inputMode,
-      inputEnergyRecordId: inputMode === 'linked' ? inputRecordId : undefined,
-      recoverySourceEnergyUnitId: inputMode === 'recovery' && (selectedRecoveryCandidate || recoverySourceId) ? selectedRecoveryCandidate?.energyUnitId ?? recoverySourceId : undefined,
-      recoveryEnergyName: inputMode === 'recovery' ? recoveryEnergy : undefined,
-      recoveryAmount: inputMode === 'recovery' ? effectiveRecoveryAmount : undefined,
-      recoveryUnit: inputMode === 'recovery' ? recoveryUnit : undefined,
-      outputAnalysisCategory: outputCategory, outputEnergyTypeId: outputType?.energyTypeId, outputEnergyName, outputUnit,
-      outputAmount: effectiveOutputValue, internalAmount: internalValue,
-      outputTargetEnergyUnitId: recordType === '空压产气/压缩空气'
-        ? units.find((unit) => unit.energyUnitId === unitId)?.parentEnergyUnitId ?? undefined
-        : undefined,
-      externalAmount: 0, receiver: '', lossAmount: confirmedLossValue, remark,
-      monthlyInputAmounts: monthlyInput ?? undefined, monthlyOutputAmounts: monthlyOutput ?? undefined, monthlyInternalAmounts: monthlyInternal ?? undefined, monthlyExternalAmounts: monthlyExternal,
-    }, item?.conversionOutputId);
-    if (!result.ok) return setError(result.error);
-    onSaved(item ? '能源转换/输出记录已更新' : '能源转换/输出记录已新增');
-  };
-  const openEnergyEntry = (role: EnergyRole, targetUnitId = '') => {
-    onClose();
-    const query = new URLSearchParams({ scopeLevel: '二级用能单元', year, role });
-    if (targetUnitId) {
-      query.set('unitId', targetUnitId);
-      query.set('new', '1');
-    }
-    navigate(`/data-management/energy-data?${query.toString()}`);
-  };
-  const selectedBusinessPath = conversionBusinessPaths.find((path) => path.value === businessPath) ?? conversionBusinessPaths[0];
-  return <Modal title={readOnly ? '查看转换与利用记录' : item ? '编辑转换与利用记录' : step === 0 ? '新增转换与利用记录' : `新增${conversionSceneLabel(recordType)}`} width={1040} onClose={onClose} onSubmit={readOnly ? undefined : save} submitText={step === 0 ? '下一步' : item ? '保存修改' : '保存记录'} dataEntryMode={entryMode}>
-    <fieldset disabled={readOnly} className={readOnly ? styles.readOnlyFieldset : undefined}>
-    {step === 0 ? <>
-      <div className={styles.conversionModalIntro}><i>1</i><span>请选择本次要记录的具体场景，系统将展示对应的填写内容。</span></div>
-      {conversionBusinessPaths.map((path) => <section className={styles.conversionSceneGroup} key={path.value}><div className={styles.conversionSceneGroupHeader}><strong>{path.label}</strong><span>{path.description}</span></div><div className={styles.conversionSceneGrid}>{path.types.map((type) => <button type="button" key={type} className={recordType === type ? styles.sceneActive : ''} onClick={() => { setBusinessPath(path.value); selectType(type); }}><strong>{conversionSceneLabel(type)}</strong><span>{conversionSceneCopy[type]}</span></button>)}</div></section>)}
-    </> : <>
-    <div className={styles.conversionContextBar}>
-      <span><small>业务路径</small><strong>{conversionBusinessPathLabel(businessPath)}</strong></span>
-      <span><small>数据年度</small><strong>{year} 年</strong></span>
-    <span><small>{recordType === '直接外供' ? '业务归属' : recordType === '回收利用' ? '处理单元' : '转换单元'}</small>{recordType === '直接外供' ? <strong>企业边界</strong> : conversionUnits.length === 1 ? <strong>{conversionUnits[0].energyUnitName}</strong> : <select className={styles.contextSelect} value={unitId} onChange={(event) => { setUnitId(event.target.value); setInputRecordId(''); }} disabled={conversionUnits.length === 0}>{conversionUnits.length === 0 ? <option>暂无适用转换单元</option> : <><option value="">请选择转换单元</option>{conversionUnits.map((unit) => <option key={unit.energyUnitId} value={unit.energyUnitId}>{unit.energyUnitName}</option>)}</>}</select>}</span>
-    </div>
-    {recordType !== '直接外供' && conversionUnits.length === 0 && <div className={styles.missingDataAction}><span>暂无适用转换系统，请先在用能单元中维护对应的适用转换场景。</span><button type="button" onClick={() => navigate('/data-management/units')}>去维护用能单元</button></div>}
-    {recordType === '直接外供' ? <div className={styles.conversionFormSection}><h3>外供来源</h3><div className={`${styles.formGrid} ${styles.conversionFormBody}`}>
-      <Field label="关联已有能源量数据" required><select value={inputRecordId} onChange={(event) => setInputRecordId(event.target.value)}><option value="">请选择</option>{directCandidates.map((record) => { const type = types.find((value) => value.energyTypeId === record.energyTypeId); return <option key={record.energyRecordId} value={record.energyRecordId}>{v11ScopeName(record.energyUnitId)}｜{type?.energyTypeName}｜{format(annual(record.monthlyAmounts, record.annualAmount), 2)} {type?.measurementUnit}</option>; })}</select></Field>
-      <Field label="本次外供量" required><input type="number" min="0" value={externalAmount} onChange={(event) => setExternalAmount(event.target.value)} /></Field>
-      <Field label="接收方"><input value={receiver} onChange={(event) => setReceiver(event.target.value)} placeholder="选填" /></Field>
-      <div className={`${styles.sourceLocked} ${styles.full}`}>{source ? <>来源：<strong>{v11ScopeName(source.energyUnitId)}｜{sourceType?.energyTypeName}｜{format(annual(source.monthlyAmounts, source.annualAmount), 2)} {sourceType?.measurementUnit}</strong><br />直接外供仅关联企业级能源输入记录；转换产出的外供请在对应转换记录中填写。</> : '暂无可关联能源量数据，请先新增能源数据。'}</div>
-    </div></div> : <>
-      {(recordType === '锅炉产汽/产热' || recordType === '空压产气/压缩空气' || recordType === '其他转换') && (!linkedCandidate || linkedCandidates.length > 1) && <div className={styles.conversionFormSection}><h3>投入能源</h3><div className={styles.conversionFormBody}>
-        {linkedCandidate ? <><Field label="关联能源记录" required><input value={`${year}年度｜${v11ScopeName(linkedCandidate.energyUnitId)}｜${types.find((value) => value.energyTypeId === linkedCandidate.energyTypeId)?.energyTypeName ?? '能源数据'}｜${format(annual(linkedCandidate.monthlyAmounts, linkedCandidate.annualAmount), 2)} ${types.find((value) => value.energyTypeId === linkedCandidate.energyTypeId)?.measurementUnit ?? ''}`} readOnly /></Field></> : linkedCandidates.length > 1 ? <><Field label="关联能源记录" required><select value={inputRecordId} onChange={(event) => setInputRecordId(event.target.value)}><option value="">请选择已有能源数据</option>{linkedCandidates.map((record) => { const type = types.find((value) => value.energyTypeId === record.energyTypeId); return <option key={record.energyRecordId} value={record.energyRecordId}>{year}年度｜{v11ScopeName(record.energyUnitId)}｜{type?.energyTypeName}｜{format(annual(record.monthlyAmounts, record.annualAmount), 2)} {type?.measurementUnit}</option>; })}</select></Field></> : <div className={styles.inlineLinkRow}><span>暂无符合条件的能源消费记录。</span><button type="button" onClick={() => openEnergyEntry('能源消费', unitId)}>去二级用能单元录入</button></div>}
-      </div></div>}
-      {(recordType === '余热发电' || recordType === '回收利用') && !readOnly && <div className={styles.conversionFormSection}><h3>关联回收能源来源</h3><div className={styles.conversionFormBody}><div className={styles.helpText}>本弹窗只登记余热直接利用或余热发电结果。本期一条转换记录只关联一条回收能源来源；如多台设备的余热已汇总后利用，请先在“能源回收”中录入一条汇总后的来源台账。</div>{recoveryCandidates.length > 0 && <><div className={styles.compactGrid}><Field label="回收能源" required><select value={recoveryEnergy} onChange={(event) => { setRecoveryEnergy(event.target.value); setRecoveryUnit(['余热', '压力能'].includes(event.target.value) ? 'GJ' : event.target.value === '可燃尾气' ? 'Nm³' : 't'); }}>{recoveryEnergyOptions.map((value) => <option key={value}>{value}</option>)}</select></Field></div><div className={styles.compactGrid}><Field label="关联回收能源来源" required>{recoveryCandidate ? <input value={`${year}年度｜${v11ScopeName(recoveryCandidate.energyUnitId)}｜${types.find((value) => value.energyTypeId === recoveryCandidate.energyTypeId)?.energyTypeName ?? recoveryEnergy}｜${format(annual(recoveryCandidate.monthlyAmounts, recoveryCandidate.annualAmount), 2)} ${types.find((value) => value.energyTypeId === recoveryCandidate.energyTypeId)?.measurementUnit ?? recoveryUnit}`} readOnly /> : <select value={inputRecordId} onChange={(event) => setInputRecordId(event.target.value)}><option value="">请选择一条回收能源来源</option>{recoveryCandidates.map((record) => { const type = types.find((value) => value.energyTypeId === record.energyTypeId); return <option key={record.energyRecordId} value={record.energyRecordId}>{v11ScopeName(record.energyUnitId)}｜{type?.energyTypeName}｜{format(annual(record.monthlyAmounts, record.annualAmount), 2)} {type?.measurementUnit}</option>; })}</select>}</Field><Field label="来源单元"><input value={selectedRecoveryCandidate?.energyUnitId ? v11ScopeName(selectedRecoveryCandidate.energyUnitId) : '选择回收能源来源后自动带出'} readOnly /></Field></div><div className={styles.helpText}>已选来源的年度/月度数据将作为本次转换投入量。</div></>}</div>{recoveryCandidates.length === 0 && <div className={styles.missingDataAction}><span>暂无可关联的回收能源来源，请先录入来源台账</span><button type="button" onClick={() => openEnergyEntry('回收能源', recoverySourceId)}>去录入回收能源来源</button></div>}</div>}
-      {(recordType === '余热发电' || recordType === '回收利用') && readOnly && <div className={styles.monthlyHint}>说明：本次转换使用{recoveryEnergy}作为回收能源，来源单元为{selectedRecoveryCandidate?.energyUnitId ? v11ScopeName(selectedRecoveryCandidate.energyUnitId) : '未关联'}，年度来源量为{selectedRecoveryCandidate ? `${format(annual(selectedRecoveryCandidate.monthlyAmounts, selectedRecoveryCandidate.annualAmount), 2)} ${types.find((value) => value.energyTypeId === selectedRecoveryCandidate.energyTypeId)?.measurementUnit ?? recoveryUnit}` : '未补充'}。该来源数据用于核算本次转换投入量。</div>}
-      <div className={styles.conversionFormSection}><h3>逐月产出量</h3><div className={styles.conversionFormBody}><div className={styles.monthlyHint}>按实际已取得月份填报；月度数据不完整时，必须补录年度总量，系统不会自动分摊缺失月份。</div><div className={`${styles.monthGrid} ${styles.full}`}>{months.map((month, index) => <Field key={month} label={month}><input aria-label={`${month}产出量`} type="number" min="0" value={monthlyOutputAmounts[index]} onChange={(event) => setMonthlyOutputAmounts((current) => current.map((value, itemIndex) => itemIndex === index ? event.target.value : value))} /></Field>)}</div><div className={styles.full}><Field label={`${monthlyOutputComplete ? '年度合计' : '年度总量补录'}（${outputUnit}）`} required={!monthlyOutputComplete}><input type="number" min="0" value={monthlyOutputComplete ? String(monthlyOutputValue) : outputAmount} readOnly={monthlyOutputComplete} placeholder={monthlyOutputComplete ? '' : '月度不完整时填写年度总量'} onChange={(event) => setOutputAmount(event.target.value)} /></Field></div></div></div>
-      <div className={styles.conversionFormSection}><h3>转换损失确认</h3><div className={styles.conversionFormBody}><div className={styles.monthlyHint}>相关去向数据由系统自动汇总，无需在此填写；保存后可在台账或分析页面查看。</div><div className={styles.flowConfirmGroup}><div className={styles.flowResultGroupTitle}><strong>企业确认数据</strong><span>按需确认 · 非必填</span></div><Field label={<span>企业确认的转换损失（{outputUnit}）</span>}><input className={styles.flowEditableInput} type="number" min="0" value={lossAmount} placeholder="有明确依据时填写" onChange={(event) => setLossAmount(event.target.value)} /></Field><div className={styles.flowInputHint}>仅填写有计量、检修记录或工艺依据的损失；没有确认依据时无需估算，保持为空即可。</div></div></div></div>
-      <div className={styles.conversionRemark}><Field label="备注"><textarea value={remark} onChange={(event) => setRemark(event.target.value)} /></Field></div>
-    </>}
-    {error && <div className={styles.error}>{error}</div>}
-    </>}
-    </fieldset>
-  </Modal>;
-}
-
 function OperationsPage() {
   const navigate = useNavigate();
   const { search } = useLocation();
@@ -1171,7 +720,7 @@ function DeviceOutputPage() {
   const params = new URLSearchParams(search);
   const returnTo = params.get('returnTo');
   const returnToIntensity = () => {
-    if (returnTo?.startsWith('/energy-analysis/intensity')) navigate(returnTo);
+    if (returnTo?.startsWith('/energy-analysis/intensity') || returnTo?.startsWith('/data-management/energy-data?')) navigate(returnTo);
   };
   const requestedDeviceId = params.get('deviceId') ?? '';
   const requestedMetricCode = params.get('metricCode') as DeviceIntensityMetricCode | null;
@@ -1194,11 +743,11 @@ function DeviceOutputPage() {
     && (!filters.keyword || `${row.device.deviceName}${v11ScopeName(row.device.energyUnitId)}${row.config?.denominator.name ?? row.device.outputBasis}`.includes(filters.keyword)));
   void version;
   return <Page toast={toast}><section className={styles.card}>
-    <Toolbar actions={<><Button primary onClick={() => setFilters({ year: yearInput, keyword: keywordInput.trim() })}>查询</Button><Button onClick={() => { setYearInput('2026'); setKeywordInput(''); setFilters({ year: '2026', keyword: '' }); }}>重置</Button>{returnTo && <Button onClick={returnToIntensity}>返回能耗指标</Button>}</>}>
+    <Toolbar actions={<><Button primary onClick={() => setFilters({ year: yearInput, keyword: keywordInput.trim() })}>查询</Button><Button onClick={() => { setYearInput('2026'); setKeywordInput(''); setFilters({ year: '2026', keyword: '' }); }}>重置</Button>{returnTo && <Button onClick={returnToIntensity}>{returnTo?.startsWith('/data-management/') ? '返回能源转换与流向' : '返回能耗指标'}</Button>}</>}>
       <Field label="年度"><select value={yearInput} onChange={(event) => setYearInput(event.target.value)}><option>2026</option><option>2025</option></select></Field>
       <Field label="关键字"><input value={keywordInput} onChange={(event) => setKeywordInput(event.target.value)} placeholder="重点设备 / 所属用能单元 / 产出口径" /></Field>
     </Toolbar>
-    <Notice><strong>说明：</strong>设备产出数据仅用于重点设备能耗指标计算，不重复计入能源消费或能源回收、转换与外供台账。</Notice>
+    <Notice><strong>说明：</strong>设备产出统一在本页维护；能源类产出同时供设备指标和能流分析引用，不重复录入。</Notice>
     <div className={styles.tableWrap}><table><thead><tr><th>重点设备</th><th>所属用能单元</th><th>设备产出口径</th><th>指标名称</th><th>数据进度</th><th>年度值</th><th>操作</th></tr></thead><tbody>{rows.length ? rows.map((row) => {
       const parameterName = row.config?.denominator.name ?? row.device.outputBasis;
       const parameterUnit = row.parameter?.unit ?? row.config?.denominator.unit ?? '—';
@@ -1222,20 +771,21 @@ function DeviceOutputDialog({ device, year, metricCode, onClose, onSaved }: { de
   const [unit, setUnit] = useState(existing?.unit ?? config?.denominator.unit ?? '');
   const [source, setSource] = useState(existing?.source ?? '');
   const [error, setError] = useState('');
-  const complete = monthlyValues.every((value) => value !== null && value > 0);
+  const complete = monthlyValues.every((value) => value !== null && Number.isFinite(value) && value >= 0);
   const save = () => {
     const normalized = monthlyValues.map((value) => value !== null && Number.isFinite(value) ? value : null);
     const hasMonthlyInput = normalized.some((value) => value !== null);
     const annual = Number(annualValue);
-    const value = complete ? normalized.reduce<number>((total, item) => total + (item ?? 0), 0) : annual;
+    const monthlyTotal = normalized.reduce<number>((total, item) => total + (item ?? 0), 0);
+    const value = complete || !annualValue.trim() ? monthlyTotal : annual;
     if (!hasMonthlyInput && (!Number.isFinite(value) || value <= 0)) return setError(`请填写年度${parameterName}`);
-    if (hasMonthlyInput && !complete && (!Number.isFinite(value) || value <= 0)) return setError(`月度${parameterName}未填完整，请补充年度兜底值`);
+    if (normalized.some((item) => item !== null && item < 0) || !Number.isFinite(value) || value < monthlyTotal) return setError('数量不能为负，年度补录值不能小于已填月份合计');
     if (!unit.trim()) return setError('请填写产出计量单位');
-    const result = saveDeviceIntensityParameter({ deviceId: device.deviceId, year, metricCode, value, annualValue: value, monthlyValues: normalized, monthlyReportedMonths: normalized.map((item) => item !== null), entryMode: complete ? 'monthly' : 'annual-fallback', unit: unit.trim(), source: source || (complete ? `重点设备产出数据—月度${parameterName}` : `重点设备产出数据—年度${parameterName}`) } satisfies DeviceIntensityParameter);
+    const result = saveDeviceIntensityParameter({ deviceId: device.deviceId, year, metricCode, value, annualValue: value, monthlyValues: normalized, monthlyReportedMonths: normalized.map((item) => item !== null), entryMode: complete || !annualValue.trim() ? 'monthly' : 'annual-fallback', unit: unit.trim(), source: source || (complete ? `重点设备产出数据—月度${parameterName}` : `重点设备产出数据—年度${parameterName}`) } satisfies DeviceIntensityParameter);
     if (!result.ok) return setError('设备产出数据保存失败');
     onSaved(complete ? '月度设备产出数据已保存，年度指标将重新计算' : '年度设备产出数据已保存，年度指标将重新计算');
   };
-  return <Modal title={existing ? '编辑设备产出数据' : '录入设备产出数据'} width={980} onClose={onClose} onSubmit={save} submitText="保存并重新计算"><div className={styles.modalNote}>正在维护：<strong>{device.deviceName}</strong>｜{parameterName}。设备产出数据仅用于本设备指标计算。</div><div className={styles.formGrid}>{months.map((month, index) => <Field key={month} label={month}><input aria-label={`${month}${parameterName}`} type="number" min="0" step="0.001" value={monthlyValues[index] ?? ''} onChange={(event) => setMonthlyValues((current) => current.map((value, valueIndex) => valueIndex === index ? (event.target.value.trim() === '' ? null : Number(event.target.value)) : value))} /></Field>)}<Field label={complete ? '年度合计（自动汇总）' : `年度${parameterName}（月度不全时必填）`}><input aria-label={`年度${parameterName}`} type="number" min="0" step="0.001" value={annualValue} onChange={(event) => setAnnualValue(event.target.value)} /></Field><Field label="产出计量单位" required><input aria-label="产出计量单位" value={unit} onChange={(event) => setUnit(event.target.value)} placeholder="例如：Nm³、t、kWh" /></Field><div className={styles.full}><Field label="数据来源说明"><input value={source} onChange={(event) => setSource(event.target.value)} placeholder="选填" /></Field></div>{error && <div className={`${styles.error} ${styles.full}`}>{error}</div>}</div></Modal>;
+  return <Modal title={existing ? '编辑设备产出数据' : '录入设备产出数据'} width={980} onClose={onClose} onSubmit={save} submitText="保存并重新计算"><div className={styles.modalNote}>正在维护：<strong>{device.deviceName}</strong>｜{parameterName}。能源类设备产出同时供设备指标和能流分析引用。</div><div className={styles.formGrid}>{months.map((month, index) => <Field key={month} label={month}><input aria-label={`${month}${parameterName}`} type="number" min="0" step="0.001" value={monthlyValues[index] ?? ''} onChange={(event) => setMonthlyValues((current) => current.map((value, valueIndex) => valueIndex === index ? (event.target.value.trim() === '' ? null : Number(event.target.value)) : value))} /></Field>)}<Field label={complete ? '年度合计（自动汇总）' : `年度${parameterName}（选填，未填按已报月份汇总）`}><input aria-label={`年度${parameterName}`} type="number" min="0" step="0.001" value={complete ? monthlyValues.reduce<number>((total, item) => total + (item ?? 0), 0) : annualValue} readOnly={complete} onChange={(event) => setAnnualValue(event.target.value)} /></Field><Field label="产出计量单位" required><input aria-label="产出计量单位" value={unit} onChange={(event) => setUnit(event.target.value)} placeholder="例如：Nm³、t、kWh" /></Field><div className={styles.full}><Field label="数据来源说明"><input value={source} onChange={(event) => setSource(event.target.value)} placeholder="选填" /></Field></div>{error && <div className={`${styles.error} ${styles.full}`}>{error}</div>}</div></Modal>;
 }
 
 function ProductAllocationDialog({ product, energyUnitId, year, onClose, onSaved }: { product?: ProductMaster; energyUnitId?: string; year: number; onClose: () => void; onSaved: () => void }) {

@@ -1,0 +1,26 @@
+.page { display: grid; gap: 16px; color: #26364a; }
+.toolbar, .card { background: #fff; border: 1px solid #e5eaf0; border-radius: 8px; }
+.toolbar { display: flex; gap: 18px; align-items: end; padding: 18px 20px; flex-wrap: wrap; }
+.spacer { flex: 1; }
+.toolbar input, .details input, .form input, .form select, .form textarea { width: 100%; min-width: 0; border: 1px solid #dce3eb; border-radius: 5px; padding: 9px 10px; font: inherit; color: #26364a; background: white; box-sizing: border-box; }
+.form input[readonly] { background: #f6f8fb; }
+.notice { padding: 12px 18px; border-radius: 6px; background: #fff8e8; color: #8b5d17; }
+.tableWrap { overflow-x: auto; }
+.card table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.card th { background: #f7f9fc; color: #617185; font-weight: 500; text-align: left; }
+.card th, .card td { padding: 18px 22px; border-bottom: 1px solid #edf0f5; }
+.card th:first-child { width: 24%; }.card th:nth-child(2) { width: 32%; }
+.selected { background: #f0faf6; }
+.link { border: 0; background: transparent; color: #008f72; cursor: pointer; padding: 3px 0; font: inherit; white-space: nowrap; }
+.actions { display: flex; gap: 16px; flex-wrap: wrap; }
+.card td.expandedCell { padding: 0; }
+.details { padding: 10px 24px 20px; background: #f8fafc; }
+.dataLine { display: grid; grid-template-columns: 130px minmax(160px, 1fr) minmax(150px, 1fr); gap: 24px; align-items: center; padding: 16px 0; border-bottom: 1px solid #e7edf3; }
+.dataLine input { max-width: 230px; }.dataLine strong { font-weight: 500; }
+.dataLine small, .hint { color: #748195; font-size: 12px; }.dataLine small { display: block; margin-top: 5px; }
+.dataLine > button { justify-self: start; }
+.details details, .form details { margin-top: 18px; }.details summary, .form summary { cursor: pointer; color: #586b80; }
+.formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 16px 0; }.form select { height: 40px; }
+.footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; color: #758397; font-size: 13px; margin-top: 4px; }
+.details .footer { margin-top: 20px; }.error { color: #b43232; }.warning { display: block; color: #946219; margin-top: 5px; }.empty { text-align: center; color: #7c8ba0; }
+@media(max-width:760px) { .formGrid { grid-template-columns: 1fr; }.dataLine { grid-template-columns: 1fr; gap: 8px; }.card th,.card td { padding: 12px; }.card table { min-width: 640px; } }

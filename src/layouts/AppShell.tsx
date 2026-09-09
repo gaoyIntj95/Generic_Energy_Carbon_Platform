@@ -25,8 +25,8 @@ export function AppShell() {
   const energyDataView = new URLSearchParams(location.search).get('tab');
   const energyDataMeta = energyDataView === 'costs'
     ? { title: '能源成本', description: '维护企业能源品种的采购及使用成本，为成本分析、预算与优化提供数据基础。' }
-    : energyDataView === 'conversion' || energyDataView === 'recovery'
-      ? { title: '能源回收、转换与外供', description: '维护能源回收、能源转换和能源外供数据，为能流图、平衡表和流向明细提供数据支撑。' }
+    : ['conversion', 'recovery', 'external', 'flow'].includes(energyDataView ?? '') || location.pathname === '/data-management/energy-relations'
+      ? { title: '能源转换与流向', description: '关联转换投入与设备产出，补充回收、外供等缺失数据，支撑一级能流分析。' }
       : { title: '能源消费', description: '按企业及用能单元层级维护能源消费量，用于能源输入、分配和利用分析。' };
   const pageTitle = isEnergyDataPage
     ? energyDataMeta.title

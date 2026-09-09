@@ -298,109 +298,53 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(deleteV11KeyDevice(device.deviceId)).toMatchObject({ ok: false });
   });
 
-  it('renders the一期 conversion and output ledger without photovoltaic self-generation', async () => {
+  it('unifies conversion recovery and external records without analysis duplication', async () => {
     await render('/data-management/energy-data?tab=conversion');
-
-    expect(container.textContent).toContain('转换与利用');
-    expect(container.textContent).toContain('共 3 条');
-    expect([...container.querySelectorAll('table')[0].querySelectorAll('th')].map((item) => item.textContent)).toEqual([
-      '转换单元',
-      '投入能源',
-      '能源来源',
-      '来源单元',
-      '产出能源',
-      '厂内可供分配',
-      '操作',
-    ]);
-    expect(container.textContent).toContain('18,300,000');
-    expect(container.textContent).toContain('52,000');
-    expect(container.textContent).toContain('余热发电机组');
-    expect(container.textContent).toContain('关联重点设备：余热发电机组');
+    expect([...container.querySelectorAll('th')].map((el) => el.textContent)).toEqual(['记录', '能源关系', '本期数据', '操作']);
+    expect(container.querySelectorAll('[role="tab"]')).toHaveLength(0);
+    expect(container.querySelectorAll('table')).toHaveLength(1);
     expect(container.textContent).toContain('锅炉系统');
-    expect(container.textContent).toContain('关联重点设备：2t/h天然气蒸汽锅炉');
-    expect(container.textContent).toContain('空压系统');
-    expect(container.textContent).toContain('关联重点设备：1#螺杆空压机、2#螺杆空压机');
-    expect(container.textContent).toContain('压缩空气 · 11,490,000 Nm³');
-    expect(container.textContent).toContain('电力 · 18,300,000 kWh');
-    expect(container.textContent).toContain('余热 · 85,000 GJ');
-    expect(container.textContent).toContain('常规能源');
-    expect(container.textContent).toContain('回收能源');
-    expect(container.textContent).toContain('来源单元');
-    expect(container.textContent).toContain('生产加工区域');
-    expect(container.textContent).not.toContain('产出 − 外供 − 转换损失');
-    expect(container.textContent).not.toContain('回收量 − 外供 − 损失');
-    expect(container.textContent).not.toContain('配电系统');
-    expect(container.textContent).not.toContain('能源回收系统');
-    expect([...container.querySelectorAll('[class*="sectionToolbar"]')].every((item) => !item.textContent?.includes('共'))).toBe(true);
-
-    await click(button('新增转换与利用记录'));
-    const dialog = container.querySelector('[role="dialog"]') ?? container;
-    for (const path of ['常规能源转换', '回收能源转换', '回收能源直接利用']) expect(dialog.textContent).toContain(path);
-    expect(dialog.textContent).toContain('锅炉产汽/产热');
-    expect(dialog.textContent).toContain('空压产气/压缩空气');
-    expect(dialog.textContent).not.toContain('自发电');
-    expect(dialog.textContent).not.toContain('光伏');
+    expect(container.textContent).toContain('蒸汽外供');
+    expect(container.textContent).not.toContain('流量（tce）');
+    await click(button('新增记录'));
+    expect(container.querySelector('[role="dialog"]')?.textContent).not.toContain('下一步');
   });
 
-  it('uses one recovery energy source for the一期 conversion flow', async () => {
+  it('opens a single-step relation form from the shared entry', async () => {
     await render('/data-management/energy-data?tab=conversion');
-    await click(button('新增转换与利用记录'));
-    await click(button('回收能源直接利用'));
-    await click(button('下一步'));
-
-    expect(container.textContent).toContain('关联回收能源来源');
-    expect(container.textContent).toContain('本期一条转换记录只关联一条回收能源来源');
-    expect(container.textContent).toContain('生产车间B｜余热｜17,180 GJ');
-    expect(container.textContent).not.toContain('暂无可关联的回收能源来源，请先录入来源台账');
-    expect(container.textContent).not.toContain('存在多条来源台账时，请选择本次实际使用的来源记录');
-    const dialog = container.querySelector('[role="dialog"]') ?? container;
-    expect(dialog.textContent).toContain('转换损失确认');
-    expect(dialog.textContent).not.toContain('系统计算结果');
-    expect(dialog.textContent).not.toContain('已登记外供量');
-    expect(dialog.textContent).not.toContain('厂内可供分配量');
+    await click(button('新增记录'));
+    await change(container.querySelector('[aria-label="记录用途"]') as HTMLSelectElement, 'conversion');
+    expect(container.textContent).toContain('投入数据来源');
+    expect(container.textContent).toContain('产出数据来源');
+    expect(container.textContent).not.toContain('选择业务路径');
   });
 
-  it('opens the recovery conversion and external supply page from the recovery deep link', async () => {
+  it('keeps recovery deep links on the unified maintenance table', async () => {
     await render('/data-management/energy-data?tab=recovery');
-
-    expect(container.textContent).toContain('能源回收');
-    expect(container.textContent).toContain('转换与利用');
-    expect(container.textContent).toContain('能源外供');
-    expect(container.textContent).toContain('回收能源来源记录');
-    expect(container.textContent).toContain('二级用能单元');
-    expect(container.textContent).toContain('一级用能单元');
-    expect(container.textContent).not.toContain('能源回收直接利用记录');
-    expect(container.textContent).not.toContain('全部层级');
-    expect([...container.querySelectorAll('[role="tab"]')].map((item) => item.textContent)).toEqual(['能源回收', '转换与利用', '能源外供']);
+    expect(container.querySelectorAll('[role="tab"]')).toHaveLength(0);
+    expect(container.textContent).toContain('余热回收利用系统');
+    expect(container.textContent).toContain('锅炉系统');
+    expect(container.textContent).toContain('新增记录');
   });
 
-  it('opens the fixed waste-heat source entry from the recovery tab', async () => {
+  it('edits recovery data inline without an extra source ledger', async () => {
     await render('/data-management/energy-data?tab=recovery');
-    await click(button('新增回收能源来源'));
-
-    expect(container.textContent).toContain('新增回收能源');
-    expect(container.textContent).toContain('余热产生设备');
-    expect(container.textContent).toContain('余热产生部位（选填）');
-    expect(container.textContent).toContain('连续式热处理炉');
-    expect(container.textContent).toContain('1#注塑机');
-    expect(container.textContent).toContain('自动喷涂线');
-    expect(container.textContent).toContain('2t/h天然气蒸汽锅炉');
-    expect(container.textContent).toContain('1#螺杆空压机');
-    expect(container.textContent).toContain('余热');
-    expect(container.textContent).not.toContain('加工工段工艺余热');
-    expect(container.textContent).not.toContain('前处理烘干/热水工艺');
-    expect(container.textContent).not.toContain('来源介质');
-    expect(container.textContent).not.toContain('请选择能源品种');
+    const row = [...container.querySelectorAll('tr')].find((el) => el.textContent?.includes('余热回收利用系统'))!;
+    await click(row.querySelector('button')!);
+    const field = container.querySelector('[aria-label="本期回收量"]') as HTMLInputElement;
+    await change(field, '1600');
+    await click(button('保存本期补充'));
+    expect(listV11EnergyRecords().find((el) => el.energyRecordId === 'v11-er-recovery-device-70')?.monthlyAmounts[5]).toBe(1600);
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 
-  it('derives recovery-source labels from the linked key-device profile', async () => {
-    const device = listV11KeyDevices().find((item) => item.deviceId === 'v11-device-62');
-    expect(device).toBeDefined();
-    if (!device) return;
-    expect(saveV11KeyDevice({ ...device, deviceName: '1#螺杆空压机（改名）' }, device.deviceId).ok).toBe(true);
-
-    await render('/data-management/energy-data?tab=recovery');
-    expect(container.textContent).toContain('1#螺杆空压机（改名）');
+  it('resolves device labels through the selected conversion association', async () => {
+    const device = listV11KeyDevices().find((item) => item.deviceId === 'v11-device-81')!;
+    saveV11KeyDevice({ ...device, deviceName: '余热发电设备（改名）' }, device.deviceId);
+    await render('/data-management/energy-data?tab=conversion');
+    const row = [...container.querySelectorAll('tr')].find((el) => el.textContent?.includes('余热发电机组'))!;
+    await click(row.querySelector('button')!);
+    expect(container.textContent).toContain('余热发电设备（改名）');
   });
 
   it('keeps V11 records centrally mutable with stable IDs and monthly values', () => {
