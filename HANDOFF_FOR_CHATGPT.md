@@ -3,6 +3,19 @@
 > 生成日期：2026-09-01
 > 项目路径：`D:\Project\Generic_Energy_Carbon_Platform`
 
+## 0. 当前任务状态（2026-09-09）
+
+- 当前分支：`codex/energy-flow-simplification`
+- 最新提交：`f7651fe feat: simplify energy conversion and flow maintenance`
+- 备份分支：`codex/backup-energy-flow-20260909`，基线提交 `e6ed1b3`
+- 已完成“能源转换与流向”一期原型改造：旧 recovery/conversion/external 入口统一进入一张维护表；无二级利用录入；一期暂不提供 Excel 导入。
+- 设备产出作为能源类设备的权威产出来源，同时供设备指标和能流分析引用；已有来源缺失时从转换行跳转设备产出页并带回返回地址。
+- 核心测试：`tests/energyFlowMaintenance.test.ts` 与 `tests/energyFlowDataContract.test.ts` 共 25 项通过；`npm run typecheck` 和 `npm run build` 通过。
+- 浏览器已验证：锅炉行内展开、来源查看、设备产出跳转、新增外供及外供后厂内可供量扣减。
+- 详细业务口径见 `docs/12-energy-flow-maintenance.md`。
+
+新窗口继续时，先切换到上述改造分支，打开 `/data-management/energy-data?tab=conversion` 查看原型；重点确认页面字段、外供与回收补录的交互是否符合业务习惯，再决定是否继续调整。
+
 ## 1. 交接目的
 
 本文档用于把本地项目的背景、协作规则和接手流程交给无法直接访问本地工作区的网页版 ChatGPT。
@@ -147,4 +160,3 @@
 ## 8. 当前交接限制
 
 本交接文档记录了项目背景和协作约束，但不等同于完整代码快照。接手模型必须以实际上传的文件为准；没有上传的页面、接口、配置和测试内容都应视为未知，不得自行臆测。
-
