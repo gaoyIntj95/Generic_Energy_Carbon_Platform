@@ -2547,7 +2547,7 @@ function FlowTraceDrawer({ row, close }: { row: ClosedLoopFlowDetailRow | null; 
 
 function closedLoopFlowSankeySvg(data: FlowAnalysisDataset, selected: string) {
   const stageX = data.viewLevel === 'level1'
-    ? new Map<string, number>([['input', 18], ['conversion', 220], ['medium', 430], ['distribution', 680], ['external', 930], ['unallocated', 930]])
+    ? new Map<string, number>([['input', 18], ['conversion', 220], ['medium', 430], ['distribution', 680], ['external', 930], ['unallocated', 680]])
     : new Map<string, number>([['input', 10], ['conversion', 180], ['medium', 350], ['distribution', 530], ['utilization', 720], ['external', 930], ['pending', 930]]);
   const stageColors: Record<string, string> = {
     input: '#1677FF',
@@ -2564,7 +2564,7 @@ function closedLoopFlowSankeySvg(data: FlowAnalysisDataset, selected: string) {
   const conversionNodeHeight = 72;
   const nodeGap = 10;
   const columnOrder = data.viewLevel === 'level1'
-    ? [['input'], ['conversion'], ['medium'], ['distribution'], ['external', 'unallocated']]
+    ? [['input'], ['conversion'], ['medium'], ['distribution', 'unallocated'], ['external']]
     : [['input'], ['conversion'], ['medium'], ['distribution'], ['utilization'], ['external', 'pending']];
   const grouped = columnOrder.map((stages) => data.nodes.filter((node) => stages.includes(node.stage)));
   const nodeHeightFor = (node: FlowAnalysisDataset['nodes'][number]) => node.stage === 'conversion' ? conversionNodeHeight : compactNodeHeight;
@@ -2645,7 +2645,7 @@ function closedLoopFlowSankeySvg(data: FlowAnalysisDataset, selected: string) {
       ['能源转换', 220],
       ['厂内可供分配能源', 430],
       ['能源分配（一级用能单元）', 680],
-      ['外部输出 / 未分配', 930],
+      ['外部输出', 930],
     ].map(([label, x]) => `<text x="${x}" y="24" font-size="13" font-weight="700" fill="#172033">${label}</text>`).join('')
     : [
       ['企业边界输入', 10],
