@@ -26,6 +26,7 @@ const dataManagementItems: NavItem[] = [
   { label: '用能单元', pageTitle: '用能单元管理', path: '/data-management/units', description: '配置企业用能单元及上下级关系，用于能源数据归属、查询与分析。' },
   { label: '能源品种', path: '/data-management/energy-types', description: '管理企业实际使用的能源品种、计量单位及默认折标参数。' },
   { label: '重点设备', path: '/data-management/devices', description: '维护重点设备基础档案及其用能归属，为后续设备级分析提供基础。' },
+  { label: '设备产出数据', path: '/data-management/device-output', description: '维护重点设备的产出、供气量等指标分母数据，用于计算设备能耗指标。' },
       { label: '能源数据', path: '/data-management/energy-data', description: '按企业及用能单元层级维护能源消费、能源转换和能源成本数据。' },
   { label: '运营数据', path: '/data-management/operations', description: '录入产品产量和经济指标，支撑能耗强度、能效对标与预算分析。' },
 ];
@@ -99,16 +100,17 @@ export const navigation: NavGroup[] = [
       dataManagementItems[0],
       dataManagementItems[1],
       dataManagementItems[2],
+      dataManagementItems[3],
       {
         key: 'energy-data-submenu',
         label: '能源数据',
         items: [
-          { ...dataManagementItems[3], label: '能源消费', path: '/data-management/energy-data' },
-          { ...dataManagementItems[3], label: '能源成本', path: '/data-management/energy-data?tab=costs' },
-          { ...dataManagementItems[3], label: '能源回收、转换与外供', path: '/data-management/energy-data?tab=recovery' },
+          { ...dataManagementItems[4], label: '能源消费', path: '/data-management/energy-data' },
+          { ...dataManagementItems[4], label: '能源成本', path: '/data-management/energy-data?tab=costs' },
+          { ...dataManagementItems[4], label: '能源回收、转换与外供', path: '/data-management/energy-data?tab=recovery' },
         ],
       },
-      dataManagementItems[4],
+      dataManagementItems[5],
     ],
   },
 ];

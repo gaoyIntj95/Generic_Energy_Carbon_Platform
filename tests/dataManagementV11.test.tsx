@@ -84,6 +84,16 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(container.textContent).not.toContain('启用');
   });
 
+  it('uses 全厂 as the enterprise-level tab label in energy and operations data', async () => {
+    await render('/data-management/energy-data');
+    expect(button('全厂')).toBeDefined();
+    expect([...container.querySelectorAll('button')].map((item) => item.textContent)).not.toContain('企业');
+
+    await render('/data-management/operations');
+    expect(button('全厂')).toBeDefined();
+    expect([...container.querySelectorAll('button')].map((item) => item.textContent)).not.toContain('企业');
+  });
+
   it('applies energy type filters only after querying and resets them on demand', async () => {
     await render('/data-management/energy-types');
     const keyword = container.querySelector('[aria-label="关键字"]') as HTMLInputElement;
@@ -546,7 +556,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(container.textContent).not.toContain('熟料产量');
     expect(container.textContent).not.toContain('水泥产量');
 
-    await click(button('企业'));
+    await click(button('全厂'));
     await click(button('新增运营数据'));
     let dialog = container.querySelector('form');
     expect(dialog?.textContent).toContain('新增运营数据');
@@ -580,7 +590,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
 
   it('defaults enterprise product output to one main product', async () => {
     await render('/data-management/operations');
-    await click(button('企业'));
+    await click(button('全厂'));
     await click(button('新增运营数据'));
     const dialog = container.querySelector('form');
     const productSelect = [...(dialog?.querySelectorAll('select') ?? [])].find((select) => select.options.namedItem('产品A') || [...select.options].some((option) => option.textContent === '产品A')) as HTMLSelectElement;
@@ -597,14 +607,14 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     await click(button('查询'));
     expect(container.textContent).toContain('层级总览（9）');
 
-    await click(button('企业'));
+    await click(button('全厂'));
     await click(button('新增运营数据'));
     expect(container.querySelector('form')?.textContent).toContain('2025年度');
   });
 
   it('opens operation data at the requested scope without opening a new-record dialog', async () => {
     await render('/data-management/operations?year=2026&scopeLevel=企业');
-    expect(button('企业').className).toContain('activeLevel');
+    expect(button('全厂').className).toContain('activeLevel');
     expect(container.textContent).toContain('工业增加值');
     expect(container.textContent).toContain('工业总产值');
     expect(container.querySelector('form')).toBeNull();
@@ -618,6 +628,30 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(container.textContent).toContain('生产车间B');
     expect(container.textContent).toContain('产品产量');
     expect(container.querySelector('form')).toBeNull();
+  });
+
+  it('shows one operation row per product and prefers monthly data over annual duplicates', async () => {
+    await render('/data-management/operations?year=2026&scopeLevel=一级用能单元');
+    const productARows = [...container.querySelectorAll('tbody tr')]
+      .filter((row) => row.textContent?.includes('产品产量') && row.textContent?.includes('产品A'));
+    const productBRows = [...container.querySelectorAll('tbody tr')]
+      .filter((row) => row.textContent?.includes('产品产量') && row.textContent?.includes('产品B'));
+
+    expect(productARows).toHaveLength(1);
+    expect(productBRows).toHaveLength(2);
+    expect(productARows[0].textContent).toContain('956,700');
+  });
+
+  it('places product allocation on production-unit groups only', async () => {
+    await render('/data-management/operations?year=2026&scopeLevel=一级用能单元');
+    const productionGroup = [...container.querySelectorAll('tr[class*="scopeGroupRow"]')]
+      .find((row) => row.textContent?.includes('生产车间A'))!;
+    const officeGroup = [...container.querySelectorAll('tr[class*="scopeGroupRow"]')]
+      .find((row) => row.textContent?.includes('办公区域'))!;
+
+    expect([...productionGroup.querySelectorAll('button')].map((item) => item.textContent)).toEqual(['＋ 新增运营数据', '配置分配']);
+    expect(officeGroup.textContent).not.toContain('配置分配');
+    expect([...container.querySelectorAll('tr')].filter((row) => row.textContent?.includes('产品产量') && row.textContent?.includes('配置分配'))).toHaveLength(0);
   });
 
   it('uses the configured energy-unit tree when assigning operation data and key devices', async () => {
@@ -648,5 +682,11 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(deviceChild.disabled).toBe(true);
     await change(deviceParent, parent.energyUnitId);
     expect([...deviceChild.options].slice(1).map((option) => option.textContent)).toEqual(expectedChildren);
+  });
+
+  it('shows the device output basis in the key-device list', async () => {
+    await render('/data-management/devices');
+    expect(container.textContent).toContain('设备产出口径');
+    expect(container.textContent).toContain('加工件产量');
   });
 });

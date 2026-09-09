@@ -544,6 +544,11 @@
   text-align: left;
 }
 
+.scopeGroupActions {
+  display: inline-flex;
+  gap: 8px;
+}
+
 .scopeAddButton:hover {
   background: #e2f6ed;
 }

@@ -3,8 +3,8 @@ import { allNavItems, navigation, navItemMatches, type NavItem } from '../src/ap
 
 describe('navigation manifest', () => {
   it('contains every confirmed page as a unique route', () => {
-    expect(allNavItems).toHaveLength(18);
-    expect(new Set(allNavItems.map((item) => item.path)).size).toBe(18);
+    expect(allNavItems).toHaveLength(19);
+    expect(new Set(allNavItems.map((item) => item.path)).size).toBe(19);
     expect(navigation.map((group) => group.label)).toEqual([
       '能源监测与分析',
       '碳排放核算与合规',
@@ -18,12 +18,14 @@ describe('navigation manifest', () => {
       '用能单元',
       '能源数据',
       '重点设备',
+      '设备产出数据',
     ]));
     expect(allNavItems.some((item) => item.label === '能碳数据采集')).toBe(false);
     expect(navigation.find((group) => group.key === 'data-management')?.items.map((item) => item.label)).toEqual([
       '用能单元',
       '能源品种',
       '重点设备',
+      '设备产出数据',
       '能源数据',
       '运营数据',
     ]);

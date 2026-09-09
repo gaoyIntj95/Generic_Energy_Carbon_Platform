@@ -263,14 +263,14 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
 
   it('uses the same action semantics across factory, product, and key-device metrics', async () => {
     await render('/energy-analysis/intensity');
-    expect([...container.querySelectorAll('button')].map((item) => item.textContent)).toEqual(expect.arrayContaining(['查看详情', '补充数据']));
+    expect([...container.querySelectorAll('button')].map((item) => item.textContent)).toEqual(expect.arrayContaining(['查看详情', '补充运营数据']));
 
     const missingFactoryMetric = [...container.querySelectorAll('tr')].find((row) => row.textContent?.includes('单位增加值综合能耗'))!;
     await click(missingFactoryMetric.querySelector('button')!);
     const factoryLocation = decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '');
     expect(factoryLocation).toContain('/data-management/operations');
     expect(factoryLocation).toContain('scopeLevel=企业');
-    expect(factoryLocation).not.toContain('keyword=');
+    expect(factoryLocation).toContain('keyword=工业增加值');
     expect(factoryLocation).toContain('returnTo=/energy-analysis/intensity?objectType=factory');
 
     await render('/energy-analysis/intensity');
@@ -299,9 +299,11 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(container.querySelector('[aria-label="完善设备指标数据"]')).toBeNull();
 
     await click(button('补充产出数据', dualMissingRow));
-    dialog = container.querySelector('[role="dialog"]')!;
-    expect(dialog.getAttribute('aria-label')).toBe('修改供气量数据');
-    expect(dialog.textContent).not.toContain('请按实际来源补充能源消耗和设备产出数据');
+    const outputLocation = decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '');
+    expect(outputLocation).toContain('/data-management/device-output');
+    expect(outputLocation).toContain('deviceId=v11-device-79');
+    expect(outputLocation).toContain('metricCode=compressed-air-electricity');
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 
   it('shows supplement data only for a level-one unit with missing operation data', async () => {
@@ -309,17 +311,17 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     await click(button('一级用能单元'));
 
     const missingRow = [...container.querySelectorAll('tr')].find((row) => row.textContent?.includes('仓储物流区域'))!;
-    expect(missingRow.textContent).toContain('补充数据');
+    expect(missingRow.textContent).toContain('补充运营数据');
     expect(missingRow.textContent).not.toContain('查看详情');
     expect([...container.querySelectorAll('tr')].find((row) => row.textContent?.includes('办公区域'))?.textContent).toContain('查看详情');
 
-    await click(button('补充数据', missingRow));
+    await click(button('补充运营数据', missingRow));
     const location = decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '');
     expect(location).toContain('/data-management/operations');
     expect(location).toContain('scopeLevel=一级用能单元');
-    expect(location).not.toContain('unitId=');
-    expect(location).not.toContain('keyword=');
-    expect(location).not.toContain('new=1');
+    expect(location).toContain('unitId=eu-public-support');
+    expect(location).toContain('keyword=货物吞吐量');
+    expect(location).toContain('category=运行指标');
   });
 
   it('routes a missing device energy action directly to device energy data', async () => {
@@ -333,9 +335,140 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(location).toContain('/data-management/energy-data');
     expect(location).toContain('scope=device');
     expect(location).toContain('deviceId=v11-device-79');
+    expect(location).toContain('keyword=');
     expect(location).not.toContain('recordId=');
     expect(location).not.toContain('new=1');
     expect(container.querySelector('[aria-label="完善设备指标数据"]')).toBeNull();
+  });
+
+  it('opens the energy-data list instead of auto-editing a source record', async () => {
+    await render('/energy-analysis/intensity');
+    await click(button('查看详情'));
+    const dialog = container.querySelector('[role="dialog"]')!;
+
+    await click(button('修改能源数据', dialog));
+    const location = decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '');
+    expect(location).toContain('/data-management/energy-data');
+    expect(location).toContain('scopeLevel=企业');
+    expect(location).toContain('keyword=全厂');
+    expect(location).not.toContain('recordId=');
+    expect(location).not.toContain('new=1');
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('passes the device energy query when editing energy data from a device detail', async () => {
+    await render('/energy-analysis/intensity?objectType=device');
+    await click(button('查看详情'));
+    const dialog = container.querySelector('[role="dialog"]')!;
+
+    await click(button('修改能源消耗数据', dialog));
+    const location = decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '');
+    expect(location).toContain('/data-management/energy-data');
+    expect(location).toContain('scope=device');
+    expect(location).toContain('deviceId=');
+    expect(location).toContain('year=2026');
+    expect(location).toContain('energyTypeId=');
+    expect(location).toContain('keyword=');
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('passes the unit scope when editing energy data from a unit metric', async () => {
+    await render('/energy-analysis/intensity');
+    await click(button('一级用能单元'));
+    const officeRow = [...container.querySelectorAll('tr')]
+      .find((row) => row.textContent?.includes('办公区域'))!;
+    await click(button('查看详情', officeRow));
+    const dialog = container.querySelector('[role="dialog"]')!;
+
+    await click(button('修改能源数据', dialog));
+    const location = decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '');
+    expect(location).toContain('/data-management/energy-data');
+    expect(location).toContain('scopeLevel=一级用能单元');
+    expect(location).toContain('keyword=办公区域');
+  });
+
+  it('passes the related energy-unit scope when editing energy data from a product metric', async () => {
+    await render('/energy-analysis/intensity');
+    await click(button('重点产品'));
+    await click(button('查看详情'));
+    const dialog = container.querySelector('[role="dialog"]')!;
+
+    await click(button('修改能源数据', dialog));
+    const location = decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '');
+    expect(location).toContain('/data-management/energy-data');
+    expect(location).toContain('scopeLevel=一级用能单元');
+    expect(location).toContain('keyword=');
+  });
+
+  it('passes the factory output-value operation query when editing a value-intensity metric', async () => {
+    await render('/energy-analysis/intensity');
+    const outputValueRow = [...container.querySelectorAll('tr')]
+      .find((row) => row.textContent?.includes('单位产值综合能耗'))!;
+    await click(outputValueRow.querySelector('button')!);
+    const dialog = container.querySelector('[role="dialog"]')!;
+
+    await click(button('修改运营数据', dialog));
+    const location = decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '');
+    expect(location).toContain('/data-management/operations');
+    expect(location).toContain('scopeLevel=企业');
+    expect(location).toContain('keyword=工业总产值');
+    expect(location).toContain('category=经济指标');
+  });
+
+  it('passes the factory added-value operation query when supplementing missing data', async () => {
+    await render('/energy-analysis/intensity');
+    const addedValueRow = [...container.querySelectorAll('tr')]
+      .find((row) => row.textContent?.includes('单位增加值综合能耗'))!;
+
+    await click(addedValueRow.querySelector('button')!);
+    const location = decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '');
+    expect(location).toContain('/data-management/operations');
+    expect(location).toContain('scopeLevel=企业');
+    expect(location).toContain('keyword=工业增加值');
+    expect(location).toContain('category=经济指标');
+  });
+
+  it('passes product filters when opening a product source-data entry', async () => {
+    await render('/energy-analysis/intensity');
+    await click(button('产品'));
+    await click(button('查看详情'));
+    const dialog = container.querySelector('[role="dialog"]')!;
+
+    await click(button('修改运营数据', dialog));
+    const location = decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '');
+    expect(location).toContain('/data-management/operations');
+    expect(location).toContain('scopeLevel=一级用能单元');
+    expect(location).toContain('productId=');
+    expect(location).toContain('category=产量');
+  });
+
+  it('routes missing device output maintenance to the device-output page', async () => {
+    await render('/energy-analysis/intensity?objectType=device');
+    await click(button('展开'));
+    const missingRow = [...container.querySelectorAll('tr')].find((row) => row.textContent?.includes('2#螺杆空压机'))!;
+
+    await click(button('补充产出数据', missingRow));
+    const location = decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '');
+    expect(location).toContain('/data-management/device-output');
+    expect(location).toContain('deviceId=v11-device-79');
+    expect(location).toContain('metricCode=compressed-air-electricity');
+    expect(container.textContent).toContain('设备产出数据');
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('passes the device output query when editing output data from a device detail', async () => {
+    await render('/energy-analysis/intensity?objectType=device');
+    await click(button('查看详情'));
+    const dialog = container.querySelector('[role="dialog"]')!;
+
+    await click(button('修改设备产出数据', dialog));
+    const location = decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '');
+    expect(location).toContain('/data-management/device-output');
+    expect(location).toContain('deviceId=');
+    expect(location).toContain('year=2026');
+    expect(location).toContain('metricCode=');
+    expect(location).toContain('keyword=');
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 
   it('routes conversion-based device output maintenance to the conversion ledger', async () => {
@@ -359,13 +492,14 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     await click(button('重点产品'));
 
     const missingProductRow = [...container.querySelectorAll('tr')].find((row) => row.textContent?.includes('产品C'))!;
-    await click(button('补充数据', missingProductRow));
+    await click(button('补充运营数据', missingProductRow));
 
     const location = decodeURIComponent(container.querySelector('[data-testid="location"]')?.textContent ?? '');
     expect(location).toContain('/data-management/operations');
     expect(location).toContain('scopeLevel=一级用能单元');
-    expect(location).not.toContain('productId=');
-    expect(location).not.toContain('keyword=');
+    expect(location).toContain('productId=');
+    expect(location).toContain('keyword=产品C');
+    expect(location).toContain('category=产量');
   });
 
   it('calculates waste heat generator unit electricity consumption from conversion output records', () => {

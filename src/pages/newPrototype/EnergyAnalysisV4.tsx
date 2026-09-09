@@ -32,7 +32,6 @@ import {
   type IntensityObjectType,
 } from '../../mocks/energyIntensitySelector';
 import {
-  saveDeviceIntensityParameter,
   saveDeviceIntensityTemplate,
   DEVICE_METRIC_TEMPLATES,
   type DeviceIntensityTemplateConfig,
@@ -86,8 +85,14 @@ function deviceEnergyDataPath(deviceId: string, year: number | string, metricCod
   return `/data-management/energy-data?scope=device&deviceId=${encodeURIComponent(deviceId)}&year=${year}&energyTypeId=${deviceEnergyTypeId(metricCode)}${recordQuery}`;
 }
 
-function deviceEnergyDataTabPath(deviceId: string, year: number | string, metricCode: string) {
-  return `/data-management/energy-data?scope=device&deviceId=${encodeURIComponent(deviceId)}&year=${year}&energyTypeId=${deviceEnergyTypeId(metricCode)}`;
+function deviceEnergyDataTabPath(deviceId: string, year: number | string, metricCode: string, keyword?: string) {
+  const keywordQuery = keyword ? `&keyword=${encodeURIComponent(keyword)}` : '';
+  return `/data-management/energy-data?scope=device&deviceId=${encodeURIComponent(deviceId)}&year=${year}&energyTypeId=${deviceEnergyTypeId(metricCode)}${keywordQuery}`;
+}
+
+function deviceOutputDataPath(deviceId: string, year: number | string, metricCode: string, keyword?: string) {
+  const keywordQuery = keyword ? `&keyword=${encodeURIComponent(keyword)}` : '';
+  return `/data-management/device-output?deviceId=${encodeURIComponent(deviceId)}&year=${year}&metricCode=${encodeURIComponent(metricCode)}${keywordQuery}`;
 }
 
 function intensityStatus(metric: CalculatedIntensityMetric) {
@@ -98,6 +103,32 @@ function intensityStatus(metric: CalculatedIntensityMetric) {
     return { label: '暂不可计算', tone: 'warn' as const, reason };
   }
   return { label: '待完善', tone: 'warn' as const, reason };
+}
+
+const energyDataIssues = new Set(['能源数据未录入', '能源数据部分录入', '缺少能源数据']);
+const operationDataIssues = new Set([
+  '缺少产品产量',
+  '缺少工业增加值',
+  '缺少供气量',
+  '缺少蒸汽产量',
+  '缺少适用运营分母',
+  '数据缺失',
+]);
+const relationDataIssues = new Set(['当前产品无法直接汇总', '未关联生产用能单元', '缺少必要关联关系']);
+
+function missingDataSources(metric: CalculatedIntensityMetric) {
+  const issue = metric.issue ?? '';
+  if (relationDataIssues.has(issue)) return { energy: false, operation: true };
+  const energy = energyDataIssues.has(issue) || (issue === '数据缺失' && metric.energyRecordIds.length === 0);
+  const operation = operationDataIssues.has(issue) || metric.operationMetricIds.length === 0;
+  return { energy, operation };
+}
+
+function missingDataActionLabel(metric: CalculatedIntensityMetric) {
+  const missing = missingDataSources(metric);
+  if (missing.energy && missing.operation) return '补充数据';
+  if (missing.energy) return '补充能源数据';
+  return '补充运营数据';
 }
 
 function EnergyButton({
@@ -591,46 +622,8 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
   const calculatedRows = useMemo(() => rows.filter((row) => row.resultStatus === '已计算'), [rows]);
   const pendingRows = useMemo(() => rows.filter((row) => row.resultStatus !== '已计算'), [rows]);
   const devices = useMemo(() => buildDeviceIntensityRows(Number(year) || 2026), [year]);
-  const openParameterDialog = (row: ReturnType<typeof buildDeviceIntensityRows>[number], compact = false, forceParameterEdit = false) => {
-    if (!forceParameterEdit && (row.resultReason === '能源数据未录入' || row.resultReason === '能源数据部分录入')) {
-      openEnergyDataDialog(row);
-      return;
-    }
-    let monthlyValues: Array<number | null> = row.parameter?.monthlyValues?.length === 12 ? [...row.parameter.monthlyValues] : Array(12).fill(null);
-    let annualValue = row.parameter?.annualValue ?? row.parameter?.value ?? 0;
-    let source = row.parameter?.source ?? '';
-    const parameterLabel = row.templateConfig?.denominator.name ?? '分母数据';
-    let parameterUnit = row.parameter?.unit ?? row.templateConfig?.denominator.unit ?? row.metricUnit.split('/')[1] ?? '';
-    const monthlyComplete = monthlyValues.every((value) => value !== null && value > 0);
-    setDialog({
-      title: compact ? `修改${parameterLabel}数据` : '补充数据',
-      body: <>
-        {compact
-          ? <><div className={styles.compactEditContext}>正在修改：<strong>{row.deviceName}</strong>｜{row.metricName}</div><div className={styles.modalNote}>设备产出数据仅用于本设备指标计算，不写入能源消费或能源回收、转换与外供台账。{row.deviceType === '能源转换设备' && '能源转换台账中的产出数据不会自动同步到本指标，请按当前指标口径填报。'}</div></>
-          : <DetailGrid items={[['具体缺失原因', row.resultReason ?? '缺少计算参数'], ['设备名称', row.deviceName], ['所属用能单元', row.energyUnitName], ['分析年度', `${applied.year}年`], ['设备类型', row.deviceType], ['年度能源消费', `${format(row.annualEnergy)} ${row.energyUnit}`], ['数据进度', row.dataProgress], ['典型指标', row.metricName], ['计算公式', row.formula]]} />}
-        <div className={styles.monthlyParameterField}>
-          <span>{parameterLabel}｜月度录入（{parameterUnit}）</span>
-          <div className={styles.monthlyParameterGrid}>{monthlyValues.map((value, index) => <label key={index}><span>{index + 1}月</span><input aria-label={`${index + 1}月${parameterLabel}`} type="number" min="0" step="0.001" defaultValue={value ?? ''} onChange={(event) => { monthlyValues[index] = event.target.value.trim() === '' ? null : Number(event.target.value); }} /></label>)}</div>
-          <div className={styles.monthlyParameterHint}>月度数据完整时，年度值自动汇总；存在缺失月份时，需补填年度值后才能计算。</div>
-        </div>
-        <div className={styles.monthlyAnnualSummary}><span className={monthlyComplete ? undefined : styles.required}>{monthlyComplete ? '年度合计（完整月度数据时自动汇总）' : `年度${parameterLabel}（月度不全时必填）`}</span><input aria-label={`年度${parameterLabel}`} type="number" min="0" step="0.001" defaultValue={annualValue || ''} onChange={(event) => { annualValue = Number(event.target.value); }} /></div>
-        <label className={styles.modalField}><span className={styles.required}>产出计量单位</span><input aria-label="产出计量单位" defaultValue={parameterUnit} placeholder="例如：Nm³、t、kWh" onChange={(event) => { parameterUnit = event.target.value; }} /></label>
-        <label className={styles.modalField}><span>数据来源说明（选填）</span><input aria-label="数据来源说明" defaultValue={source} onChange={(event) => { source = event.target.value; }} /></label>
-      </>,
-      submitText: compact ? '保存并重新计算' : '保存并计算',
-      onSubmit: () => {
-        const normalizedMonthlyValues = monthlyValues.map((value) => value !== null && Number.isFinite(value) ? value : null);
-        const hasMonthlyInput = normalizedMonthlyValues.some((value) => value !== null);
-        const complete = normalizedMonthlyValues.every((value) => value !== null && value > 0);
-        const value = complete ? normalizedMonthlyValues.reduce<number>((total, item) => total + (item ?? 0), 0) : Number(annualValue);
-        if (!hasMonthlyInput && (!Number.isFinite(value) || value <= 0)) { notify(`请填写年度${parameterLabel}`); return false; }
-        if (hasMonthlyInput && !complete && (!Number.isFinite(value) || value <= 0)) { notify(`月度${parameterLabel}未填完整，请补充年度兜底值`); return false; }
-        if (!parameterUnit.trim()) { notify('请填写产出计量单位'); return false; }
-        saveDeviceIntensityParameter({ deviceId: row.deviceId, year: applied.year, metricCode: row.metricCode as DeviceIntensityMetricCode, value, annualValue: value, monthlyValues: normalizedMonthlyValues, monthlyReportedMonths: normalizedMonthlyValues.map((item) => item !== null), entryMode: complete ? 'monthly' : 'annual-fallback', unit: parameterUnit.trim(), source: source || (complete ? `重点设备产出数据—月度${parameterLabel}` : `重点设备产出数据—年度${parameterLabel}`) });
-        setVersion((current) => current + 1);
-        notify(complete ? '月度数据已保存，年度指标已重新计算' : '年度兜底值已保存，年度指标已重新计算');
-      },
-    });
+  const openParameterDialog = (row: ReturnType<typeof buildDeviceIntensityRows>[number]) => {
+    navigate(withReturnTo(deviceOutputDataPath(row.deviceId, applied.year, row.metricCode ?? 'custom-device-work', row.deviceName), returnToIntensityPath()));
   };
   const openDeviceMetricConfig = (row?: ReturnType<typeof buildDeviceIntensityRows>[number]) => {
     let templateId: DeviceMetricTemplateId = row?.templateConfig?.templateId ?? 'unit-output-energy';
@@ -678,7 +671,7 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
     navigate(withReturnTo(energyPath, returnToIntensityPath()));
   };
   const openEnergyDataDialog = (row: ReturnType<typeof buildDeviceIntensityRows>[number]) => {
-    navigate(withReturnTo(deviceEnergyDataTabPath(row.deviceId, applied.year, row.metricCode ?? 'custom-device-work'), returnToIntensityPath()));
+    navigate(withReturnTo(deviceEnergyDataTabPath(row.deviceId, applied.year, row.metricCode ?? 'custom-device-work', row.deviceName), returnToIntensityPath()));
   };
   const hasDeviceOutputData = (row: ReturnType<typeof buildDeviceIntensityRows>[number]) => {
     if (row.templateConfig?.denominator.source === 'energy-conversion') return (row.calculationInputs?.denominatorRaw ?? 0) > 0;
@@ -736,7 +729,10 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
       secondarySubmitText: config?.numerator.source === 'device-energy' ? '修改能源消耗数据' : undefined,
       onSecondarySubmit: config?.numerator.source === 'device-energy' ? () => window.setTimeout(() => openEnergyDataDialog(row), 0) : undefined,
       submitText: isConversionOutput ? '修改转换产出数据' : '修改设备产出数据',
-      onSubmit: () => window.setTimeout(() => config?.denominator.source === 'energy-conversion' ? openConversionOutputDialog(row) : openParameterDialog(row, true), 0),
+      onSubmit: () => window.setTimeout(() => {
+        if (config?.denominator.source === 'energy-conversion') openConversionOutputDialog(row);
+        else openParameterDialog(row);
+      }, 0),
     });
   };
   const query = () => { const next = { year: Number(year) || 2026, energyUnitId, deviceId }; setApplied(next); window.sessionStorage.setItem('energy-intensity-device-filters', JSON.stringify(next)); };
@@ -775,7 +771,11 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
     const needsOutputData = row.resultStatus === '待完善' && !hasDeviceOutputData(row);
     const selectRow = () => { setTrendDeviceId(row.deviceId); setShowDeviceMonthly(false); };
     const outputActionLabel = row.templateConfig?.denominator.source === 'energy-conversion' ? '补充转换产出数据' : '补充产出数据';
-    return <tr key={row.deviceId}><td>{row.deviceName}</td><td>{row.energyUnitName}</td><td>{row.metricName}</td><td>{row.value === null ? '—' : `${format(row.value, 3)} ${row.metricUnit}`}</td><td className={styles.changeCell}>{percent(changes.mom)}</td><td className={styles.changeCell}>{percent(changes.yoy)}</td><td><div className={styles.deviceInlineActions}>{row.resultStatus === '已计算' && <button type="button" className={styles.link} onClick={() => { selectRow(); openDetail(row); }}>查看详情</button>}{needsEnergyData && <button type="button" className={styles.link} onClick={() => { selectRow(); openEnergyDataDialog(row); }}>补充能源数据</button>}{needsOutputData && <button type="button" className={styles.link} onClick={() => { selectRow(); row.templateConfig?.denominator.source === 'energy-conversion' ? openConversionOutputDialog(row) : openParameterDialog(row, true, true); }}>{outputActionLabel}</button>}{row.resultStatus === '暂不可计算' && <button type="button" className={styles.link} onClick={() => { selectRow(); openDeviceMetricConfig(row); }}>配置指标口径</button>}</div></td></tr>;
+    const openOutputData = () => {
+      if (row.templateConfig?.denominator.source === 'energy-conversion') openConversionOutputDialog(row);
+      else openParameterDialog(row);
+    };
+    return <tr key={row.deviceId}><td>{row.deviceName}</td><td>{row.energyUnitName}</td><td>{row.metricName}</td><td>{row.value === null ? '—' : `${format(row.value, 3)} ${row.metricUnit}`}</td><td className={styles.changeCell}>{percent(changes.mom)}</td><td className={styles.changeCell}>{percent(changes.yoy)}</td><td><div className={styles.deviceInlineActions}>{row.resultStatus === '已计算' && <button type="button" className={styles.link} onClick={() => { selectRow(); openDetail(row); }}>查看详情</button>}{needsEnergyData && <button type="button" className={styles.link} onClick={() => { selectRow(); openEnergyDataDialog(row); }}>补充能源数据</button>}{needsOutputData && <button type="button" className={styles.link} onClick={() => { selectRow(); openOutputData(); }}>{outputActionLabel}</button>}{row.resultStatus === '暂不可计算' && <button type="button" className={styles.link} onClick={() => { selectRow(); openDeviceMetricConfig(row); }}>配置指标口径</button>}</div></td></tr>;
   };
   return <div className={styles.page}>
     <section className={`${styles.card} ${styles.filterCard}`}>
@@ -1161,15 +1161,24 @@ function IntensityPage() {
     };
     const itemOnly = (text: string) => text.replace(/\s+-?\d[\d,]*(?:\.\d+)?\s+[^\s]+$/, '');
     const energyPath = metricView.object.objectType === 'unit'
-      ? `/data-management/energy-data?year=${year}&keyword=${encodeURIComponent(metricView.object.objectName)}${metric.energyRecordIds[0] ? `&recordId=${encodeURIComponent(metric.energyRecordIds[0])}` : ''}`
+      ? `/data-management/energy-data?year=${year}&scopeLevel=${encodeURIComponent(metricView.object.unitLevel === 'level2' ? '二级用能单元' : '一级用能单元')}&keyword=${encodeURIComponent(metricView.object.objectName)}`
       : metricView.object.objectType === 'device'
-        ? deviceEnergyDataPath(metricView.object.objectId, year, metric.intensityMetricId.includes('boiler') ? 'boiler-standard-coal' : 'compressed-air-electricity', metric.energyRecordIds[0])
-        : `/data-management/energy-data?year=${year}${metric.energyRecordIds[0] ? `&recordId=${encodeURIComponent(metric.energyRecordIds[0])}` : ''}`;
+        ? deviceEnergyDataTabPath(metricView.object.objectId, year, metric.intensityMetricId.includes('boiler') ? 'boiler-standard-coal' : 'compressed-air-electricity', metricView.object.objectName)
+        : metricView.object.objectType === 'product'
+          ? `/data-management/energy-data?year=${year}&scopeLevel=${encodeURIComponent('一级用能单元')}&keyword=${encodeURIComponent(metric.relatedEnergyUnitNames?.[0] ?? metricView.object.objectName)}`
+          : `/data-management/energy-data?year=${year}&scopeLevel=${encodeURIComponent('企业')}&keyword=${encodeURIComponent('全厂')}`;
     const operationScopeParams = metricView.object.objectType === 'unit'
       ? `&scopeLevel=${encodeURIComponent(metricView.object.unitLevel === 'level2' ? '二级用能单元' : '一级用能单元')}&unitId=${encodeURIComponent(metricView.object.energyUnitId ?? '')}`
-      : '';
-    const officeMetric = metricView.object.objectId === 'eu-office' || metric.name.includes('建筑面积');
-    const operationKeyword = officeMetric
+      : metricView.object.objectType === 'product'
+        ? `&scopeLevel=${encodeURIComponent('一级用能单元')}&productId=${encodeURIComponent(metricView.object.objectId)}`
+        : metricView.object.objectType === 'factory'
+          ? `&scopeLevel=${encodeURIComponent('企业')}`
+          : '';
+    const logisticsMetric = metricView.object.objectId === 'eu-public-support' || metric.name.includes('物流作业量');
+    const officeMetric = metricView.object.objectId === 'eu-office' || (metric.name.includes('建筑面积') && !logisticsMetric);
+    const operationKeyword = logisticsMetric
+      ? '货物吞吐量'
+      : officeMetric
       ? '办公建筑面积'
       : metricView.object.objectType === 'product'
       ? metric.relatedProductName ?? metric.name
@@ -1177,30 +1186,49 @@ function IntensityPage() {
         ? '工业增加值'
         : metric.name.includes('产值')
           ? '工业总产值'
+          : metric.name.includes('供气电耗')
+            ? '供气量'
+            : metric.name.includes('蒸汽')
+              ? '蒸汽产量'
           : metric.name.includes('供能量')
             ? '动力中心供能量'
             : metric.name.includes('建筑面积')
               ? '办公建筑面积'
               : metric.name.includes('物流作业量')
                 ? '货物吞吐量'
-          : metric.name.includes('产品')
-            ? '产品产量'
-            : metricView.object.objectName;
-    const operationPath = `/data-management/operations?year=${year}&keyword=${encodeURIComponent(operationKeyword)}${operationScopeParams}`;
-    const operationCategory = officeMetric || metric.name.includes('供能量') || metric.name.includes('单位') ? (metric.name.includes('单位产品') ? '产量' : '运行指标') : undefined;
-    const operationEntryPath = metric.issue === '缺少工业增加值' && metric.name.includes('增加值')
-      ? `/data-management/operations?year=${year}&scopeLevel=${encodeURIComponent('企业')}`
-      : metricView.object.objectType === 'unit' && operationCategory
-        ? `/data-management/operations?year=${year}&scopeLevel=${encodeURIComponent(metricView.object.unitLevel === 'level2' ? '二级用能单元' : '一级用能单元')}`
-        : metricView.object.objectType === 'product'
-          ? `/data-management/operations?year=${year}&scopeLevel=${encodeURIComponent('一级用能单元')}`
-          : operationPath;
+                : metric.name.includes('产品')
+                  ? '产品产量'
+                  : metric.name.includes('运行能耗')
+                    ? (metric.denominator.match(/按([^）)]+)/)?.[1] ?? '运营量')
+                    : metricView.object.objectName;
+    const operationCategory = metricView.object.objectType === 'product' || metric.name.includes('单位产品')
+      ? '产量'
+      : metric.name.includes('产值') || metric.name.includes('增加值')
+        ? '经济指标'
+        : officeMetric || metric.name.includes('供能量') || metric.name.includes('单位')
+          ? '运行指标'
+          : undefined;
+    const operationPath = `/data-management/operations?year=${year}&keyword=${encodeURIComponent(operationKeyword)}${operationCategory ? `&category=${encodeURIComponent(operationCategory)}` : ''}${operationScopeParams}`;
+    const operationEntryPath = operationPath;
     if (action && metric.resultType !== 'ok') {
-      const energyReasons = ['缺少能源数据', '能源数据未录入', '能源数据部分录入'];
-      const needsOperation = !energyReasons.includes(status.reason) || status.reason === '数据缺失';
-      // 补充数据统一直接进入数据管理菜单页；多类数据缺失时优先进入运营数据页，
-      // 由用户在数据管理中按实际来源补录，避免在指标页再次弹出选择框。
-      navigate(withReturnTo(needsOperation ? operationEntryPath : energyPath, returnTo));
+      const missing = missingDataSources(metric);
+      const energyTarget = withReturnTo(energyPath, returnTo);
+      const operationTarget = withReturnTo(operationEntryPath, returnTo);
+      if (missing.energy && missing.operation) {
+        setDialog({
+          title: '数据待补充',
+          body: <>
+            <DetailGrid items={[['分析对象', metricView.object.objectName], ['指标名称', metric.name], ['具体原因', status.reason || '能源数据和运营数据均未完整']]} />
+            <div className={styles.modalNote}>当前指标同时缺少能源数据和运营数据，请选择需要补充的数据类型。</div>
+          </>,
+          secondarySubmitText: '补充能源数据',
+          onSecondarySubmit: () => navigate(energyTarget),
+          submitText: '补充运营数据',
+          onSubmit: () => navigate(operationTarget),
+        });
+      } else {
+        navigate(missing.energy ? energyTarget : operationTarget);
+      }
       return;
     }
     const objectLevel = metricView.object.objectType === 'factory'
@@ -1318,15 +1346,15 @@ function IntensityPage() {
             <div className={styles.chartTitle}>指标结果明细</div>
           </div>
         </div>
-        {applied.objectType === 'factory' ? <div className={styles.tableWrap} aria-label="全厂指标摘要"><table className={`${styles.unitMetricTable} ${styles.factoryMetricTable}`}><thead><tr><th>指标名称</th><th>指标值</th><th>环比变化</th><th>同比变化</th><th>操作</th></tr></thead><tbody>{rows.map((metric) => { const changes = metricChanges(metric, 'factory'); return <tr key={metric.intensityMetricId}><td><strong>{metric.name}</strong></td><td>{metric.value === null ? '—' : <><strong>{format(metric.value, metricDigits(metric.value))}</strong><small>{metric.unit}</small></>}</td><td className={styles.changeCell}>{percent(changes.mom)}</td><td className={styles.changeCell}>{percent(changes.yoy)}</td><td><button type="button" className={styles.link} onClick={() => openMetricDialog(metric, true, metricViewFor(metric))}>{metric.resultType === 'warn' ? '补充数据' : '查看详情'}</button></td></tr>; })}</tbody></table></div> : applied.objectType === 'unit' ? <div className={styles.unitMetricGroups} aria-label="一级用能单元适用指标">
+        {applied.objectType === 'factory' ? <div className={styles.tableWrap} aria-label="全厂指标摘要"><table className={`${styles.unitMetricTable} ${styles.factoryMetricTable}`}><thead><tr><th>指标名称</th><th>指标值</th><th>环比变化</th><th>同比变化</th><th>操作</th></tr></thead><tbody>{rows.map((metric) => { const changes = metricChanges(metric, 'factory'); return <tr key={metric.intensityMetricId}><td><strong>{metric.name}</strong></td><td>{metric.value === null ? '—' : <><strong>{format(metric.value, metricDigits(metric.value))}</strong><small>{metric.unit}</small></>}</td><td className={styles.changeCell}>{percent(changes.mom)}</td><td className={styles.changeCell}>{percent(changes.yoy)}</td><td><button type="button" className={styles.link} onClick={() => openMetricDialog(metric, true, metricViewFor(metric))}>{metric.resultType === 'warn' ? missingDataActionLabel(metric) : '查看详情'}</button></td></tr>; })}</tbody></table></div> : applied.objectType === 'unit' ? <div className={styles.unitMetricGroups} aria-label="一级用能单元适用指标">
           {unitMetricGroups.map((group) => <section className={styles.unitMetricGroup} key={group.key}>
             <div className={styles.unitMetricGroupHeader}><div><strong>{group.label}</strong><span>{group.description}</span></div></div>
-            <div className={styles.tableWrap}><table className={styles.unitMetricTable}><thead><tr><th>名称</th><th>适用核心指标</th><th>指标值</th><th>环比变化</th><th>同比变化</th><th>操作</th></tr></thead><tbody>{group.views.map((resultView) => { const metric = resultView.metrics[0]; const isCalculated = metric.resultType === 'ok'; const changes = metricChanges(metric, resultView.object.objectId); return <tr key={resultView.object.objectId}><td><strong>{resultView.object.objectName}</strong></td><td>{metric.name}</td><td>{isCalculated ? <><strong>{format(metric.value, metricDigits(metric.value))}</strong><small>{metric.unit}</small></> : '—'}</td><td className={styles.changeCell}>{percent(changes.mom)}</td><td className={styles.changeCell}>{percent(changes.yoy)}</td><td><button type="button" className={styles.link} onClick={() => { setTrendMetricId(metric.intensityMetricId); openMetricDialog(metric, true, resultView); }}>{isCalculated ? '查看详情' : '补充数据'}</button></td></tr>; })}</tbody></table></div>
+            <div className={styles.tableWrap}><table className={styles.unitMetricTable}><thead><tr><th>名称</th><th>适用核心指标</th><th>指标值</th><th>环比变化</th><th>同比变化</th><th>操作</th></tr></thead><tbody>{group.views.map((resultView) => { const metric = resultView.metrics[0]; const isCalculated = metric.resultType === 'ok'; const changes = metricChanges(metric, resultView.object.objectId); return <tr key={resultView.object.objectId}><td><strong>{resultView.object.objectName}</strong></td><td>{metric.name}</td><td>{isCalculated ? <><strong>{format(metric.value, metricDigits(metric.value))}</strong><small>{metric.unit}</small></> : '—'}</td><td className={styles.changeCell}>{percent(changes.mom)}</td><td className={styles.changeCell}>{percent(changes.yoy)}</td><td><button type="button" className={styles.link} onClick={() => { setTrendMetricId(metric.intensityMetricId); openMetricDialog(metric, true, resultView); }}>{isCalculated ? '查看详情' : missingDataActionLabel(metric)}</button></td></tr>; })}</tbody></table></div>
           </section>)}
         </div> : <div className={styles.tableWrap}>
           <table className={styles.comparisonTable}>
             <thead><tr><th>产品</th><th>关联一级用能单元</th>{comparisonMetricNames.map((name) => <th key={name}>{name}</th>)}<th>环比变化</th><th>同比变化</th><th>操作</th></tr></thead>
-            <tbody>{comparisonViews.map((resultView) => { const primaryMetric = resultView.metrics.find((metric) => metric.resultType === 'ok') ?? resultView.metrics[0]; const changes = metricChanges(primaryMetric, resultView.object.objectId); return <tr key={resultView.object.objectId}><td>{resultView.object.objectName}</td><td>{primaryMetric.relatedEnergyUnitNames?.join('、') || '—'}</td>{comparisonMetricNames.map((name) => { const metric = resultView.metrics.find((item) => item.name === name && item.resultType === 'ok'); return <td key={name}>{metric ? <><strong>{format(metric.value, metricDigits(metric.value))}</strong><small>{metric.unit}</small></> : '—'}</td>; })}<td className={styles.changeCell}>{percent(changes.mom)}</td><td className={styles.changeCell}>{percent(changes.yoy)}</td><td><button type="button" className={styles.link} onClick={() => { setTrendMetricId(primaryMetric.intensityMetricId); openMetricDialog(primaryMetric, true, resultView); }}>{primaryMetric.resultType === 'ok' ? '查看详情' : '补充数据'}</button></td></tr>; })}</tbody>
+            <tbody>{comparisonViews.map((resultView) => { const primaryMetric = resultView.metrics.find((metric) => metric.resultType === 'ok') ?? resultView.metrics[0]; const changes = metricChanges(primaryMetric, resultView.object.objectId); return <tr key={resultView.object.objectId}><td>{resultView.object.objectName}</td><td>{primaryMetric.relatedEnergyUnitNames?.join('、') || '—'}</td>{comparisonMetricNames.map((name) => { const metric = resultView.metrics.find((item) => item.name === name && item.resultType === 'ok'); return <td key={name}>{metric ? <><strong>{format(metric.value, metricDigits(metric.value))}</strong><small>{metric.unit}</small></> : '—'}</td>; })}<td className={styles.changeCell}>{percent(changes.mom)}</td><td className={styles.changeCell}>{percent(changes.yoy)}</td><td><button type="button" className={styles.link} onClick={() => { setTrendMetricId(primaryMetric.intensityMetricId); openMetricDialog(primaryMetric, true, resultView); }}>{primaryMetric.resultType === 'ok' ? '查看详情' : missingDataActionLabel(primaryMetric)}</button></td></tr>; })}</tbody>
           </table>
         </div>}
         {applied.objectType === 'unit' && unitMetricGroups.length === 0 && <div className={styles.slimNote}><div><i>i</i><span>当前筛选对象暂无适用的能耗指标结果。</span></div></div>}
