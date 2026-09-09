@@ -26,7 +26,7 @@ const dataManagementItems: NavItem[] = [
   { label: '用能单元', pageTitle: '用能单元管理', path: '/data-management/units', description: '配置企业用能单元及上下级关系，用于能源数据归属、查询与分析。' },
   { label: '能源品种', path: '/data-management/energy-types', description: '管理企业实际使用的能源品种、计量单位及默认折标参数。' },
   { label: '重点设备', path: '/data-management/devices', description: '维护重点设备基础档案及其用能归属，为后续设备级分析提供基础。' },
-  { label: '设备产出数据', path: '/data-management/device-output', description: '统一维护设备产出；能源类产出同时供设备能耗指标和能流分析引用。' },
+  { label: '设备产出数据', path: '/data-management/device-output', description: '自动继承全部重点设备，优先展示已有产出；缺失数据可在此按月或按年度补录。' },
       { label: '能源数据', path: '/data-management/energy-data', description: '按企业及用能单元层级维护能源消费、能源转换和能源成本数据。' },
   { label: '运营数据', path: '/data-management/operations', description: '录入产品产量和经济指标，支撑能耗强度、能效对标与预算分析。' },
 ];
@@ -35,7 +35,7 @@ const energyAnalysisItems: NavItem[] = [
   { label: '能耗查询', path: '/energy-analysis/consumption-query', description: '查询和分析能源消费数据，掌握能耗趋势与能源结构。' },
   { label: '能耗指标', path: '/energy-analysis/intensity', description: '基于能源消费数据、产品产量及经济指标自动计算典型能耗指标，支持查看结果、计算口径及数据来源。' },
   { label: '能效对标', path: '/energy-analysis/benchmarking', description: '将实际能效指标与目标值进行对比，识别未达标对象，支撑节能管理。' },
-  { label: '能流分析', path: '/energy-analysis/flow-analysis', description: '通过桑基图、能源平衡表和流向明细，分析企业能源输入、转换及一级分配。' },
+  { label: '能流分析', path: '/energy-analysis/flow-analysis', description: '通过桑基图和能源平衡表，分析企业能源输入、转换及一级分配。' },
 ];
 
 const carbonAccountingItems: NavItem[] = [
@@ -107,7 +107,7 @@ export const navigation: NavGroup[] = [
         items: [
           { ...dataManagementItems[4], label: '能源消费', path: '/data-management/energy-data' },
           { ...dataManagementItems[4], label: '能源成本', path: '/data-management/energy-data?tab=costs' },
-          { ...dataManagementItems[4], label: '能源转换与流向', path: '/data-management/energy-data?tab=recovery' },
+          { ...dataManagementItems[4], label: '能源转换与外供', path: '/data-management/energy-data?tab=recovery' },
         ],
       },
       dataManagementItems[5],

@@ -1,3 +1,4 @@
+import { createAnnualStore } from './annualData';
 import type {
   ProductAllocationMode,
   ProductMaster,
@@ -43,7 +44,7 @@ const seedProducts: ProductMaster[] = [
   },
 ];
 
-let products = seedProducts.map(cloneProduct);
+const annualProducts = createAnnualStore(seedProducts);
 let productSequence = 100;
 
 function cloneProduct(product: ProductMaster): ProductMaster {
@@ -55,16 +56,19 @@ function cloneProduct(product: ProductMaster): ProductMaster {
   };
 }
 
-export function listProducts() {
+export function listProducts(year = 2026) {
+  const products = annualProducts.get(year);
   return products.map(cloneProduct);
 }
 
-export function getProduct(productId: string) {
+export function getProduct(productId: string, year = 2026) {
+  const products = annualProducts.get(year);
   const product = products.find((item) => item.productId === productId);
   return product ? cloneProduct(product) : null;
 }
 
-export function saveProduct(input: ProductWriteInput, productId?: string) {
+export function saveProduct(input: ProductWriteInput, productId?: string, year = 2026) {
+  const products = annualProducts.get(year);
   const duplicate = products.some((item) =>
     item.productId !== productId && item.productName.trim() === input.productName.trim());
   if (duplicate) return { ok: false as const, error: '产品名称不能重复。' };
@@ -83,7 +87,8 @@ export function saveProduct(input: ProductWriteInput, productId?: string) {
   return { ok: true as const, productId: nextProductId };
 }
 
-export function linkProductEnergyUnit(productId: string, energyUnitId: string) {
+export function linkProductEnergyUnit(productId: string, energyUnitId: string, year = 2026) {
+  const products = annualProducts.get(year);
   const product = products.find((item) => item.productId === productId);
   if (!product) return { ok: false as const, error: '产品不存在。' };
   if (!product.linkedEnergyUnitIds.includes(energyUnitId)) {
@@ -106,7 +111,9 @@ export function updateProductAllocation(
   allocationMode: ProductAllocationMode,
   energyAllocations: ProductMaster['energyAllocations'],
   directEnergyRecordIds: string[] = [],
+  year = 2026,
 ) {
+  const products = annualProducts.get(year);
   const product = products.find((item) => item.productId === productId);
   if (!product) return { ok: false as const, error: '产品不存在。' };
   product.allocationMode = allocationMode;
@@ -115,7 +122,8 @@ export function updateProductAllocation(
   return { ok: true as const };
 }
 
-export function resolveProductEnergyAllocation(productId: string, energyUnitId: string) {
+export function resolveProductEnergyAllocation(productId: string, energyUnitId: string, year = 2026) {
+  const products = annualProducts.get(year);
   const product = products.find((item) => item.productId === productId && item.status === 'active');
   if (!product || !product.linkedEnergyUnitIds.includes(energyUnitId)) {
     return { ok: false as const, reason: '产品未关联该生产单元。', share: 0 };
@@ -147,6 +155,6 @@ export function resolveProductEnergyAllocation(productId: string, energyUnitId: 
 }
 
 export function resetProductMasterStore() {
-  products = seedProducts.map(cloneProduct);
+  annualProducts.reset();
   productSequence = 100;
 }

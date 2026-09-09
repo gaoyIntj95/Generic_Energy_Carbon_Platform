@@ -1,3 +1,4 @@
+import { resetDataManagementV11Store } from '../src/mocks/dataManagementV11Store';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   addChildEnergyUnit,
@@ -12,7 +13,7 @@ import {
 } from '../src/mocks/energyUnitMockStore';
 
 describe('energy unit centralized mock store', () => {
-  beforeEach(() => resetEnergyUnitMockStore());
+  beforeEach(() => { resetDataManagementV11Store(); resetEnergyUnitMockStore(); });
 
   it('creates a level-one unit with a stable id', () => {
     const result = createEnergyUnit({
@@ -87,7 +88,7 @@ describe('energy unit centralized mock store', () => {
     const references = inspectEnergyUnitDeletion('eu-utilities');
     const result = deleteEnergyUnit('eu-utilities');
 
-    expect(references.childCount).toBe(4);
+    expect(references.childCount).toBe(6);
     expect(result).toMatchObject({ ok: false, error: 'referenced' });
   });
 
@@ -112,7 +113,9 @@ describe('energy unit centralized mock store', () => {
       .map((unit) => unit.energyUnitName)).toEqual([
         '空压系统',
         '余热发电机组',
+        '自备发电机组',
         '余热回收利用系统',
+        '余压回收系统',
         '锅炉系统',
       ]);
   });
@@ -140,10 +143,10 @@ describe('energy unit centralized mock store', () => {
 
     expect(references).toMatchObject({
       childCount: 0,
-      energyRecordCount: 3,
-      conversionRelationCount: 1,
+      energyRecordCount: 4,
+      conversionRelationCount: 2,
     });
-    expect(result.references?.energyRecordCount).toBe(3);
+    expect(result.references?.energyRecordCount).toBe(4);
     expect(result.ok).toBe(false);
   });
 
@@ -165,6 +168,6 @@ describe('energy unit centralized mock store', () => {
 
     resetEnergyUnitMockStore();
     expect(listEnergyUnits().some((unit) => unit.energyUnitName === '会话内单元')).toBe(false);
-    expect(listEnergyUnits()).toHaveLength(16);
+    expect(listEnergyUnits()).toHaveLength(18);
   });
 });

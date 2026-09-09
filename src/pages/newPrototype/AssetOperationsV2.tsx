@@ -750,7 +750,7 @@ function BalanceDiagnosisDrawer({
     width={560}
     onClose={onClose}
     footer={<>
-      <Button onClick={() => onNavigate('/energy-analysis/flow-analysis?tab=detail')}>查看流向明细</Button>
+      <Button onClick={() => onNavigate('/energy-analysis/flow-analysis')}>查看能流图</Button>
       <Button primary onClick={() => onNavigate('/data-management/energy-data')}>前往数据管理</Button>
     </>}
   >

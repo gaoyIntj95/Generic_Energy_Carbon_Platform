@@ -105,7 +105,9 @@ function MenuLink({ item, nested = false }: { item: NavItem; nested?: boolean })
 
   return (
     <NavLink
-      to={item.path}
+      to={item.path.startsWith('/data-management/') && new URLSearchParams(location.search).has('year')
+        ? `${item.path}${item.path.includes('?') ? '&' : '?'}year=${new URLSearchParams(location.search).get('year')}`
+        : item.path}
       className={`${styles.item} ${nested ? styles.nestedItem : ''} ${isItemActive ? styles.active : ''}`}
       aria-current={isItemActive ? 'page' : undefined}
       title={item.label}

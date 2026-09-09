@@ -242,8 +242,21 @@
 }
 
 .costTable {
-  min-width: 2050px !important;
+  min-width: 640px !important;
+  table-layout: fixed !important;
 }
+
+.costTable th {
+  width: calc(100% / 3);
+}
+
+.deviceOutputTable {
+  table-layout: fixed !important;
+  min-width: 1080px !important;
+}
+
+.deviceOutputTable th { width: calc(100% / 6); }
+.deviceOutputTable td { white-space: normal; overflow-wrap: anywhere; }
 
 .operationColumn {
   width: 150px;
@@ -988,20 +1001,20 @@
   gap: 10px;
 }
 
-.monthDetailGrid div {
+.monthDetailGrid > div {
   padding: 9px 10px;
   background: #fbfcfd;
   border: 1px solid #edf0f4;
   border-radius: 6px;
 }
 
-.monthDetailGrid span {
+.monthDetailGrid > div > span {
   display: block;
   color: #8a94a3;
   font-size: 12px;
 }
 
-.monthDetailGrid strong {
+.monthDetailGrid > div > strong {
   display: block;
   margin-top: 3px;
   font-weight: 500;
@@ -2348,3 +2361,15 @@
 .deviceTable .actions .danger:hover {
   background: #fff0ef;
 }
+
+.inlineDataForm { width: 100%; min-width: 0; padding: 8px 4px; box-sizing: border-box; }
+.inlineDataForm > header { margin-bottom: 16px; }
+.inlineDataForm > header h3 { margin: 0; font-size: 15px; }
+.inlineDataForm > header p { margin: 6px 0 0; color: #829087; font-size: 13px; }
+.inlineDataForm > footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+.detailCollapse { display: flex; justify-content: flex-end; margin-top: 16px; }
+.detailCollapse button { border: 0; background: transparent; color: #07976e; cursor: pointer; padding: 4px 0; font: inherit; }
+
+.inlineDataForm input, .inlineDataForm select, .inlineDataForm textarea { width: 100%; min-width: 0; min-height: 38px; box-sizing: border-box; border: 1px solid #cbded5; border-radius: 6px; padding: 8px 10px; color: #263b36; background: #fff; font: inherit; }
+.inlineDataForm input:focus, .inlineDataForm select:focus, .inlineDataForm textarea:focus { outline: none; border-color: #07966a; box-shadow: 0 0 0 3px rgb(7 150 106 / 10%); }
+.inlineDataForm input[readonly] { background: #f5f8f6; color: #65786f; }

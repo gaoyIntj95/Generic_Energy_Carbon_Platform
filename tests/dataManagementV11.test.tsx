@@ -298,53 +298,66 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(deleteV11KeyDevice(device.deviceId)).toMatchObject({ ok: false });
   });
 
-  it('unifies conversion recovery and external records without analysis duplication', async () => {
+  it('separates conversion and external records without analysis duplication', async () => {
     await render('/data-management/energy-data?tab=conversion');
-    expect([...container.querySelectorAll('th')].map((el) => el.textContent)).toEqual(['记录', '能源关系', '本期数据', '操作']);
+    expect([...container.querySelectorAll('section[aria-label="用能单元数据"] th')].map((el) => el.textContent)).toEqual(['用能单元（动力中心）', '能源关系', '产出能源', '年度能源投入', '年度产出', '年度损失', '操作']);
     expect(container.querySelectorAll('[role="tab"]')).toHaveLength(0);
-    expect(container.querySelectorAll('table')).toHaveLength(1);
+    expect(container.querySelectorAll('table')).toHaveLength(2);
+    expect(container.querySelector('section[aria-label="对外供能台账"] h2')?.textContent).toBe('外供记录');
     expect(container.textContent).toContain('锅炉系统');
-    expect(container.textContent).toContain('蒸汽外供');
+    expect(container.querySelector('section[aria-label="对外供能台账"]')?.textContent).toContain('蒸汽');
     expect(container.textContent).not.toContain('流量（tce）');
-    await click(button('新增记录'));
-    expect(container.querySelector('[role="dialog"]')?.textContent).not.toContain('下一步');
+    const row = [...container.querySelectorAll('tr')].find((el) => el.textContent?.includes('锅炉系统'))!;
+    await click([...row.querySelectorAll('button')].find((el) => el.textContent === '编辑')!);
+    expect(container.querySelector('[data-inline-editor], [role="dialog"]')?.textContent).not.toContain('外供');
+    expect(container.querySelector('[data-inline-editor], [role="dialog"]')?.textContent).not.toContain('设置数据来源');
   });
 
-  it('opens a single-step relation form from the shared entry', async () => {
-    await render('/data-management/energy-data?tab=conversion');
-    await click(button('新增记录'));
-    await change(container.querySelector('[aria-label="记录用途"]') as HTMLSelectElement, 'conversion');
+  it('opens missing-data entry for an inherited unit without a separate source manager', async () => {
+    await render('/data-management/energy-data?tab=conversion&year=2027');
+    const row = [...container.querySelectorAll('tr')].find((el) => el.textContent?.includes('锅炉系统'))!;
+    await click([...row.querySelectorAll('button')].find((el) => el.textContent === '编辑')!);
+    expect(container.querySelector('[data-inline-editor], [role="dialog"]')?.textContent).toContain('补数据');
+    expect(container.querySelector<HTMLInputElement>('[aria-label="用能单元"]')?.readOnly).toBe(true);
+    expect(container.querySelector('[aria-label="记录用途"]')).toBeNull();
     expect(container.textContent).toContain('投入数据来源');
-    expect(container.textContent).toContain('产出数据来源');
+    expect(container.textContent).toContain('产出能源');
+    expect(container.querySelector('[aria-label="产出数据来源"]')).toBeNull();
     expect(container.textContent).not.toContain('选择业务路径');
   });
 
-  it('keeps recovery deep links on the unified maintenance table', async () => {
+  it('keeps recovery deep links on the shared maintenance page', async () => {
     await render('/data-management/energy-data?tab=recovery');
     expect(container.querySelectorAll('[role="tab"]')).toHaveLength(0);
     expect(container.textContent).toContain('余热回收利用系统');
     expect(container.textContent).toContain('锅炉系统');
-    expect(container.textContent).toContain('新增记录');
+    expect(container.textContent).not.toContain('关联用能单元');
+    expect(container.textContent).toContain('登记外供');
   });
 
-  it('edits recovery data inline without an extra source ledger', async () => {
+  it('maintains missing recovery input in the original source ledger and returns to conversion details', async () => {
+    const source = listV11EnergyRecords().find((row) => row.energyRecordId === 'v11-er-recovery-device-70')!;
+    expect(saveV11EnergyRecord({ ...source, monthlyReportedMonths: Array.from({ length: 12 }, (_, i) => i !== 5) }, source.energyRecordId).ok).toBe(true);
     await render('/data-management/energy-data?tab=recovery');
     const row = [...container.querySelectorAll('tr')].find((el) => el.textContent?.includes('余热回收利用系统'))!;
-    await click(row.querySelector('button')!);
-    const field = container.querySelector('[aria-label="本期回收量"]') as HTMLInputElement;
+    await click([...row.querySelectorAll('button')].find((el) => el.textContent === '编辑')!);
+    await click(button('补充数据'));
+    await click(button('编辑'));
+    const field = container.querySelector('[aria-label="6月能源数量"]') as HTMLInputElement;
     await change(field, '1600');
-    await click(button('保存本期补充'));
+    await click(button('保存'));
     expect(listV11EnergyRecords().find((el) => el.energyRecordId === 'v11-er-recovery-device-70')?.monthlyAmounts[5]).toBe(1600);
-    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.querySelector('[data-inline-editor], [role="dialog"]')?.textContent).toContain('1,600');
   });
 
-  it('resolves device labels through the selected conversion association', async () => {
+  it('keeps unit details independent of device names', async () => {
     const device = listV11KeyDevices().find((item) => item.deviceId === 'v11-device-81')!;
     saveV11KeyDevice({ ...device, deviceName: '余热发电设备（改名）' }, device.deviceId);
     await render('/data-management/energy-data?tab=conversion');
     const row = [...container.querySelectorAll('tr')].find((el) => el.textContent?.includes('余热发电机组'))!;
-    await click(row.querySelector('button')!);
-    expect(container.textContent).toContain('余热发电设备（改名）');
+    await click([...row.querySelectorAll('button')].find((el) => el.textContent === '编辑')!);
+    expect(container.textContent).not.toContain('余热发电设备（改名）');
+    expect(container.querySelector('[data-inline-editor], [role="dialog"]')?.textContent).toContain('产出（kWh）');
   });
 
   it('keeps V11 records centrally mutable with stable IDs and monthly values', () => {

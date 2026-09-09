@@ -600,9 +600,9 @@ export function buildBenchmarkDataset(year: number): BenchmarkDataset {
     )));
   // 企业级指标继续复用能耗指标 selector，保证两个页面的实际值、来源记录和趋势完全一致。
   // 其余对象必须从数据管理的原始记录按稳定 ID 派生，否则补录/编辑源数据后对标对象会丢失。
-  const sourceUnits = listEnergyUnits();
+  const sourceUnits = listEnergyUnits(year);
   const sourceUnitNames = new Map(sourceUnits.map((unit) => [unit.energyUnitId, unit.energyUnitName]));
-  const sourceTypes = listV11EnergyTypes();
+  const sourceTypes = listV11EnergyTypes(year);
   const sourceEnergyRecords = listV11EnergyRecords().filter((record) =>
     record.year === year && record.energyRole === '能源消费' && v11RecordScopeType(record) !== 'device');
   const sourceDeviceEnergyRecords = listV11EnergyRecords().filter((record) =>
@@ -620,7 +620,7 @@ export function buildBenchmarkDataset(year: number): BenchmarkDataset {
     unavailableReasons: {
       unit: unitRows.length ? '' : '未找到同时具备能源消费数据和运营数据的用能单元。',
       product: productRows.length ? '' : '当前企业尚未维护产品基础信息。',
-      device: listV11KeyDevices().length ? '' : '暂无重点设备，请先前往数据管理维护重点设备档案。',
+      device: listV11KeyDevices(year).length ? '' : '暂无重点设备，请先前往数据管理维护重点设备档案。',
     },
   };
 
@@ -629,9 +629,9 @@ export function buildBenchmarkDataset(year: number): BenchmarkDataset {
    * 对标页面不再使用它，实际值统一来自能耗强度指标 selector。
    */
   /* istanbul ignore next */
-  const units = listEnergyUnits();
+  const units = listEnergyUnits(year);
   const unitNames = new Map(units.map((unit) => [unit.energyUnitId, unit.energyUnitName]));
-  const types = listV11EnergyTypes();
+  const types = listV11EnergyTypes(year);
   const allEnergyRecords = listV11EnergyRecords()
     .filter((record) => record.year === year && record.energyRole === '能源消费');
   const energyRecords = allEnergyRecords.filter((record) => v11RecordScopeType(record) !== 'device');
@@ -689,7 +689,7 @@ export function buildBenchmarkDataset(year: number): BenchmarkDataset {
 
   rows.push(productSummaryBenchmarkMetric(year));
 
-  listV11KeyDevices().forEach((device) => {
+  listV11KeyDevices(year).forEach((device) => {
     const records = deviceEnergyRecords.filter((record) => record.scopeId === device.deviceId);
     const energyUnitName = unitNames.get(device.energyUnitId) ?? device.energyUnitId;
     if (!records.length) {
@@ -718,7 +718,7 @@ export function buildBenchmarkDataset(year: number): BenchmarkDataset {
       product: rows.some((row) => row.objectTypeKey === 'product')
         ? ''
         : '当前企业尚未维护产品基础信息。',
-      device: listV11KeyDevices().length
+      device: listV11KeyDevices(year).length
         ? '已维护重点设备，但尚未录入当前年度设备级能源数据。'
         : '暂无重点设备，请先前往数据管理维护重点设备档案。',
     },

@@ -6,7 +6,7 @@ import { resetDataManagementV11Store, saveV11EnergyRecord } from '../src/mocks/d
 import { buildBenchmarkDataset } from '../src/mocks/energyBenchmarkSelector';
 import { buildDeviceIntensityRows, buildIntensityCalculationView } from '../src/mocks/energyIntensitySelector';
 import { getBenchmarkTarget } from '../src/mocks/benchmarkTargetStore';
-import { buildFlowAnalysisDataset } from '../src/mocks/energyFlowSelector';
+import { buildFlowAnalysisDataset, selectFlowRelations } from '../src/mocks/energyFlowSelector';
 import { getProduct, saveProduct } from '../src/mocks/productMasterStore';
 import { EnergyAnalysisV4 } from '../src/pages/newPrototype/EnergyAnalysisV4';
 
@@ -649,8 +649,9 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(getBenchmarkTarget('product', productId, 'energy_per_product', 2026)?.value).toBe(52);
   });
 
-  it('keeps the phase-one flow page on the factory level-one view with matching balance and details', async () => {
+  it('keeps the phase-one flow page on the factory level-one view with matching balance', async () => {
     await render('/energy-analysis/flow-analysis');
+    expect([...container.querySelectorAll('[class*="flowTabs"] > div:first-child button')].map((item) => item.textContent)).toEqual(['能流图', '能源平衡表']);
     expect(container.textContent).not.toContain('当前数据能力');
     expect(container.textContent).not.toContain('管理口径说明');
     expect(container.textContent).not.toContain('组织范围');
@@ -677,34 +678,76 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(container.querySelector('[role="tooltip"]')?.textContent).toContain('生产车间A');
     const refreshedProductionNode = container.querySelector('g[data-key="distribution:eu-clinker-line-1"]')!;
     await act(async () => refreshedProductionNode.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-    expect(container.textContent).toContain('相关流向已高亮');
+    expect(container.textContent).toContain('已选：');
+    expect(container.querySelector('g[data-key="distribution:eu-office"]')?.classList.contains('muted')).toBe(true);
     expect(container.textContent).not.toContain('查看二级利用');
-    await click(button('取消选择'));
+    await click(button('清除选择'));
 
     await click(button('能源平衡表'));
     expect(container.textContent).toContain('外部输入');
-    expect(container.textContent).toContain('内部回收');
-    expect(container.textContent).toContain('转换投入');
+    expect(container.textContent).toContain('过程回收');
     expect(container.textContent).toContain('转换产出');
-    expect(container.textContent).toContain('内部分配');
-    expect(container.textContent).toContain('未归属');
-    expect(container.textContent).toContain('外部输入 + 内部回收 + 转换产出');
+    expect(container.textContent).toContain('转换投入');
+    expect(container.textContent).toContain('来源合计');
+    expect(container.textContent).toContain('用能单元消耗');
+    expect(container.textContent).toContain('待分配');
+    expect(container.textContent).toContain('收支差额');
+    const balance = container.querySelector('table[aria-label="全厂能源平衡表"]')!;
+    const steamRow = [...balance.querySelectorAll('tbody tr')].find((row) => row.querySelector('th')?.textContent === '回收蒸汽')!;
+    expect(steamRow.querySelectorAll('td')[2].textContent).toBe('37.51');
+    expect(steamRow.querySelectorAll('td')[1].textContent).toBe('—');
+    expect(balance.textContent).not.toContain('-0.00');
+    expect(balance.querySelectorAll('[class*="balanceExcess"]')).toHaveLength(0);
+    expect(container.textContent).not.toContain('自产 / 回收能源');
+    expect(container.textContent).not.toContain('超分配 0.00');
     expect(container.textContent).not.toContain('待细分');
     expect(container.textContent).not.toContain('上下级数据仅作层级核对');
 
-    await click(button('流向明细'));
-    expect(container.textContent).toContain('来源');
-    expect(container.textContent).toContain('去向');
-    expect(container.textContent).toContain('输出流');
-    expect(container.textContent).toContain('未归属');
-    expect(container.querySelector('th')?.parentElement?.textContent).not.toContain('状态');
-    expect(container.textContent).not.toContain('数据性质');
-    expect(container.textContent).toContain('全部能流阶段');
-    await click(button('查看'));
-    expect(container.textContent).toContain('能源流向追溯');
-    expect(container.textContent).toContain('数据说明');
-    expect(container.textContent).toContain('折标系数');
-    await click(button('关闭'));
+    expect(container.textContent).not.toContain('流向明细');
+    expect(container.textContent).not.toContain('查看异常来源');
+    expect(container.querySelectorAll('table tbody button')).toHaveLength(0);
+  });
+
+  it('highlights node relations in the complete diagram without relayout and preserves tab filtering', async () => {
+    await render('/energy-analysis/flow-analysis');
+    const data = buildFlowAnalysisDataset({ year: 2026, grain: 'month', month: 6 }, 'level1');
+    const recovery = data.nodes.find((node) => node.name === '余压回收系统')!;
+    const related = selectFlowRelations(data, recovery.nodeId);
+    const geometry = () => {
+      const svg = container.querySelector('svg.sankey')!;
+      return {
+        viewBox: svg.getAttribute('viewBox'),
+        nodes: [...svg.querySelectorAll('g[data-key]')].map((node) => ({
+          id: node.getAttribute('data-key'),
+          box: ['x', 'y', 'width', 'height'].map((key) => node.querySelector('rect')!.getAttribute(key)),
+        })),
+        links: [...svg.querySelectorAll('path[data-link-id]')].map((link) => ({
+          id: link.getAttribute('data-link-id'), d: link.getAttribute('d'), width: link.getAttribute('stroke-width'),
+        })),
+      };
+    };
+    const initial = geometry();
+    const selectRecovery = async () => {
+      const node = container.querySelector(`g[data-key="${recovery.nodeId}"]`)!;
+      await act(async () => node.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    };
+    await selectRecovery();
+    expect(geometry()).toEqual(initial);
+    expect([...container.querySelectorAll('path.flow.active')].map((path) => path.getAttribute('data-link-id')).sort())
+      .toEqual(related.links.map((link) => link.linkId).sort());
+    expect(container.querySelector('g[data-key="distribution:eu-office"]')?.classList.contains('muted')).toBe(true);
+    expect(container.querySelector('div[class*="flowSelectionBar"]')).toBeNull();
+    await click(button('能源平衡表'));
+    expect(container.querySelectorAll('table[aria-label="当前链路能源平衡表"] tbody tr')).toHaveLength(3);
+    await click(button('能流图'));
+    expect(geometry()).toEqual(initial);
+    await selectRecovery();
+    expect(container.querySelectorAll('path.flow.active, g.node.muted')).toHaveLength(0);
+    expect(geometry()).toEqual(initial);
+    await selectRecovery();
+    await click(button('清除选择'));
+    expect(geometry()).toEqual(initial);
+    expect(container.querySelectorAll('path.flow.active, g.node.muted')).toHaveLength(0);
   });
 
   it('keeps parent distribution isolated and uses one pending node without negative links', () => {

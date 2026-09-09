@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { listV11ConversionOutputs, listV11ExternalSupplyRecords, resetDataManagementV11Store, saveV11ConversionOutput, saveV11EnergyRecord, saveV11ExternalSupplyRecord } from '../src/mocks/dataManagementV11Store';
+import { listV11ConversionOutputs, listV11ExternalSupplyRecords, listV11EnergyRecords, listV11EnergyTypes, v11EnergyRecordAnnualAmount, v11RecordScopeType, resetDataManagementV11Store, saveV11ConversionOutput, saveV11EnergyRecord, saveV11ExternalSupplyRecord } from '../src/mocks/dataManagementV11Store';
 import { buildFlowAnalysisDataset } from '../src/mocks/energyFlowSelector';
-import { buildEnergyQueryDataset } from '../src/mocks/energyQuerySelector';
 
 describe('energy flow phase-one data contract', () => {
   beforeEach(() => {
@@ -66,7 +65,7 @@ describe('energy flow phase-one data contract', () => {
   it('maps monthly boiler and waste-heat conversions into the flow view', () => {
     const result = buildFlowAnalysisDataset({ year: 2026, grain: 'month', month: 6 }, 'level1');
     const conversionNames = result.nodes
-      .filter((node) => node.stage === 'conversion')
+      .filter((node) => node.stage === 'conversion' || node.stage === 'recovery')
       .map((node) => node.name);
 
     expect(conversionNames).toEqual(expect.arrayContaining(['锅炉系统', '余热发电机组', '余热回收利用系统']));
@@ -85,8 +84,14 @@ describe('energy flow phase-one data contract', () => {
     const result = buildFlowAnalysisDataset({ year: 2026, grain: 'month', month: 6 }, 'level1');
     const recovery = result.nodes.find((node) => node.nodeId === 'input:v11-energy-waste-heat');
 
-    expect(recovery?.name).toBe('内部回收·余热');
-    expect(recovery?.nodeType).toBe('内部回收能源');
+    expect(recovery).toBeUndefined();
+    const recoverySystem = result.nodes.find((node) => node.name === '余热回收利用系统');
+    expect(recoverySystem?.stage).toBe('recovery');
+    expect(recoverySystem?.nodeType).toBe('能源回收与循环利用');
+    expect(recoverySystem?.sourceLabel).toContain('生产车间B');
+    expect(result.links.some((link) => link.targetNodeId === recoverySystem?.nodeId && link.flowType === 'recovery_input' && link.sourceNodeId.startsWith('distribution:'))).toBe(true);
+    expect(result.nodes.filter((node) => node.stage === 'medium').map((node) => node.name)).toContain('锅炉蒸汽');
+    expect(result.nodes.filter((node) => node.stage === 'medium').map((node) => node.name)).toContain('回收蒸汽');
   });
   it('rejects conversion external supply that exceeds the output ledger', () => {
     const result = saveV11ExternalSupplyRecord({
@@ -113,9 +118,20 @@ describe('energy flow phase-one data contract', () => {
   it('closes compressed-air allocation through an electricity conversion source', () => {
     const result = buildFlowAnalysisDataset({ year: 2026, grain: 'month', month: 6 }, 'level1');
 
-    expect(result.nodes.some((node) => node.stage === 'conversion' && node.name === '空压系统')).toBe(true);
+    expect(result.nodes.find((node) => node.stage === 'conversion' && node.name === '空压系统')?.sourceLabel).toContain('1#、2#螺杆空压机');
     expect(result.dataNotice).not.toContain('压缩空气');
     expect(result.levelOneBalanceRows.find((row) => row.energyTypeId === 'v11-energy-compressed-air')?.overAllocatedAmount).toBe(0);
+  });
+
+  it('includes captive generation and residual-pressure recovery in the correct stages', () => {
+    const result = buildFlowAnalysisDataset({ year: 2026, grain: 'month', month: 6 }, 'level1');
+    const captivePower = result.nodes.find((node) => node.name === '自备发电机组');
+    const pressureRecovery = result.nodes.find((node) => node.name === '余压回收系统');
+
+    expect(captivePower).toMatchObject({ stage: 'conversion', valueLabel: '原煤 → 电力' });
+    expect(pressureRecovery).toMatchObject({ stage: 'recovery', valueLabel: '余压 → 压缩空气', sourceLabel: '来源：动力中心余压' });
+    expect(result.links.some((link) => link.targetNodeId === pressureRecovery?.nodeId && link.flowType === 'recovery_input')).toBe(true);
+    expect(result.links.some((link) => link.sourceNodeId === pressureRecovery?.nodeId && link.flowType === 'recovery_output')).toBe(true);
   });
   it('keeps external supply as an independent ledger linked to conversion output', () => {
     const conversionOutputId = 'v11-output-200';
@@ -133,27 +149,31 @@ describe('energy flow phase-one data contract', () => {
     if (!saved.ok) expect(saved.error).toContain('扣除内部使用和损失后的可外供量');
   });
 
-  it('keeps annual energy query and flow boundary input on the same reported-period cutoff', () => {
+  it('uses the full annual consumption ledger for flow boundary input', () => {
     for (const year of [2026, 2025]) {
-      const query = buildEnergyQueryDataset({ year, period: 'year', month: 12 });
+      const types = listV11EnergyTypes(year);
+      const annualInput = listV11EnergyRecords().filter(record => record.year === year && record.energyRole === '能源消费' && v11RecordScopeType(record) === 'enterprise').reduce((total, record) => {
+        const type = types.find(item => item.energyTypeId === record.energyTypeId)!;
+        return total + v11EnergyRecordAnnualAmount(record) * type.standardCoalFactor / (type.standardCoalFactorUnit.startsWith('kgce') ? 1000 : 1);
+      }, 0);
       const flow = buildFlowAnalysisDataset({ year, grain: 'year', month: 6 }, 'level1');
       const flowBoundaryInput = flow.levelOneBalanceRows.reduce(
         (total, row) => total + row.externalInputStandardAmount,
         0,
       );
 
-      expect(flowBoundaryInput).toBeCloseTo(query.total, 8);
+      expect(flowBoundaryInput).toBeCloseTo(annualInput, 8);
     }
   });
 
   it('keeps historical conversion outputs linked to historical energy records', () => {
     const historicalConversions = listV11ConversionOutputs().filter((item) => item.year === 2025);
-    expect(historicalConversions).toHaveLength(3);
-    expect(historicalConversions.every((item) => item.inputEnergyRecordId?.endsWith('-2025'))).toBe(true);
+    expect(historicalConversions).toHaveLength(5);
+    expect(historicalConversions.filter((item) => item.inputEnergyRecordId).every((item) => item.inputEnergyRecordId?.endsWith('-2025'))).toBe(true);
 
     const flow = buildFlowAnalysisDataset({ year: 2025, grain: 'year', month: 6 }, 'level1');
-    expect(flow.nodes.filter((node) => node.stage === 'conversion').map((node) => node.name))
-      .toEqual(expect.arrayContaining(['锅炉系统', '余热发电机组', '余热回收利用系统']));
+    expect(flow.nodes.filter((node) => node.stage === 'conversion' || node.stage === 'recovery').map((node) => node.name))
+      .toEqual(expect.arrayContaining(['锅炉系统', '自备发电机组', '余热发电机组', '余热回收利用系统', '余压回收系统']));
   });
 
   it('renders direct enterprise external supply as a flow edge from the energy medium', () => {
@@ -255,7 +275,7 @@ describe('energy flow phase-one data contract', () => {
     expect(result.internalAvailableStandardCoalAmount).toBeCloseTo(sum(result.levelOneBalanceRows.map(
       (row) => row.availableStandardAmount,
     )), 8);
-    expect(result.internalAvailableStandardCoalAmount).toBeCloseTo(sum(result.nodes
+    expect(result.internalAvailableStandardCoalAmount + sum(result.conversionDifferenceRows.map((row) => row.externalOutputStandardAmount))).toBeCloseTo(sum(result.nodes
       .filter((node) => node.stage === 'medium')
       .map((node) => node.standardCoalAmount)), 8);
     expect(result.utilizationStandardCoalAmount).toBeCloseTo(sum(result.levelOneBalanceRows.map(
@@ -281,7 +301,10 @@ describe('energy flow phase-one data contract', () => {
       const mediumNodeId = `medium:${row.energyTypeId}`;
       const medium = result.nodes.find((node) => node.nodeId === mediumNodeId);
       if (!medium) return;
-      expect(medium.standardCoalAmount).toBeCloseTo(row.availableStandardAmount, 8);
+      const conversionExternal = result.conversionDifferenceRows
+        .filter((item) => item.outputEnergyTypeName === row.energyTypeName)
+        .reduce((total, item) => total + item.externalOutputStandardAmount, 0);
+      expect(medium.standardCoalAmount).toBeCloseTo(row.availableStandardAmount + conversionExternal, 8);
       expect(sum(result.links
         .filter((link) => link.sourceNodeId === mediumNodeId)
         .map((link) => link.standardCoalAmount))).toBeCloseTo(medium.standardCoalAmount, 8);

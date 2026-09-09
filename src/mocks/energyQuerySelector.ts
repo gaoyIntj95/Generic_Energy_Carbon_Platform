@@ -14,8 +14,8 @@ const IOT_DAILY_ENERGY_TYPE_IDS = new Set(['v11-energy-electricity', 'v11-energy
 export const ENERGY_QUERY_CURRENT_YEAR = ENERGY_ANALYSIS_CURRENT_YEAR;
 export const ENERGY_QUERY_REPORTED_MONTH = ENERGY_ANALYSIS_REPORTED_MONTH;
 
-function standardCoalAmount(amount: number, energyTypeId: string) {
-  const type = listV11EnergyTypes().find((item) => item.energyTypeId === energyTypeId);
+function standardCoalAmount(amount: number, energyTypeId: string, year = 2026) {
+  const type = listV11EnergyTypes(year).find((item) => item.energyTypeId === energyTypeId);
   if (!type) return 0;
   const converted = amount * type.standardCoalFactor;
   return type.standardCoalFactorUnit.startsWith('kgce') ? converted / 1000 : converted;
@@ -29,8 +29,8 @@ function amountAt(record: ReturnType<typeof listV11EnergyRecords>[number], perio
 
 function datasetForPeriod(year: number, period: 'month' | 'year', month: number, energyUnitId?: string) {
   const effectiveMonth = period === 'year' ? effectiveAnalysisMonth(year, month) : month;
-  const types = listV11EnergyTypes();
-  const units = listEnergyUnits();
+  const types = listV11EnergyTypes(year);
+  const units = listEnergyUnits(year);
   const records = listV11EnergyRecords().filter((record) => (
     record.year === year
     && record.energyRole === ENERGY_CONSUMPTION_ROLE
@@ -39,7 +39,7 @@ function datasetForPeriod(year: number, period: 'month' | 'year', month: number,
       ? record.energyUnitId === energyUnitId
       : v11RecordScopeType(record) === 'enterprise')
   ));
-  const total = records.reduce((sum, record) => sum + standardCoalAmount(amountAt(record, period, effectiveMonth), record.energyTypeId), 0);
+  const total = records.reduce((sum, record) => sum + standardCoalAmount(amountAt(record, period, effectiveMonth), record.energyTypeId, year), 0);
   const grouped = new Map<string, { amount: number; standardCoal: number; unitName: string }>();
   records.forEach((record) => {
     const type = types.find((item) => item.energyTypeId === record.energyTypeId);
@@ -48,7 +48,7 @@ function datasetForPeriod(year: number, period: 'month' | 'year', month: number,
     const item = grouped.get(key) ?? { amount: 0, standardCoal: 0, unitName: units.find((unit) => unit.energyUnitId === record.energyUnitId)?.energyUnitName ?? '全企业' };
     const amount = amountAt(record, period, effectiveMonth);
     item.amount += amount;
-    item.standardCoal += standardCoalAmount(amount, record.energyTypeId);
+    item.standardCoal += standardCoalAmount(amount, record.energyTypeId, year);
     grouped.set(key, item);
   });
   const rows: EnergyQueryRow[] = [...grouped.entries()].map(([key, item]) => {
@@ -132,6 +132,6 @@ export function getEnergyQueryMonthlyAmounts(row: EnergyQueryRow) {
   const monthCount = year === ENERGY_QUERY_CURRENT_YEAR ? ENERGY_QUERY_REPORTED_MONTH : 12;
   return {
     physical: records.reduce((months, record) => months.map((value, index) => value + (record.monthlyAmounts[index] ?? 0)), Array(monthCount).fill(0) as number[]),
-    standardCoal: records.reduce((months, record) => months.map((value, index) => value + standardCoalAmount(record.monthlyAmounts[index] ?? 0, record.energyTypeId)), Array(monthCount).fill(0) as number[]),
+    standardCoal: records.reduce((months, record) => months.map((value, index) => value + standardCoalAmount(record.monthlyAmounts[index] ?? 0, record.energyTypeId, year)), Array(monthCount).fill(0) as number[]),
   };
 }

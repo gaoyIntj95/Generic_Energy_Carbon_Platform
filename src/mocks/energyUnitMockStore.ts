@@ -1,3 +1,5 @@
+import { listV11EnergyRecords, listV11OperationMetrics, listV11KeyDevices, listV11ConversionOutputs } from './dataManagementV11Store';
+import { createAnnualStore } from './annualData';
 import type {
   EnergyUnit,
   EnergyUnitLevel,
@@ -129,6 +131,17 @@ const seedEnergyUnits: EnergyUnit[] = [
     remark: '',
   },
   {
+    energyUnitId: 'eu-captive-power',
+    organizationId: DEMO_ORGANIZATION_ID,
+    energyUnitName: '自备发电机组',
+    conversionScenarios: ['其他转换'],
+    parentEnergyUnitId: 'eu-utilities',
+    unitLevel: 'level2',
+    unitType: '公辅系统',
+    displayOrder: 22,
+    remark: '企业自备燃料发电设施。',
+  },
+  {
     energyUnitId: 'eu-waste-heat-utilization',
     organizationId: DEMO_ORGANIZATION_ID,
     energyUnitName: '余热回收利用系统',
@@ -138,6 +151,17 @@ const seedEnergyUnits: EnergyUnit[] = [
     unitType: '公辅系统',
     displayOrder: 25,
     remark: '回收余热后直接产生或补充蒸汽、热水等能源，不含余热发电。',
+  },
+  {
+    energyUnitId: 'eu-pressure-recovery',
+    organizationId: DEMO_ORGANIZATION_ID,
+    energyUnitName: '余压回收系统',
+    conversionScenarios: ['回收利用'],
+    parentEnergyUnitId: 'eu-utilities',
+    unitLevel: 'level2',
+    unitType: '公辅系统',
+    displayOrder: 27,
+    remark: '回收动力中心生产过程产生的余压并转换为可利用能源。',
   },
   {
     energyUnitId: 'eu-gas-boiler',
@@ -182,7 +206,7 @@ const seedEnergyUnits: EnergyUnit[] = [
   },
 ];
 
-let energyUnits = cloneUnits(seedEnergyUnits);
+const annualUnits = createAnnualStore(seedEnergyUnits);
 let nextMockId = 100;
 
 function cloneUnits(units: EnergyUnit[]): EnergyUnit[] {
@@ -197,7 +221,9 @@ function isDuplicateName(
   name: string,
   parentEnergyUnitId: string | null,
   excludeEnergyUnitId?: string,
+  year = 2026,
 ) {
+  const energyUnits = annualUnits.get(year);
   const normalized = normalizeName(name);
   return energyUnits.some(
     (unit) =>
@@ -219,14 +245,16 @@ function makeId() {
   return id;
 }
 
-function nextDisplayOrder(parentEnergyUnitId: string | null) {
+function nextDisplayOrder(parentEnergyUnitId: string | null, year = 2026) {
+  const energyUnits = annualUnits.get(year);
   const siblingOrders = energyUnits
     .filter((unit) => unit.parentEnergyUnitId === parentEnergyUnitId)
     .map((unit) => unit.displayOrder);
   return (siblingOrders.length ? Math.max(...siblingOrders) : 0) + 10;
 }
 
-export function listEnergyUnits() {
+export function listEnergyUnits(year = 2026) {
+  const energyUnits = annualUnits.get(year);
   return cloneUnits(energyUnits).sort((left, right) => {
     const parent = String(left.parentEnergyUnitId ?? '').localeCompare(String(right.parentEnergyUnitId ?? ''), 'zh-CN');
     if (parent) return parent;
@@ -234,13 +262,15 @@ export function listEnergyUnits() {
   });
 }
 
-export function getEnergyUnit(energyUnitId: string) {
+export function getEnergyUnit(energyUnitId: string, year = 2026) {
+  const energyUnits = annualUnits.get(year);
   const unit = energyUnits.find((item) => item.energyUnitId === energyUnitId);
   return unit ? { ...unit } : undefined;
 }
 
-export function createEnergyUnit(input: EnergyUnitWriteInput): EnergyUnitMutationResult {
-  if (isDuplicateName(input.energyUnitName, null)) return { ok: false, error: 'duplicateName' };
+export function createEnergyUnit(input: EnergyUnitWriteInput, year = 2026): EnergyUnitMutationResult {
+  const energyUnits = annualUnits.get(year);
+  if (isDuplicateName(input.energyUnitName, null, undefined, year)) return { ok: false, error: 'duplicateName' };
 
   const unit: EnergyUnit = {
     energyUnitId: makeId(),
@@ -249,7 +279,7 @@ export function createEnergyUnit(input: EnergyUnitWriteInput): EnergyUnitMutatio
     parentEnergyUnitId: null,
     unitLevel: 'level1',
     unitType: input.unitType,
-    displayOrder: nextDisplayOrder(null),
+    displayOrder: nextDisplayOrder(null, year),
     remark: input.remark?.trim() ?? '',
     conversionScenarios: input.conversionScenarios ? [...input.conversionScenarios] : undefined,
   };
@@ -260,13 +290,15 @@ export function createEnergyUnit(input: EnergyUnitWriteInput): EnergyUnitMutatio
 export function addChildEnergyUnit(
   parentEnergyUnitId: string,
   input: EnergyUnitWriteInput,
+  year = 2026,
 ): EnergyUnitMutationResult {
+  const energyUnits = annualUnits.get(year);
   const parent = energyUnits.find((item) => item.energyUnitId === parentEnergyUnitId);
   if (!parent) return { ok: false, error: 'notFound' };
 
   const unitLevel = nextLevel(parent.unitLevel);
   if (!unitLevel) return { ok: false, error: 'maxLevel' };
-  if (isDuplicateName(input.energyUnitName, parentEnergyUnitId)) {
+  if (isDuplicateName(input.energyUnitName, parentEnergyUnitId, undefined, year)) {
     return { ok: false, error: 'duplicateName' };
   }
 
@@ -277,7 +309,7 @@ export function addChildEnergyUnit(
     parentEnergyUnitId,
     unitLevel,
     unitType: input.unitType,
-    displayOrder: nextDisplayOrder(parentEnergyUnitId),
+    displayOrder: nextDisplayOrder(parentEnergyUnitId, year),
     remark: input.remark?.trim() ?? '',
     conversionScenarios: input.conversionScenarios ? [...input.conversionScenarios] : undefined,
   };
@@ -288,10 +320,12 @@ export function addChildEnergyUnit(
 export function updateEnergyUnit(
   energyUnitId: string,
   input: EnergyUnitWriteInput,
+  year = 2026,
 ): EnergyUnitMutationResult {
+  const energyUnits = annualUnits.get(year);
   const unit = energyUnits.find((item) => item.energyUnitId === energyUnitId);
   if (!unit) return { ok: false, error: 'notFound' };
-  if (isDuplicateName(input.energyUnitName, unit.parentEnergyUnitId, energyUnitId)) {
+  if (isDuplicateName(input.energyUnitName, unit.parentEnergyUnitId, energyUnitId, year)) {
     return { ok: false, error: 'duplicateName' };
   }
 
@@ -307,7 +341,9 @@ export function updateEnergyUnit(
 export function reorderEnergyUnits(
   parentEnergyUnitId: string | null,
   orderedEnergyUnitIds: string[],
+  year = 2026,
 ): EnergyUnitMutationResult {
+  const energyUnits = annualUnits.get(year);
   const siblings = energyUnits.filter((unit) => unit.parentEnergyUnitId === parentEnergyUnitId);
   const siblingIds = new Set(siblings.map((unit) => unit.energyUnitId));
   const valid = orderedEnergyUnitIds.length === siblings.length
@@ -322,36 +358,38 @@ export function reorderEnergyUnits(
   return { ok: true };
 }
 
-export function inspectEnergyUnitDeletion(energyUnitId: string): EnergyUnitReferenceSummary {
+export function inspectEnergyUnitDeletion(energyUnitId: string, year = 2026): EnergyUnitReferenceSummary {
+  const energyUnits = annualUnits.get(year);
   return {
     childCount: energyUnits.filter((unit) => unit.parentEnergyUnitId === energyUnitId).length,
-    energyRecordCount: listEnergyActivityRecords().filter(
-      (record) => record.energyUnitId === energyUnitId,
+    energyRecordCount: listV11EnergyRecords().filter((record) => record.year === year && record.energyUnitId === energyUnitId).length + listEnergyActivityRecords().filter(
+      (record) => record.year === year && record.energyUnitId === energyUnitId,
     ).length,
-    operationRecordCount: listOperationMetrics().filter(
-      (record) => record.energyUnitId === energyUnitId,
+    operationRecordCount: listV11OperationMetrics().filter((record) => record.year === year && record.energyUnitId === energyUnitId).length + listOperationMetrics().filter(
+      (record) => record.year === year && record.energyUnitId === energyUnitId,
     ).length,
-    deviceCount: listKeyDevices().filter((device) => device.energyUnitId === energyUnitId).length,
-    conversionRelationCount: listEnergyConversionRelations().filter(
+    deviceCount: listV11KeyDevices(year).filter((device) => device.energyUnitId === energyUnitId).length + (year === 2026 ? listKeyDevices() : []).filter((device) => device.energyUnitId === energyUnitId).length,
+    conversionRelationCount: listV11ConversionOutputs().filter((record) => record.year === year && [record.conversionEnergyUnitId, record.recoverySourceEnergyUnitId, record.outputTargetEnergyUnitId].includes(energyUnitId)).length + (year === 2026 ? listEnergyConversionRelations() : []).filter(
       (relation) => relation.conversionEnergyUnitId === energyUnitId,
     ).length,
   };
 }
 
-export function deleteEnergyUnit(energyUnitId: string): EnergyUnitMutationResult {
+export function deleteEnergyUnit(energyUnitId: string, year = 2026): EnergyUnitMutationResult {
+  const energyUnits = annualUnits.get(year);
   const unit = energyUnits.find((item) => item.energyUnitId === energyUnitId);
   if (!unit) return { ok: false, error: 'notFound' };
 
-  const references = inspectEnergyUnitDeletion(energyUnitId);
+  const references = inspectEnergyUnitDeletion(energyUnitId, year);
   if (Object.values(references).some((count) => count > 0)) {
     return { ok: false, error: 'referenced', references };
   }
 
-  energyUnits = energyUnits.filter((item) => item.energyUnitId !== energyUnitId);
+  energyUnits.splice(energyUnits.findIndex((item) => item.energyUnitId === energyUnitId), 1);
   return { ok: true, unit: { ...unit } };
 }
 
 export function resetEnergyUnitMockStore() {
-  energyUnits = cloneUnits(seedEnergyUnits);
+  annualUnits.reset();
   nextMockId = 100;
 }

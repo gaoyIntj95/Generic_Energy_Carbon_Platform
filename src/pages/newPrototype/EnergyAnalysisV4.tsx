@@ -40,9 +40,12 @@ import {
 } from '../../mocks/deviceIntensityParameterStore';
 import {
   buildFlowAnalysisDataset,
+  selectFlowRelations,
+  buildFlowViewTables,
+  type FlowNodeBalanceRow,
   type FlowAnalysisDataset,
-  type FlowDetailRow as ClosedLoopFlowDetailRow,
 } from '../../mocks/energyFlowSelector';
+import { balanceSourceColumns, balanceUseColumns, buildEnergyBalanceTable, energyBalanceCsvRows, formatBalanceAmount, roundedBalanceAmount } from './energyBalanceTable';
 import styles from './EnergyAnalysisV4.module.css';
 
 type DialogState = {
@@ -645,7 +648,7 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
         </select></label>
         <label className={styles.modalField}><span>指标名称</span><input aria-label="指标名称" value={metricName} readOnly /></label>
         <label className={styles.modalField}><span className={styles.required}>能源消耗</span><select aria-label="能源消耗" defaultValue={energyTypeId} onChange={(event) => { energyTypeId = event.target.value; syncResultUnit(); }}><option value="v11-energy-electricity">电力</option><option value="v11-energy-natural-gas">天然气折标综合能耗</option></select></label>
-        <div className={styles.modalNote}>设备产出统一在设备产出数据中维护，能源类产出同时供设备指标和能流分析引用。</div>
+        <div className={styles.modalNote}>设备产出用于设备能耗指标；能流分析使用能源转换与外供中独立维护的用能单元产出。</div>
         <label className={styles.modalField}><span className={styles.required}>产出口径</span><input aria-label="产出口径" value={denominatorName} readOnly /></label>
         <label className={styles.modalField}><span>产出计量单位（数据录入时维护）</span><input aria-label="分母单位" value={denominatorUnit} readOnly /></label>
         <label className={styles.modalField}><span>分母指标编码（选填）</span><input aria-label="分母指标编码" defaultValue={denominatorMetricCode} placeholder="例如：steam_output" onChange={(event) => { denominatorMetricCode = event.target.value; }} /></label>
@@ -693,7 +696,7 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
       : source === 'operation-data'
         ? '设备产出数据'
       : source === 'energy-conversion'
-          ? '能源转换与流向'
+          ? '能源转换与外供'
           : undefined;
     setDialog({
       title: '设备指标详情',
@@ -1905,48 +1908,21 @@ function benchmarkLineSvg(row: BenchmarkMetric, grain: 'month' | 'quarter' | 'ye
   return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-label="指标趋势图">${grid}${targetGraphic}${values.length > 1 ? `<polyline points="${points}" fill="none" stroke="#1677FF" stroke-width="2.2" stroke-dasharray="7 5"/>` : ''}${values.map((value, index) => `<circle cx="${x(index)}" cy="${y(value)}" r="4" fill="#fff" stroke="#1677FF" stroke-width="1.7"/><text x="${x(index)}" y="${y(value) - 10}" text-anchor="middle" font-size="10" fill="#365A7A">${format(value, metricDigits(value))}</text><text x="${x(index)}" y="${height - 15}" text-anchor="middle" font-size="10" fill="#667085">${labels[index]}</text>`).join('')}</svg>`;
 }
 
-type FlowTab = 'diagram' | 'balance' | 'detail';
+type FlowTab = 'diagram' | 'balance';
 type FlowHoverState = { nodeId: string; x: number; y: number } | null;
 
-function exportEnergyBalance(data: FlowAnalysisDataset) {
-  const escapeCsv = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
-  const value = (amount: number) => amount ? format(amount, amount < 10 ? 2 : 1) : '—';
-  const rows = data.levelOneBalanceRows;
-  const incomeRows = [
-    ['一、收入项'],
-    ['1. 外购能源', ...rows.map((row) => value(row.externalInputStandardAmount))],
-    ['2. 自产/回收能源', ...rows.map((row) => value(row.internalRecoveryStandardAmount + row.conversionOutputStandardAmount))],
-    ['收入合计', ...rows.map((row) => value(row.externalInputStandardAmount + row.internalRecoveryStandardAmount + row.conversionOutputStandardAmount))],
-  ];
-  const expenseRows = [
-    ['二、支出项'],
-    ['3. 能源转换投入', ...rows.map((row) => value(row.conversionInputStandardAmount))],
-    ['4. 各用能单元消耗', ...rows.map((row) => value(row.distributionStandardAmount))],
-    ['5. 对外输出', ...rows.map((row) => value(row.externalOutputStandardAmount))],
-    ['6. 已确认转换损失', ...rows.map((row) => value(row.confirmedConversionLossStandardAmount))],
-    ['7. 未分配量', ...rows.map((row) => value(row.unallocatedStandardAmount))],
-    ['支出合计', ...rows.map((row) => value(
-      row.conversionInputStandardAmount + row.distributionStandardAmount + row.externalOutputStandardAmount
-      + row.confirmedConversionLossStandardAmount + row.unallocatedStandardAmount,
-    ))],
-    ['超分配量（核对异常）', ...rows.map((row) => value(row.overAllocatedStandardAmount))],
-    ['三、平衡差', ...rows.map((row) => value(
-      row.externalInputStandardAmount + row.internalRecoveryStandardAmount + row.conversionOutputStandardAmount
-      + row.overAllocatedStandardAmount - row.conversionInputStandardAmount - row.distributionStandardAmount
-      - row.externalOutputStandardAmount - row.confirmedConversionLossStandardAmount - row.unallocatedStandardAmount,
-    ))],
-  ];
-  const header = ['项目', ...rows.map((row) => `${row.energyTypeName}（tce）`), '合计（tce）'];
-  const addTotals = (row: (string | number)[]) => [...row, value(row.slice(1).reduce<number>((total, amount) => total + (Number(String(amount).replace(/,/g, '')) || 0), 0))];
-  const csv = [header, ...incomeRows.map(addTotals), ...expenseRows.map(addTotals)]
-    .map((row) => row.map(escapeCsv).join(','))
-    .join('\r\n');
+function downloadFlowCsv(filename: string, rows: (string | number)[][]) {
+  const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\r\n');
   const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = `能源平衡表_${data.viewName}.csv`;
+  anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+function exportEnergyBalance(data: FlowAnalysisDataset, scopeLabel: string) {
+  downloadFlowCsv(`能源平衡表_${scopeLabel}.csv`, energyBalanceCsvRows(data.levelOneBalanceRows, scopeLabel));
 }
 
 function FlowAnalysisPage() {
@@ -1968,8 +1944,6 @@ function FlowAnalysisPage() {
   const [tab, setTab] = useState<FlowTab>('diagram');
   const [selectedNode, setSelectedNode] = useState('');
   const [hoveredNode, setHoveredNode] = useState<FlowHoverState>(null);
-  const [traceRow, setTraceRow] = useState<ClosedLoopFlowDetailRow | null>(null);
-  const [detailInitialStage, setDetailInitialStage] = useState('');
   const { toast, notify } = useFeedback();
   const data = useMemo(
     () => buildFlowAnalysisDataset(
@@ -1978,10 +1952,17 @@ function FlowAnalysisPage() {
     ),
     [applied],
   );
+  const overviewFlow = useMemo(() => selectFlowRelations(data), [data]);
+  const focusedFlow = useMemo(() => selectFlowRelations(data, selectedNode), [data, selectedNode]);
   const selectedNodeData = data.nodes.find((node) => node.nodeId === selectedNode) ?? null;
+  const scopedTables = useMemo(() => buildFlowViewTables(data, focusedFlow), [data, focusedFlow]);
+  const isScoped = Boolean(selectedNodeData);
+  const scopeLabel = selectedNodeData ? selectedNodeData.name + '关联链路' : '全厂';
+  const periodScope = `${applied.year}年${applied.grain === 'month' ? applied.month + '月' : '度'}｜${scopeLabel}`;
   const hoveredNodeData = data.nodes.find((node) => node.nodeId === hoveredNode?.nodeId) ?? null;
 
   const handleSankeyClick = (event: MouseEvent<HTMLDivElement>) => {
+    setHoveredNode(null);
     const node = (event.target as Element).closest<SVGGElement>('g[data-key]');
     if (!node) {
       setSelectedNode('');
@@ -2032,7 +2013,6 @@ function FlowAnalysisPage() {
             month: Number(draftMonth),
           });
           setSelectedNode('');
-          setDetailInitialStage('');
           notify('已按当前期间重新生成全厂能源流向');
         }}>查询</EnergyButton>
         <EnergyButton onClick={() => {
@@ -2042,7 +2022,6 @@ function FlowAnalysisPage() {
           setApplied({ year: 2026, grain: 'month', month: 6 });
           setTab('diagram');
           setSelectedNode('');
-          setDetailInitialStage('');
           notify('筛选条件已重置');
         }}>重置</EnergyButton>
       </section>
@@ -2079,7 +2058,12 @@ function FlowAnalysisPage() {
           <div>
             <button type="button" className={tab === 'diagram' ? styles.active : ''} onClick={() => setTab('diagram')}>能流图</button>
             <button type="button" className={tab === 'balance' ? styles.active : ''} onClick={() => setTab('balance')}>能源平衡表</button>
-            <button type="button" className={tab === 'detail' ? styles.active : ''} onClick={() => setTab('detail')}>流向明细</button>
+          </div>
+          <div className={styles.flowHeadActions}>
+            {selectedNodeData ? <>
+              <span className={styles.flowScopeLabel}>已选：<strong>{selectedNodeData.name}</strong></span>
+              <button type="button" className={styles.link} onClick={() => { setSelectedNode(''); setHoveredNode(null); }}>清除选择</button>
+            </> : <span className={styles.flowScopeLabel}>点击节点查看相关流向</span>}
           </div>
         </div>
 
@@ -2089,8 +2073,10 @@ function FlowAnalysisPage() {
               <span><i style={{ background: '#1677FF' }} />企业边界输入</span>
               <span><i style={{ background: '#F79009' }} />能源转换</span>
               <span><i style={{ background: '#00A870' }} />厂内可供分配能源</span>
-              <span><i style={{ background: '#23A35A' }} />一级用能单元</span>
-              <span><i style={{ background: '#7A5AF8' }} />外部输出</span>
+              <span><i style={{ background: '#00AD83' }} />一级用能单元</span>
+              <span><i style={{ background: '#F9AB00' }} />能源回收与循环利用</span>
+              <span><i style={{ border: '2px dashed #00A870', background: 'transparent' }} />回收能源回流</span>
+              {overviewFlow.nodes.some((node) => node.stage === 'external') && <span><i style={{ background: '#8547FF' }} />企业边界输出</span>}
               <span><i style={{ background: '#98A2B3' }} />未分配</span>
             </div>
             {data.dataNotice && (
@@ -2105,7 +2091,7 @@ function FlowAnalysisPage() {
               onMouseLeave={() => setHoveredNode(null)}
             >
               {data.nodes.length > 0
-                ? <div dangerouslySetInnerHTML={{ __html: closedLoopFlowSankeySvg(data, selectedNode) }} />
+                ? <div dangerouslySetInnerHTML={{ __html: closedLoopFlowSankeySvg({ ...data, ...overviewFlow }, selectedNode, focusedFlow) }} />
                 : (
                   <div className={styles.emptyState}>
                     <strong>暂无可展示的能源流向</strong>
@@ -2117,19 +2103,13 @@ function FlowAnalysisPage() {
                   <strong>{hoveredNodeData.name}</strong>
                   <span>{hoveredNodeData.nodeType}</span>
                   <span>{hoveredNodeData.valueLabel}</span>
+                  {hoveredNodeData.sourceLabel && <span>{hoveredNodeData.sourceLabel}</span>}
                   {hoveredNodeData.detailLabel && <span>{hoveredNodeData.detailLabel}</span>}
                   {hoveredNodeData.detailLabelSecondary && <span>{hoveredNodeData.detailLabelSecondary}</span>}
-                  <span>占当前去向 {format(hoveredNodeData.share, 1)}%</span>
+                  <span>占全厂当前去向 {format(hoveredNodeData.share, 1)}%</span>
                 </div>
               )}
             </div>
-            {selectedNodeData && (
-              <div className={styles.flowSelectionBar}>
-                <span>已选节点：<strong>{selectedNodeData.name}</strong>，相关流向已高亮。</span>
-                <button type="button" className={styles.link} onClick={() => setTab('detail')}>查看流向明细</button>
-                <button type="button" className={styles.link} onClick={() => setSelectedNode('')}>取消选择</button>
-              </div>
-            )}
             <div className={`${styles.flowMethodNote} ${styles.flowDiagramNote}`}>
               <div className={styles.flowReadingHeader}>
                 <div className={styles.flowNoteTitle}>能流口径说明</div>
@@ -2149,38 +2129,25 @@ function FlowAnalysisPage() {
                   <code>外部输入 + 内部回收 + 转换产出 = 转换投入 + 一级分配 + 外部输出 + 已确认转换损失 + 未分配</code>
                 </div>
                 <div className={styles.flowCalculationText}>
-                  厂内可供分配能源 = 外部输入 + 内部回收 − 转换投入 + 转换产出（厂内使用部分）；未分配能源 = 可供分配能源 − 一级分配 − 直接外供。转换后直接外供的能源从转换节点流向企业外部，不进入“厂内可供分配能源”节点；超分配能源 = 一级分配 + 直接外供 − 可供分配能源。平衡表中的“已确认转换损失”来自转换记录的产出去向，转换折标差额仅用于分析投入与产出的折标差异；未分配和超分配均不代表物理损失。
+                  图中厂内可供分配能源展示外供前可供量，包含厂内净可供量及转换外供量；外供从能源池以紫色支线展示。未分配能源 = 可供分配能源 − 一级分配 − 外部输出，由系统根据平衡关系计算；去向超过可供量时显示超分配。平衡表按能源品种列示完整转换产出与外部输出，核对来源、已登记去向和收支差额。回收能源沿底部虚线返回能源池，带回收标识的节点包含回收产出，同品种能源合并展示，不重复计入企业边界输入。平衡表中的“已确认转换损失”来自转换记录的产出去向，转换折标差额仅用于分析投入与产出的折标差异；未分配和超分配均不代表物理损失。
                 </div>
               </details>
-              <div className={styles.flowNoteFooter}>单位：tce；具体能源品种、来源记录和去向记录，请查看“能源平衡表”和“流向明细”。</div>
+              <div className={styles.flowNoteFooter}>单位：tce。卡片展示节点本期总量，连线展示对应关系的登记量；能源池汇总不代表设备与车间之间的专属供能。点击节点在原图突出关联流向；能源平衡表按所选链路联动，顶部指标为全厂汇总。</div>
             </div>
           </>
         )}
-        {tab === 'balance' && (
+        {tab === 'balance' && (isScoped ? (
+          <FocusedFlowBalanceTable rows={scopedTables.balanceRows} scopeLabel={periodScope} />
+        ) : (
           <ClosedLoopBalanceTable
             data={data}
             onExport={() => {
-              exportEnergyBalance(data);
+              exportEnergyBalance(data, periodScope);
               notify('能源平衡表已导出');
             }}
-            showUnallocated={() => {
-              setDetailInitialStage('未分配');
-              setTab('detail');
-            }}
           />
-        )}
-        {tab === 'detail' && (
-          <ClosedLoopFlowDetailTable
-            key={`${data.viewName}:${detailInitialStage}:${selectedNode}`}
-            data={data}
-            notify={notify}
-            open={setTraceRow}
-            initialStage={detailInitialStage}
-            selectedNodeId={selectedNode}
-          />
-        )}
+        ))}
       </section>
-      <FlowTraceDrawer row={traceRow} close={() => setTraceRow(null)} />
       <EnergyToast message={toast} />
     </div>
   );
@@ -2215,13 +2182,37 @@ function ClosedLoopFlowStat({
   );
 }
 
+function FocusedFlowBalanceTable({ rows, scopeLabel }: { rows: FlowNodeBalanceRow[]; scopeLabel: string }) {
+  const value = (amount: number | null) => amount === null ? '—' : formatBalanceAmount(amount);
+  return <div className={styles.balanceCard}>
+    <div className={styles.balanceHead}>
+      <div>
+        <div className={styles.chartTitle}>能源平衡表｜{scopeLabel}</div>
+        <div className={styles.balanceCaption}>按当前链路逐节点核对，单位：tce。流入、流出只统计图中显示的连线。</div>
+      </div>
+      <EnergyButton onClick={() => downloadFlowCsv(`能源平衡表_${scopeLabel}.csv`, [
+        ['范围', scopeLabel], ['节点', '节点类型', '本视图流入（tce）', '本视图流出（tce）', '折标差额（tce）', '核对说明'],
+        ...rows.map((row) => [row.name, row.nodeType, row.incoming, row.outgoing, row.difference ?? '—', row.note]),
+      ])}>⇩ 导出能源平衡表</EnergyButton>
+    </div>
+    <div className={styles.tableWrap}>
+      <table className={styles.flowDetailTable} aria-label="当前链路能源平衡表">
+        <thead><tr><th>节点</th><th>节点类型</th><th>本视图流入（tce）</th><th>本视图流出（tce）</th><th>折标差额（tce）</th><th>核对说明</th></tr></thead>
+        <tbody>{rows.map((row) => <tr key={row.nodeId}>
+          <td>{row.name}</td><td>{row.nodeType}</td><td>{value(row.incoming)}</td><td>{value(row.outgoing)}</td><td>{value(row.difference)}</td><td>{row.note}</td>
+        </tr>)}</tbody>
+      </table>
+    </div>
+    {rows.length === 0 && <div className={styles.emptyState}>当前范围暂无能源流向</div>}
+    <div className={styles.flowMethodNote}>仅在节点收支完整且可比较时显示折标差额。未展开的来源或去向、用能单元及边界节点显示“—”，不据此判定损失或超分配。不同节点之间存在能源传递，不重复累加为企业总量。</div>
+  </div>;
+}
+
 function ClosedLoopBalanceTable({
   data,
-  showUnallocated,
   onExport,
 }: {
   data: FlowAnalysisDataset;
-  showUnallocated: () => void;
   onExport: () => void;
 }) {
   const value = (amount: number) => amount ? format(amount, amount < 10 ? 2 : 1) : '—';
@@ -2239,14 +2230,14 @@ function ClosedLoopBalanceTable({
   };
   if (data.viewLevel === 'level1') {
     return <div className={styles.balanceCard}>
-      <div className={styles.balanceHead}>
+      <div className={`${styles.balanceHead} ${styles.balanceLedgerHeader}`}>
         <div>
           <div className={styles.chartTitle}>能源平衡表</div>
-          <div className={styles.balanceCaption}>参考 GB/T 28751-2012《企业能量平衡表编制方法》；用于平台内部能源收支与分配核对，不等同于正式标准表式。</div>
+          <div className={styles.balanceCaption}>按能源品种核对来源、去向与收支差额</div>
         </div>
-        <EnergyButton onClick={onExport}>⇩ 导出能源平衡表</EnergyButton>
+        <div className={styles.balanceToolbar}><span>单位：吨标准煤（tce）</span><EnergyButton disabled={!data.levelOneBalanceRows.length} onClick={onExport}>⇩ 导出能源平衡表</EnergyButton></div>
       </div>
-          <EnergyBalanceLedger data={data} onUnallocated={showUnallocated} />
+          <EnergyBalanceLedger data={data} />
     </div>;
   }
   return (
@@ -2256,7 +2247,7 @@ function ClosedLoopBalanceTable({
           <div className={styles.chartTitle}>能源平衡表</div>
           <div className={styles.balanceCaption}>
             {(data.viewLevel as string) === 'level1'
-              ? '参考 GB/T 28751-2012《企业能量平衡表编制方法》；用于平台内部能源收支与分配核对，不等同于正式标准表式。'
+              ? '按能源品种逐行核对：从哪里来、用到哪里、还差多少。单位：吨标准煤（tce）。'
               : '按一级分配量和二级利用量核对能源去向；上下级数据仅作层级核对，不重复计入企业总量。'}
           </div>
         </div>
@@ -2280,7 +2271,6 @@ function ClosedLoopBalanceTable({
                   <td>{value(row.confirmedConversionLossStandardAmount)}</td>
                   <td className={row.unallocatedStandardAmount ? styles.up : ''}>
                     {value(row.unallocatedStandardAmount)}
-                    {row.unallocatedStandardAmount > 0 && <button type="button" className={styles.miniLink} onClick={showUnallocated}>查看构成</button>}
                   </td>
                   <td className={row.overAllocatedStandardAmount ? styles.up : ''}>{value(row.overAllocatedStandardAmount)}</td>
                   <td><StatusTag tone={status.tone}>{status.label}</StatusTag></td>
@@ -2304,7 +2294,6 @@ function ClosedLoopBalanceTable({
                   </td>
                   <td className={row.pendingStandardAmount ? styles.up : ''}>
                     {value(row.pendingStandardAmount)}
-                    {row.pendingStandardAmount > 0 && <button type="button" className={styles.miniLink} onClick={showUnallocated}>查看明细</button>}
                   </td>
                   <td><StatusTag tone={status.tone}>{status.label}</StatusTag></td>
                 </tr>
@@ -2322,340 +2311,210 @@ function ClosedLoopBalanceTable({
   );
 }
 
-function EnergyBalanceLedger({
-  data,
-  onUnallocated,
-}: {
-  data: FlowAnalysisDataset;
-  onUnallocated: () => void;
-}) {
-  const rows = data.levelOneBalanceRows;
-  const value = (amount: number) => amount ? format(amount, amount < 10 ? 2 : 1) : '—';
-  const balanceValue = (amount: number) => format(amount, Math.abs(amount) < 10 ? 2 : 1);
-  const incomeRows = [
-    { label: '外部输入', values: rows.map((row) => row.externalInputStandardAmount) },
-    { label: '自产 / 回收能源', values: rows.map((row) => row.internalRecoveryStandardAmount + row.conversionOutputStandardAmount) },
-  ];
-  const expenseRows = [
-    { label: '能源转换投入', values: rows.map((row) => row.conversionInputStandardAmount) },
-    { label: '用能单元消耗', values: rows.map((row) => row.distributionStandardAmount) },
-    { label: '对外输出', values: rows.map((row) => row.externalOutputStandardAmount) },
-    { label: '已确认转换损失', values: rows.map((row) => row.confirmedConversionLossStandardAmount) },
-    { label: '未分配能源', values: rows.map((row) => row.unallocatedStandardAmount) },
-  ];
-  const overAllocatedValues = rows.map((row) => row.overAllocatedStandardAmount);
-  const totals = (items: typeof incomeRows) => rows.map((_, index) => items.reduce((total, item) => total + item.values[index], 0));
-  const incomeTotals = totals(incomeRows);
-  const expenseTotals = totals(expenseRows);
-  const differences = incomeTotals.map((amount, index) => amount + overAllocatedValues[index] - expenseTotals[index]);
-  const grandTotal = (values: number[]) => values.reduce((total, amount) => total + amount, 0);
-  const renderRow = (row: (typeof incomeRows)[number], abnormal = false) => (
-    <tr key={row.label}>
-      <td>{row.label}</td>
-      {row.values.map((amount, index) => <td key={rows[index].energyTypeId} className={abnormal && amount > 0 ? styles.up : ''}>
-        {value(amount)}
-      </td>)}
-      <td className={abnormal && grandTotal(row.values) > 0 ? styles.up : ''}>
-        {value(grandTotal(row.values))}
-      </td>
-    </tr>
+function EnergyBalanceLedger({ data }: { data: FlowAnalysisDataset }) {
+  const { rows, totals, totalStatus } = buildEnergyBalanceTable(data.levelOneBalanceRows);
+  const amountCell = (amount: number) => roundedBalanceAmount(amount) === 0 ? '—' : formatBalanceAmount(amount);
+  const differenceClass = (status: string) => status === '超分配' ? styles.balanceExcess : status === '待分配' || status === '分项待核对' ? styles.balancePending : styles.balanceMatched;
+  const renderDifference = (difference: number, status: string) => (
+    <td className={`${styles.balanceResult} ${differenceClass(status)}`}>
+      <div className={styles.balanceResultContent}><strong>{formatBalanceAmount(difference, true)}</strong><span>{status}</span></div>
+    </td>
   );
-  const unallocatedTotal = grandTotal(expenseRows.find((row) => row.label === '未分配能源')!.values);
-  const overAllocatedTotal = grandTotal(overAllocatedValues);
-  const differenceTotal = grandTotal(differences);
-  const unexplainedDifference = Math.abs(differenceTotal);
-  const hasIssue = unallocatedTotal > 0 || overAllocatedTotal > 0 || unexplainedDifference > 0.01;
+  if (!rows.length) return <div className={styles.emptyState}><strong>暂无可核对的能源数据</strong><span>{data.dataNotice || '请先维护当前期间的能源消费与转换数据。'}</span></div>;
   return (
     <>
-      <div className={`${styles.balanceStatusSummary} ${hasIssue ? styles.balanceStatusWarn : styles.balanceStatusOk}`}>
-        <span className={styles.balanceStatusDot}>{hasIssue ? '!' : '✓'}</span>
-        <div>
-          <strong>{hasIssue ? '能源分配存在异常' : '能源输入与分配基本闭合'}</strong>
-          <p>{hasIssue
-            ? `未分配能源 ${value(unallocatedTotal)} tce${overAllocatedTotal > 0 ? `，超分配能源 ${value(overAllocatedTotal)} tce` : ''}，建议优先查看异常来源。`
-            : '当前未发现未分配、超分配或明显核对差异。'}</p>
-        </div>
-        {unallocatedTotal > 0 && <button type="button" className={styles.balanceStatusLink} onClick={onUnallocated}>查看异常来源</button>}
-      </div>
-      <div className={styles.tableWrap}>
-        <table className={styles.energyBalanceTable}>
-          <thead><tr><th>项目</th>{rows.map((row) => <th key={row.energyTypeId}>{row.energyTypeName}（tce）</th>)}<th>合计（tce）</th></tr></thead>
-          <tbody>
-            <tr className={styles.balanceSectionRow}><th colSpan={rows.length + 2}>能源来源</th></tr>
-            {incomeRows.map((row) => renderRow(row))}
-            <tr className={styles.balanceTotalRow}><th>来源合计</th>{incomeTotals.map((amount, index) => <td key={rows[index].energyTypeId}>{value(amount)}</td>)}<td>{value(grandTotal(incomeTotals))}</td></tr>
-            <tr className={styles.balanceSectionRow}><th colSpan={rows.length + 2}>能源去向</th></tr>
-            {expenseRows.map((row) => renderRow(row, row.label === '未分配能源'))}
-            <tr className={styles.balanceTotalRow}><th>去向合计</th>{expenseTotals.map((amount, index) => <td key={rows[index].energyTypeId}>{value(amount)}</td>)}<td>{value(grandTotal(expenseTotals))}</td></tr>
-            {renderRow({ label: '超分配能源（核对异常）', values: overAllocatedValues }, true)}
-            <tr className={styles.balanceDifferenceRow}><th>核对差异</th>{differences.map((amount, index) => <td key={rows[index].energyTypeId} className={amount !== 0 ? styles.up : ''}>{balanceValue(amount)}</td>)}<td>{balanceValue(grandTotal(differences))}</td></tr>
-          </tbody>
+      {data.dataNotice && <div className={styles.flowDataNotice}>{data.dataNotice}</div>}
+      <div className={`${styles.tableWrap} ${styles.balanceTableFrame}`}>
+        <table className={styles.energyBalanceTable} aria-label="全厂能源平衡表">
+          <colgroup><col className={styles.balanceEnergyColumn} /><col span={5} /><col className={styles.balanceConsumptionColumn} /><col span={3} /><col className={styles.balanceDifferenceColumn} /></colgroup>
+          <thead>
+            <tr className={styles.balanceGroupHead}>
+              <th rowSpan={2} scope="col">能源品种</th>
+              <th colSpan={4} scope="colgroup" className={styles.balanceSourceHead}>能源来源</th>
+              <th colSpan={5} scope="colgroup" className={styles.balanceUseHead}>已登记去向</th>
+              <th rowSpan={2} scope="col" className={styles.balanceResultHead}>收支差额<span>来源 − 去向</span></th>
+            </tr>
+            <tr>
+              {balanceSourceColumns.map((column) => <th key={column.key} scope="col" title={column.note}>{column.label}</th>)}
+              <th scope="col" className={styles.balanceSubtotal}>来源合计</th>
+              {balanceUseColumns.map((column) => <th key={column.key} scope="col" title={column.note}>{column.label}</th>)}
+              <th scope="col" className={styles.balanceSubtotal}>去向合计</th>
+            </tr>
+          </thead>
+          <tbody>{rows.map((row) => <tr key={row.energyTypeId}>
+            <th scope="row">{row.energyTypeName}</th>
+            {balanceSourceColumns.map((column) => <td key={column.key}>{amountCell(row[column.key])}</td>)}
+            <td className={styles.balanceSubtotal}>{formatBalanceAmount(row.sourceTotal)}</td>
+            {balanceUseColumns.map((column) => <td key={column.key}>{amountCell(row[column.key])}</td>)}
+            <td className={styles.balanceSubtotal}>{formatBalanceAmount(row.useTotal)}</td>
+            {renderDifference(row.difference, row.status)}
+          </tr>)}</tbody>
+          <tfoot><tr className={styles.balanceTotalRow}>
+            <th scope="row">分项合计</th>
+            {totals.sourceValues.map((amount, index) => <td key={balanceSourceColumns[index].key}>{amountCell(amount)}</td>)}
+            <td>{formatBalanceAmount(totals.sourceTotal)}</td>
+            {totals.useValues.map((amount, index) => <td key={balanceUseColumns[index].key}>{amountCell(amount)}</td>)}
+            <td>{formatBalanceAmount(totals.useTotal)}</td>
+            {renderDifference(totals.difference, totalStatus)}
+          </tr></tfoot>
         </table>
       </div>
-      <div className={styles.flowMethodNote}>
-        核对关系：外部输入 + 自产/回收能源 + 超分配能源 = 能源转换投入 + 用能单元消耗 + 对外输出 + 已确认转换损失 + 未分配能源。超分配仅用于核对补差，不是实际能源去向；已确认转换损失来自转换记录的产出去向；转换折标差额不参与平衡表闭合，仅用于分析转换投入与产出的折标差异{data.conversionLossStandardCoalAmount > 0 ? `，当前为 ${value(data.conversionLossStandardCoalAmount)} tce` : ''}。
-      </div>
+      <section className={styles.balanceDefinitions} aria-label="能源平衡口径说明">
+        <div className={styles.balanceDefinitionHeader}>
+          <h3>口径说明</h3>
+          <p>“回收蒸汽”是能源品种；“过程回收、转换产出”是来源环节，分别在表内核对。</p>
+        </div>
+        <dl className={styles.balanceDefinitionGrid}>
+          <div><dt>过程回收</dt><dd>生产过程中回收的余热、余压等，进入回收装置时同时列入“转换投入”。</dd></div>
+          <div><dt>转换产出</dt><dd>发电、供汽、空压及回收装置产出的能源。例如余热回收产汽，余热和蒸汽各自按品种核对。</dd></div>
+          <div><dt>已确认损失</dt><dd>仅取台账已登记的转换损失；未填报不代表零损失，顶部“转换折标差额”不在此重复计入。</dd></div>
+        </dl>
+        <div className={styles.balanceAccountingNotes}>
+          <p><strong>差额判断</strong><span>正值待分配，负值超分配，均不直接代表物理损失；不同能源的正负差额分别核对。</span></p>
+          <p><strong>合计与精度</strong><span>合计包含厂内转换与回收，不等同于外购量或综合能耗。按未舍入数据汇总，显示值相加可能存在尾差；“—”表示零或不足两位小数的显示精度。</span></p>
+        </div>
+        <p className={styles.balanceScopeNote}>本表用于企业内部能源收支与分配核对；差额按两位小数提示，不作为计量允差或正式标准报表的合格判定。</p>
+      </section>
     </>
   );
 }
 
-function ClosedLoopFlowDetailTable({
-  data,
-  notify,
-  open,
-  initialStage,
-  selectedNodeId,
-}: {
-  data: FlowAnalysisDataset;
-  notify: (message: string) => void;
-  open: (row: ClosedLoopFlowDetailRow) => void;
-  initialStage: string;
-  selectedNodeId: string;
-}) {
-  const [stage, setStage] = useState(initialStage);
-  const [energyType, setEnergyType] = useState('');
-  const [keyword, setKeyword] = useState('');
-  const [abnormalOnly, setAbnormalOnly] = useState(false);
-  const stages = [...new Set(data.detailRows.map((row) => row.stage))];
-  const energyTypes = [...new Set(data.detailRows.map((row) => row.energyTypeName))];
-  const rows = data.detailRows.filter((row) =>
-    (!stage || row.stage === stage)
-    && (!energyType || row.energyTypeName === energyType)
-    && (!keyword || `${row.source}${row.target}`.includes(keyword.trim()))
-    && (!abnormalOnly || row.abnormal)
-    && (!selectedNodeId || row.relatedNodeIds.includes(selectedNodeId)));
-  const stageDisplay = (value: ClosedLoopFlowDetailRow['stage']) => ({
-    能源输入: '外部输入',
-    能源转换: '转换产出',
-    能源分配: '一级分配',
-    能源利用: '二级利用',
-    外部输出: '外部输出',
-    未分配: '未归属',
-    待分解: '待细分',
-  }[value]);
-  const stageOrder: ClosedLoopFlowDetailRow['stage'][] = ['能源输入', '能源转换', '能源分配', '能源利用', '外部输出', '未分配', '待分解'];
-  const orderedRows = [...rows].sort((left, right) => stageOrder.indexOf(left.stage) - stageOrder.indexOf(right.stage));
-  const flowGroups: Array<{ label: string; stages: ClosedLoopFlowDetailRow['stage'][] }> = [
-    { label: '输入流', stages: ['能源输入'] },
-    { label: '转换流', stages: ['能源转换'] },
-    { label: '分配流', stages: ['能源分配', '能源利用', '待分解'] },
-    { label: '输出流', stages: ['外部输出'] },
-    { label: '未归属', stages: ['未分配'] },
-  ];
-  return (
-    <div className={styles.flowDetailTab}>
-      <div className={styles.tableToolbar}>
-        <div>
-          <div className={styles.chartTitle}>流向记录 <span className={styles.detailCount}>（共 {rows.length} 条）</span></div>
-          <div className={styles.subtleCount}>展示能源从来源到去向的路径关系；点击“查看”可查看原始记录或差额说明。</div>
-        </div>
-        <EnergyButton onClick={() => notify('已按当前期间和展示层级导出能源流向明细')}>⇩ 导出当前明细</EnergyButton>
-      </div>
-      <div className={styles.detailFilters}>
-        <select aria-label="能流阶段" value={stage} onChange={(event) => setStage(event.target.value)}>
-          <option value="">全部能流阶段</option>
-          {stages.map((item) => <option key={item} value={item}>{stageDisplay(item)}</option>)}
-        </select>
-        <select aria-label="能源品种筛选" value={energyType} onChange={(event) => setEnergyType(event.target.value)}>
-          <option value="">全部能源品种</option>
-          {energyTypes.map((item) => <option key={item} value={item}>{item}</option>)}
-        </select>
-        <input aria-label="来源去向关键字" placeholder="搜索来源或去向" value={keyword} onChange={(event) => setKeyword(event.target.value)} />
-        <label><input type="checkbox" checked={abnormalOnly} onChange={(event) => setAbnormalOnly(event.target.checked)} /> 仅看异常或差额</label>
-      </div>
-      <div className={styles.tableWrap}>
-        <table className={styles.flowDetailTable}>
-          <thead><tr><th>流向分组</th><th>能源阶段</th><th>来源</th><th>去向</th><th>能源品种</th><th>流量（tce）</th><th>操作</th></tr></thead>
-          {flowGroups.map((group) => {
-            const groupRows = orderedRows.filter((row) => group.stages.includes(row.stage));
-            if (!groupRows.length) return null;
-            return <tbody key={group.label}>{groupRows.map((row, index) => <tr key={row.flowDetailId}>
-              {index === 0 && <td rowSpan={groupRows.length} className={styles.flowGroupCell}>{group.label}</td>}
-              <td>{stageDisplay(row.stage)}</td>
-              <td>{row.source}</td>
-              <td>{row.target}</td>
-              <td>{row.energyTypeName}</td>
-              <td className={row.abnormal ? styles.up : ''}>{format(row.standardCoalAmount, row.standardCoalAmount < 10 ? 2 : 1)}</td>
-              <td><button type="button" className={styles.link} onClick={() => open(row)}>查看</button></td>
-            </tr>)}</tbody>;
-          })}
-        </table>
-      </div>
-      {rows.length === 0 && <div className={styles.emptyState}><strong>没有符合条件的流向记录</strong><span>请调整筛选条件后重试。</span></div>}
-    </div>
-  );
-}
-
-function FlowTraceDrawer({ row, close }: { row: ClosedLoopFlowDetailRow | null; close: () => void }) {
-  if (!row) return null;
-  const singleTrace = row.traceRecords.length === 1 ? row.traceRecords[0] : null;
-  const calculatedFactor = singleTrace && singleTrace.originalAmount
-    ? singleTrace.standardCoalAmount * 1000 / singleTrace.originalAmount
-    : null;
-  const formula = singleTrace && calculatedFactor !== null
-    ? `折标量 = ${format(singleTrace.originalAmount, singleTrace.originalAmount < 10 ? 2 : 1)} ${singleTrace.originalUnit} × ${format(calculatedFactor, 4)} kgce/${singleTrace.originalUnit} ÷ 1000 = ${format(singleTrace.standardCoalAmount, singleTrace.standardCoalAmount < 10 ? 2 : 1)} tce`
-    : null;
-  return (
-    <div className={styles.drawerOverlay} onClick={close}>
-      <aside className={styles.traceDialog} onClick={(event) => event.stopPropagation()}>
-        <header>
-          <div><h2>能源流向追溯</h2><span>{row.source} → {row.target}｜{row.energyTypeName}</span></div>
-          <button type="button" aria-label="关闭追溯抽屉" onClick={close}>×</button>
-        </header>
-        <div className={styles.traceDialogBody}>
-          <section className={styles.traceSection}>
-            <h3>基本信息</h3>
-            <DetailGrid items={[
-              ['来源', row.source],
-              ['去向', row.target],
-              ['能源品种', row.energyTypeName],
-              ['数据期间', singleTrace?.periodLabel ?? '当前分析期间'],
-              ['数据来源', singleTrace?.recordType ?? row.traceDescription],
-              ...(singleTrace?.sourceType.startsWith('设备产出换算依据') ? [['换算依据', singleTrace.sourceType] as [string, ReactNode]] : []),
-            ]} />
-          </section>
-          {singleTrace ? (
-            <>
-              <section className={styles.traceSection}>
-                <h3>参与计算值</h3>
-                <div className={`${styles.traceRecord} ${styles.traceValueGrid}`}>
-                  <div><span>原始实物量</span><strong>{format(singleTrace.originalAmount, singleTrace.originalAmount < 10 ? 2 : 1)} {singleTrace.originalUnit}</strong></div>
-                  <div><span>折标系数</span><strong>{format(calculatedFactor ?? 0, 4)} kgce/{singleTrace.originalUnit}</strong></div>
-                  <div className={styles.traceResult}><span>折标量</span><strong>{format(singleTrace.standardCoalAmount, singleTrace.standardCoalAmount < 10 ? 2 : 1)} tce</strong></div>
-                </div>
-              </section>
-              {formula && <section className={styles.traceSection}>
-                <h3>计算公式</h3>
-                <div className={styles.traceFormula}>{formula}</div>
-              </section>}
-            </>
-          ) : (
-            <section className={styles.traceSection}>
-              <h3>{row.stage === '未分配' || row.stage === '待分解' ? '差额说明' : '数据说明'}</h3>
-              <p>{row.traceDescription}</p>
-              {row.traceRecords.length > 1 ? (
-                <div className={styles.modalNote}>该流向由 {row.traceRecords.length} 条数据汇总生成，普通用户无需逐条查看原始记录。</div>
-              ) : (
-                <div className={styles.modalNote}>该项由管理平衡关系计算得出，没有独立的上游数据记录。</div>
-              )}
-            </section>
-          )}
-        </div>
-        <footer><EnergyButton onClick={close}>关闭</EnergyButton></footer>
-      </aside>
-    </div>
-  );
-}
-
-function closedLoopFlowSankeySvg(data: FlowAnalysisDataset, selected: string) {
+function closedLoopFlowSankeySvg(
+  data: Pick<FlowAnalysisDataset, 'nodes' | 'links' | 'viewLevel' | 'viewName'>,
+  selected: string,
+  related: Pick<FlowAnalysisDataset, 'nodes' | 'links'>,
+) {
+  const relatedNodes = new Set(related.nodes.map((node) => node.nodeId));
+  const relatedLinks = new Set(related.links.map((link) => link.linkId));
+  const branchGap = data.nodes.some((node) => node.stage === 'external') ? 0 : 204;
   const stageX = data.viewLevel === 'level1'
-    ? new Map<string, number>([['input', 18], ['conversion', 220], ['medium', 430], ['distribution', 680], ['external', 930], ['unallocated', 680]])
-    : new Map<string, number>([['input', 10], ['conversion', 180], ['medium', 350], ['distribution', 530], ['utilization', 720], ['external', 930], ['pending', 930]]);
+    ? new Map<string, number>([['input', 24], ['conversion', 270], ['medium', 520], ['external', 752], ['distribution', 970], ['recovery', 1220], ['unallocated', 970]])
+    : new Map<string, number>([['input', 24], ['conversion', 270], ['medium', 520], ['external', 752], ['distribution', 970], ['utilization', 1220], ['recovery', 1470], ['pending', 1220]]);
+  stageX.forEach((x, stage) => { if (x >= 970) stageX.set(stage, x - branchGap); });
+  const chartWidth = (data.viewLevel === 'level1' ? 1450 : 1700) - branchGap;
+  const externalX = stageX.get('external')!;
+  const returnLabelX = ((stageX.get('medium') ?? 24) + chartWidth - 286) / 2;
   const stageColors: Record<string, string> = {
     input: '#1677FF',
     conversion: '#F79009',
+    recovery: '#F9AB00',
     medium: '#00A870',
-    distribution: '#23A35A',
+    distribution: '#00AD83',
     utilization: '#45B36B',
-    external: '#7A5AF8',
+    external: '#8547FF',
     unallocated: '#98A2B3',
     pending: '#98A2B3',
   };
-  const nodeWidth = data.viewLevel === 'level1' ? 118 : 112;
-  const compactNodeHeight = 54;
-  const conversionNodeHeight = 72;
-  const nodeGap = 10;
+  const nodeWidth = 198;
+  const compactNodeHeight = 64;
+  const nodeGap = 14;
+  const nodeWidthFor = (node: FlowAnalysisDataset['nodes'][number]) => node.stage === 'external' ? 150 : nodeWidth;
+  const recoveryTargets = new Set(data.links.filter((link) => link.flowType === 'recovery_output').map((link) => link.targetNodeId));
+  // Wrap labels within the card while retaining the full value in the tooltip.
+  const wrapText = (value: string, maxWidth: number, fontSize: number) => {
+    const lines: string[] = [];
+    let line = '';
+    let width = 0;
+    for (const character of value) {
+      const characterWidth = character.codePointAt(0)! > 255 ? fontSize : fontSize * .58;
+      if (line && width + characterWidth > maxWidth) { lines.push(line); line = ''; width = 0; }
+      line += character;
+      width += characterWidth;
+    }
+    if (line) lines.push(line);
+    return lines;
+  };
+  const labels = new Map(data.nodes.map((node) => {
+    const width = nodeWidthFor(node) - 28;
+    const title = wrapText(node.name, width - (recoveryTargets.has(node.nodeId) ? 20 : 0), 16);
+    const details = [node.sourceLabel, node.valueLabel, node.detailLabel, ...(node.detailLabelSecondary?.split('｜') ?? [])]
+      .filter((line): line is string => Boolean(line)).flatMap((line) => wrapText(line, width, 13));
+    return [node.nodeId, { title, details }];
+  }));
   const columnOrder = data.viewLevel === 'level1'
-    ? [['input'], ['conversion'], ['medium'], ['distribution', 'unallocated'], ['external']]
-    : [['input'], ['conversion'], ['medium'], ['distribution'], ['utilization'], ['external', 'pending']];
+    ? [['input'], ['conversion'], ['medium'], ['distribution', 'unallocated'], ['recovery']]
+    : [['input'], ['conversion'], ['medium'], ['distribution'], ['utilization', 'pending'], ['recovery']];
   const grouped = columnOrder.map((stages) => data.nodes.filter((node) => stages.includes(node.stage)));
-  const nodeHeightFor = (node: FlowAnalysisDataset['nodes'][number]) => node.stage === 'conversion' ? conversionNodeHeight : compactNodeHeight;
+  const nodeHeightFor = (node: FlowAnalysisDataset['nodes'][number]) => {
+    const label = labels.get(node.nodeId)!;
+    const minimum = node.stage === 'conversion' || node.stage === 'recovery' ? 138 : node.stage === 'medium' ? 56 : compactNodeHeight;
+    return Math.max(minimum, 22 + label.title.length * 22 + label.details.length * 19);
+  };
   const maxContentHeight = Math.max(
     ...grouped.map((nodes) => nodes.reduce((total, node) => total + nodeHeightFor(node), 0) + Math.max(nodes.length - 1, 0) * nodeGap),
     1,
   );
-  const height = Math.max(390, maxContentHeight + 100);
+  const externalNodes = data.nodes.filter((node) => node.stage === 'external');
+  const externalContentHeight = externalNodes.reduce((total, node) => total + nodeHeightFor(node) + nodeGap, 0);
+  const height = Math.max(690, maxContentHeight + 170, externalContentHeight + 170);
   const positions = new Map<string, { x: number; y: number }>();
   grouped.forEach((nodes) => {
-    const contentHeight = nodes.reduce((total, node) => total + nodeHeightFor(node), 0) + Math.max(nodes.length - 1, 0) * nodeGap;
-    const startY = 42 + Math.max((height - 58 - contentHeight) / 2, 0);
+    const startY = 94;
     let currentY = startY;
     nodes.forEach((node) => {
       positions.set(node.nodeId, { x: stageX.get(node.stage) ?? 0, y: currentY });
       currentY += nodeHeightFor(node) + nodeGap;
     });
   });
-  const nodesById = new Map(data.nodes.map((node) => [node.nodeId, node]));
-  const incoming = new Map<string, string[]>();
-  const outgoing = new Map<string, string[]>();
-  data.links.forEach((link) => {
-    incoming.set(link.targetNodeId, [...(incoming.get(link.targetNodeId) ?? []), link.sourceNodeId]);
-    outgoing.set(link.sourceNodeId, [...(outgoing.get(link.sourceNodeId) ?? []), link.targetNodeId]);
+  let externalY = 76;
+  externalNodes.forEach((node) => {
+    positions.set(node.nodeId, { x: externalX + 10, y: externalY });
+    externalY += nodeHeightFor(node) + nodeGap;
   });
-  const related = new Set<string>();
-  const visit = (nodeId: string, graph: Map<string, string[]>) => {
-    if (related.has(nodeId)) return;
-    related.add(nodeId);
-    (graph.get(nodeId) ?? []).forEach((next) => visit(next, graph));
-  };
-  if (selected) {
-    visit(selected, incoming);
-    const ancestors = [...related];
-    related.clear();
-    visit(selected, outgoing);
-    ancestors.forEach((nodeId) => related.add(nodeId));
-  }
+  const nodesById = new Map(data.nodes.map((node) => [node.nodeId, node]));
   const maxLink = Math.max(...data.links.map((link) => link.standardCoalAmount), 1);
   const escape = (value: string) => value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[char]!);
   const links = data.links.map((link) => {
     const source = positions.get(link.sourceNodeId);
     const target = positions.get(link.targetNodeId);
     if (!source || !target || link.standardCoalAmount <= 0) return '';
-    const x1 = source.x + nodeWidth;
+    const x1 = source.x + nodeWidthFor(nodesById.get(link.sourceNodeId)!);
     const y1 = source.y + nodeHeightFor(nodesById.get(link.sourceNodeId)!) / 2;
     const x2 = target.x;
     const y2 = target.y + nodeHeightFor(nodesById.get(link.targetNodeId)! ) / 2;
     const middle = (x1 + x2) / 2;
-    const width = Math.max(3, Math.min(20, link.standardCoalAmount / maxLink * 20));
-    const isRelated = !selected || (related.has(link.sourceNodeId) && related.has(link.targetNodeId));
-    const active = selected && isRelated ? ' active' : '';
-    const muted = selected && !isRelated ? ' muted' : '';
+    const width = Math.max(3, Math.min(26, Math.sqrt(link.standardCoalAmount / maxLink) * 26));
+    const active = selected ? relatedLinks.has(link.linkId) ? ' active' : ' muted' : '';
     const sourceStage = nodesById.get(link.sourceNodeId)?.stage ?? 'medium';
     const targetStage = nodesById.get(link.targetNodeId)?.stage;
     const stroke = targetStage === 'external' || targetStage === 'unallocated' || targetStage === 'pending'
       ? stageColors[targetStage]
       : stageColors[sourceStage];
+    const returning = link.flowType === 'recovery_output';
+    const dash = returning ? ` stroke-dasharray="7 5" stroke-dashoffset="${y1}"` : '';
+    const returnY = height - 34;
+    const route = returning
+      ? `M${x1} ${y1} H${x1 + 12} Q${x1 + 18} ${y1} ${x1 + 18} ${y1 + 6} V${returnY - 8} Q${x1 + 18} ${returnY} ${x1 + 10} ${returnY} H${x2 - 18} Q${x2 - 26} ${returnY} ${x2 - 26} ${returnY - 8} V${y2 + 8} Q${x2 - 26} ${y2} ${x2 - 18} ${y2} H${x2}`
+      : `M${x1} ${y1} C${middle} ${y1},${middle} ${y2},${x2} ${y2}`;
     const title = link.tooltip ?? `${nodesById.get(link.sourceNodeId)?.name ?? ''} → ${nodesById.get(link.targetNodeId)?.name ?? ''}｜${format(link.standardCoalAmount, 1)} tce`;
-    return `<path class="flow${active}${muted}" d="M${x1} ${y1} C${middle} ${y1},${middle} ${y2},${x2} ${y2}" stroke="${stroke}" stroke-width="${width}"><title>${escape(title)}</title></path>`;
+    return `<path data-link-id="${escape(link.linkId)}" class="flow${returning ? ' return-flow' : ''}${active}" d="${route}" stroke="${returning ? '#00A870' : targetStage === 'recovery' ? stageColors.recovery : stroke}" stroke-width="${returning ? 2.5 : width}"${dash}${returning ? ' marker-end="url(#recovery-arrow)"' : ''}><title>${escape(title)}</title></path>`;
   }).join('');
   const nodes = data.nodes.map((node) => {
     const position = positions.get(node.nodeId)!;
     const selectedClass = selected === node.nodeId ? ' selected' : '';
-    const mutedClass = selected && !related.has(node.nodeId) ? ' muted' : '';
+    const mutedClass = selected && !relatedNodes.has(node.nodeId) ? ' muted' : '';
     const anomalyClass = node.anomalous ? ' anomalous' : '';
-    const lineOne = node.name.length > 9 ? node.name.slice(0, 9) : node.name;
-    const lineTwo = node.name.length > 9 ? node.name.slice(9, 18) : '';
-    const valueY = lineTwo ? position.y + 45 : position.y + 34;
-    const detailY = valueY + 13;
-    const secondaryDetailY = detailY + 12;
     const nodeHeight = nodeHeightFor(node);
-    return `<g class="node${selectedClass}${mutedClass}${anomalyClass}" data-key="${escape(node.nodeId)}"><title>${escape(`${node.name}｜${node.nodeType}｜${node.valueLabel}${node.detailLabel ? `｜${node.detailLabel}` : ''}${node.detailLabelSecondary ? `｜${node.detailLabelSecondary}` : ''}`)}</title><rect x="${position.x}" y="${position.y}" width="${nodeWidth}" height="${nodeHeight}" rx="7" fill="#fff" stroke="${node.anomalous ? '#F04438' : stageColors[node.stage]}"/><rect x="${position.x}" y="${position.y}" width="7" height="${nodeHeight}" rx="3" fill="${node.anomalous ? '#F04438' : stageColors[node.stage]}"/><text x="${position.x + 16}" y="${position.y + 18}" font-size="11.5" fill="#172033">${escape(lineOne)}</text>${lineTwo ? `<text x="${position.x + 16}" y="${position.y + 31}" font-size="11.5" fill="#172033">${escape(lineTwo)}</text>` : ''}<text x="${position.x + 16}" y="${valueY}" font-size="10" fill="#5F6B7A">${escape(node.valueLabel)}</text>${node.detailLabel ? `<text x="${position.x + 16}" y="${detailY}" font-size="9.5" fill="#5F6B7A">${escape(node.detailLabel)}</text>` : ''}${node.detailLabelSecondary ? `<text x="${position.x + 16}" y="${secondaryDetailY}" font-size="9.5" fill="#5F6B7A">${escape(node.detailLabelSecondary)}</text>` : ''}</g>`;
+    const label = labels.get(node.nodeId)!;
+    const title = [node.name, node.nodeType, node.sourceLabel, node.valueLabel, node.detailLabel, node.detailLabelSecondary].filter(Boolean).join('｜');
+    const color = node.anomalous ? '#F04438' : stageColors[node.stage];
+    const recycled = recoveryTargets.has(node.nodeId);
+    const cardWidth = nodeWidthFor(node);
+    const fill = recycled ? 'url(#recovered-energy)' : '#FFFFFF';
+    const recycleIcon = recycled ? `<use href="#recycle-icon" x="${position.x + cardWidth - 30}" y="${position.y + 10}" width="20" height="20" aria-label="含回收能源"/>` : '';
+    return `<g class="node${selectedClass}${mutedClass}${anomalyClass}" data-key="${escape(node.nodeId)}"><title>${escape(title)}</title><rect x="${position.x}" y="${position.y}" width="${cardWidth}" height="${nodeHeight}" rx="7" fill="${fill}" stroke="${color}" stroke-width="1.5"/><rect x="${position.x}" y="${position.y}" width="7" height="${nodeHeight}" rx="3" fill="${color}"/>${label.title.map((line, index) => `<text x="${position.x + 16}" y="${position.y + 25 + index * 22}" font-size="16" font-weight="600" fill="#102039">${escape(line)}</text>`).join('')}${label.details.map((line, index) => `<text x="${position.x + 16}" y="${position.y + 25 + label.title.length * 22 + index * 19}" font-size="13" fill="#536580">${escape(line)}</text>`).join('')}${recycleIcon}</g>`;
+
   }).join('');
-  const headings = data.viewLevel === 'level1'
-    ? [
-      ['企业边界输入', 18],
-      ['能源转换', 220],
-      ['厂内可供分配能源', 430],
-      ['能源分配（一级用能单元）', 680],
-      ['外部输出', 930],
-    ].map(([label, x]) => `<text x="${x}" y="24" font-size="13" font-weight="700" fill="#172033">${label}</text>`).join('')
-    : [
-      ['企业边界输入', 10],
-      ['能源转换', 180],
-      ['厂内可供分配能源', 350],
-      ['能源分配（一级）', 530],
-      ['能源利用（二级）', 720],
-      ['外部输出 / 待分解', 930],
-    ].map(([label, x]) => `<text x="${x}" y="24" font-size="13" font-weight="700" fill="#172033">${label}</text>`).join('');
-  return `<svg class="sankey" viewBox="0 0 1070 ${height}" aria-label="${escape(data.viewName)}">${headings}${links}${nodes}</svg>`;
+  const columns = [
+    ['input', '企业边界输入', '外部进入企业的能源'],
+    ['conversion', '能源转换', '使用外部输入能源'],
+    ['medium', '厂内可供分配能源', '厂内可继续分配的能源'],
+    ['distribution', '一级用能单元', '能源使用对象'],
+    ...(data.viewLevel === 'level2' ? [['utilization', '二级用能单元', '一级单元内部利用']] : []),
+    ['recovery', '能源回收与循环利用', '回收用能过程产生的余能'],
+  ];
+  const headings = columns.map(([stage, label, subtitle]) => { const x = stageX.get(stage)!; return `<rect x="${x - 12}" y="10" width="222" height="${height - 74}" rx="8" fill="#F3F9FB"/><text x="${x + 4}" y="40" font-size="17" font-weight="700" fill="#172033">${label}</text><text x="${x + 4}" y="63" font-size="13" fill="#667085">${subtitle}</text>`; }).join('');
+  const externalPanel = externalNodes.length ? `<rect x="${externalX}" y="16" width="170" height="${externalY - 16}" rx="8" fill="#FAF7FF" fill-opacity=".94" stroke="#B692F6" stroke-width="1.5" stroke-dasharray="6 5"/><text x="${externalX + 10}" y="39" font-size="14" font-weight="600" fill="#8547FF">企业边界输出</text><text x="${externalX + 10}" y="59" font-size="11.5" fill="#9670DA">仅显示已登记的能源外供</text>` : '';
+  const returnLabel = data.links.some((link) => link.flowType === 'recovery_output') ? `<rect x="${returnLabelX}" y="${height - 47}" width="286" height="24" rx="4" fill="white"/><text x="${returnLabelX + 12}" y="${height - 30}" font-size="14" font-weight="600" fill="#00A870">回收能源回流至厂内可供分配能源</text>` : '';
+  return `<svg class="sankey" viewBox="0 0 ${chartWidth} ${height}" aria-label="${escape(data.viewName)}"><defs><linearGradient id="recovered-energy" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#E6F7F1"/></linearGradient><symbol id="recycle-icon" viewBox="0 0 24 24"><g fill="none" stroke="#00AD83" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6l2-3a2 2 0 0 1 3.5 0L17 9m-4-1 4 1 1-4M19 12l2 4a2 2 0 0 1-1.7 3H13m3-3-3 3 3 3M9 19H5a2 2 0 0 1-1.8-3L6 10m-4 1 4-1 1 4"/></g></symbol><marker id="recovery-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#00A870"/></marker></defs>${headings}${links}${externalPanel}${nodes}${returnLabel}</svg>`;
 }

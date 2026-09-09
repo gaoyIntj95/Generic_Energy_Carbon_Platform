@@ -1,3 +1,5 @@
+import { useDataYear } from './useDataYear';
+import { DATA_YEARS } from '../../mocks/annualData';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -10,12 +12,6 @@ import {
   reorderEnergyUnits,
   updateEnergyUnit,
 } from '../../mocks/energyUnitMockStore';
-import {
-  listV11ConversionOutputs,
-  listV11EnergyRecords,
-  listV11KeyDevices,
-  listV11OperationMetrics,
-} from '../../mocks/dataManagementV11Store';
 import type {
   EnergyUnit,
   EnergyUnitLevel,
@@ -86,9 +82,7 @@ interface DisplayRow {
   childCount: number;
 }
 
-const currentYear = new Date().getFullYear();
-const yearOptions = [currentYear, currentYear - 1, currentYear - 2].map(String);
-const emptyFilter: FilterState = { year: String(currentYear), keyword: '', unitType: '' };
+const yearOptions = DATA_YEARS.map(String);
 
 function formUnitTypes(level: EnergyUnitLevel) {
   return level === 'level1' ? rootUnitTypeOptions : childUnitTypeOptions;
@@ -156,10 +150,16 @@ function makeDisplayRows(
 }
 
 export function EnergyUnitsPage() {
-  const [units, setUnits] = useState(() => listEnergyUnits());
+  const [year] = useDataYear();
+  return <AnnualEnergyUnitsPage key={year} />;
+}
+function AnnualEnergyUnitsPage() {
+  const [year, setYear] = useDataYear();
+  const emptyFilter: FilterState = { year, keyword: '', unitType: '' };
+  const [units, setUnits] = useState(() => listEnergyUnits(Number(year)));
   const [draftFilter, setDraftFilter] = useState<FilterState>(emptyFilter);
   const [activeFilter, setActiveFilter] = useState<FilterState>(emptyFilter);
-  const [expanded, setExpanded] = useState(() => initialExpanded(listEnergyUnits()));
+  const [expanded, setExpanded] = useState(() => initialExpanded(listEnergyUnits(Number(year))));
   const [dialog, setDialog] = useState<DialogState>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [toast, setToast] = useState('');
@@ -176,7 +176,7 @@ export function EnergyUnitsPage() {
     window.setTimeout(() => setToast(''), 1800);
   };
 
-  const refreshUnits = () => setUnits(listEnergyUnits());
+  const refreshUnits = () => setUnits(listEnergyUnits(Number(year)));
   const canReorder = !activeFilter.keyword && !activeFilter.unitType;
   const groupedRows = [
     { category: '生产类', rows: rows.filter(({ unit }) => unitCategory(unit) === '生产类') },
@@ -199,7 +199,7 @@ export function EnergyUnitsPage() {
     const targetIndex = nextIds.indexOf(targetId);
     const [moved] = nextIds.splice(sourceIndex, 1);
     nextIds.splice(targetIndex, 0, moved);
-    const result = reorderEnergyUnits(source.parentEnergyUnitId, nextIds);
+    const result = reorderEnergyUnits(source.parentEnergyUnitId, nextIds, Number(year));
     if (result.ok) {
       refreshUnits();
       notify('用能单元顺序已更新');
@@ -207,18 +207,7 @@ export function EnergyUnitsPage() {
   };
 
   const openDelete = (unit: EnergyUnit) => {
-    const baseReferences = inspectEnergyUnitDeletion(unit.energyUnitId);
-    const references: EnergyUnitReferenceSummary = {
-      ...baseReferences,
-      energyRecordCount: baseReferences.energyRecordCount + listV11EnergyRecords().filter((record) => record.energyUnitId === unit.energyUnitId).length,
-      operationRecordCount: baseReferences.operationRecordCount + listV11OperationMetrics().filter((record) => record.energyUnitId === unit.energyUnitId).length,
-      deviceCount: baseReferences.deviceCount + listV11KeyDevices().filter((device) => device.energyUnitId === unit.energyUnitId).length,
-      conversionRelationCount: baseReferences.conversionRelationCount + listV11ConversionOutputs().filter((record) =>
-        record.conversionEnergyUnitId === unit.energyUnitId
-        || record.recoverySourceEnergyUnitId === unit.energyUnitId
-        || record.outputTargetEnergyUnitId === unit.energyUnitId,
-      ).length,
-    };
+    const references = inspectEnergyUnitDeletion(unit.energyUnitId, Number(year));
     if (Object.values(references).some((count) => count > 0)) {
       setDialog({ type: 'deleteBlocked', unit, references });
       return;
@@ -319,6 +308,15 @@ export function EnergyUnitsPage() {
           </>
         }
       >
+        <Field label="年度">
+          <select
+            aria-label="用能单元年度"
+            value={draftFilter.year}
+            onChange={(event) => setYear(event.target.value)}
+          >
+            {yearOptions.map((year) => <option key={year}>{year}</option>)}
+          </select>
+        </Field>
         <Field label="关键字">
           <input
             className={styles.filterKeyword}
@@ -329,16 +327,6 @@ export function EnergyUnitsPage() {
               setDraftFilter((current) => ({ ...current, keyword: event.target.value }))
             }
           />
-        </Field>
-        <Field label="年度">
-          <select
-            aria-label="用能单元年度"
-            value={draftFilter.year}
-            onChange={(event) => setDraftFilter((current) => ({ ...current, year: event.target.value }))}
-          >
-            {yearOptions.map((year) => <option key={year}>{year}</option>)}
-          </select>
-          <span className={styles.fieldHint}>业务年度上下文；主数据跨年度复用，切换年度不改变树形结果</span>
         </Field>
         <Field label="单元类型">
           <select
@@ -364,7 +352,7 @@ export function EnergyUnitsPage() {
 
       <Card className={styles.tableCard}>
         <div className={styles.notice}>
-          <div><strong>用能单元用于维护企业的用能层级和数据归属。</strong><span>一期仅支持两级；能流分析不汇总二级能源消费记录。</span></div>
+          <div><strong>{year} 年度用能单元：独立维护本年度的层级和归属，修改不影响其他年度。</strong><span>一期仅支持两级；能流分析不汇总二级能源消费记录。</span></div>
           <button type="button" className={styles.noticeLink} onClick={() => setShowHelp(true)}>查看说明</button>
         </div>
         <div className={styles.tableArea}>
@@ -427,7 +415,7 @@ export function EnergyUnitsPage() {
             </section>
             <section>
               <strong>其他能源业务</strong>
-              <p>能源转换与流向请前往“数据管理 &gt; 能源数据 &gt; 能源转换与流向”维护。</p>
+              <p>能源转换与外供请前往“数据管理 &gt; 能源数据 &gt; 能源转换与外供”维护。</p>
             </section>
             <section>
               <strong>转换场景</strong>
@@ -470,7 +458,7 @@ export function EnergyUnitsPage() {
           submitText="确认删除"
           onClose={() => setDialog(null)}
           onSubmit={() => {
-            const result = deleteEnergyUnit(dialog.unit.energyUnitId);
+            const result = deleteEnergyUnit(dialog.unit.energyUnitId, Number(year));
             if (result.ok) {
               refreshUnits();
               setDialog(null);
@@ -498,9 +486,10 @@ function ReorderEnergyUnitsDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const parent = parentEnergyUnitId ? getEnergyUnit(parentEnergyUnitId) : undefined;
+  const [year] = useDataYear();
+  const parent = parentEnergyUnitId ? getEnergyUnit(parentEnergyUnitId, Number(year)) : undefined;
   const [orderedUnits, setOrderedUnits] = useState(() =>
-    listEnergyUnits().filter((unit) => unit.parentEnergyUnitId === parentEnergyUnitId),
+    listEnergyUnits(Number(year)).filter((unit) => unit.parentEnergyUnitId === parentEnergyUnitId),
   );
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
@@ -522,7 +511,7 @@ function ReorderEnergyUnitsDialog({
       submitText="保存顺序"
       onClose={onClose}
       onSubmit={() => {
-        const result = reorderEnergyUnits(parentEnergyUnitId, orderedUnits.map((unit) => unit.energyUnitId));
+        const result = reorderEnergyUnits(parentEnergyUnitId, orderedUnits.map((unit) => unit.energyUnitId), Number(year));
         if (result.ok) onSaved();
       }}
     >
@@ -579,8 +568,9 @@ function EnergyUnitFormDialog({
   onClose: () => void;
   onSaved: (message: string, expandedParentId?: string) => void;
 }) {
-  const target = dialog.type === 'edit' ? getEnergyUnit(dialog.energyUnitId) : undefined;
-  const parent = dialog.type === 'addChild' ? getEnergyUnit(dialog.parentEnergyUnitId) : undefined;
+  const [year] = useDataYear();
+  const target = dialog.type === 'edit' ? getEnergyUnit(dialog.energyUnitId, Number(year)) : undefined;
+  const parent = dialog.type === 'addChild' ? getEnergyUnit(dialog.parentEnergyUnitId, Number(year)) : undefined;
   const level: EnergyUnitLevel =
     dialog.type === 'addRoot'
       ? 'level1'
@@ -630,10 +620,10 @@ function EnergyUnitFormDialog({
         : { ...form, conversionScenarios: [] };
     const result =
       dialog.type === 'addRoot'
-        ? createEnergyUnit(submitForm)
+        ? createEnergyUnit(submitForm, Number(year))
         : dialog.type === 'addChild'
-          ? addChildEnergyUnit(dialog.parentEnergyUnitId, form)
-          : updateEnergyUnit(dialog.energyUnitId, submitForm);
+          ? addChildEnergyUnit(dialog.parentEnergyUnitId, form, Number(year))
+          : updateEnergyUnit(dialog.energyUnitId, submitForm, Number(year));
 
     if (!result.ok) {
       setError(
@@ -652,7 +642,7 @@ function EnergyUnitFormDialog({
   };
 
   return (
-    <Modal title={title} width={760} onClose={onClose} onSubmit={save}>
+    <Modal title={`${title}（${year}年度）`} width={760} onClose={onClose} onSubmit={save}>
       <div className={styles.formGrid}>
         {dialog.type === 'addChild' && parent && (
           <div className={styles.context}>
@@ -814,6 +804,7 @@ function DeleteBlockedDialog({
   references: EnergyUnitReferenceSummary;
   onClose: () => void;
 }) {
+  const [year] = useDataYear();
   const navigate = useNavigate();
   const referenceItems = [
     { label: '下级用能单元', count: references.childCount, path: '/data-management/units' },
@@ -824,7 +815,7 @@ function DeleteBlockedDialog({
   ].filter((item) => item.count > 0);
 
   return (
-    <Modal title="无法删除用能单元" width={560} cancelText="我知道了" onClose={onClose}>
+    <Modal title={`无法删除用能单元（${year}年度）`} width={560} cancelText="我知道了" onClose={onClose}>
       <p className={styles.blockerIntro}>
         用能单元“{unit.energyUnitName}”已关联数据，无法删除。
       </p>
@@ -834,7 +825,7 @@ function DeleteBlockedDialog({
             <span>{item.label}</span>
             <span className={styles.blockerAction}>
               <strong>{item.count} 项</strong>
-              <button type="button" onClick={() => navigate(item.path)}>去处理</button>
+              <button type="button" onClick={() => navigate(`${item.path}${item.path.includes('?') ? '&' : '?'}year=${year}&unitId=${unit.energyUnitId}`)}>去处理</button>
             </span>
           </li>
         ))}

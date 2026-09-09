@@ -59,8 +59,8 @@ export function saveBenchmarkTarget(input: Omit<BenchmarkTarget, 'targetId'>) {
   return { ok: true as const, targetId };
 }
 
-export function countBenchmarkTargets(objectType: BenchmarkTarget['objectType'], objectId: string) {
-  return targets.filter((target) => target.objectType === objectType && target.objectId === objectId).length;
+export function countBenchmarkTargets(objectType: BenchmarkTarget['objectType'], objectId: string, year?: number) {
+  return targets.filter((target) => target.objectType === objectType && target.objectId === objectId && (year === undefined || target.year === year)).length;
 }
 
 export function listBenchmarkTargets() {

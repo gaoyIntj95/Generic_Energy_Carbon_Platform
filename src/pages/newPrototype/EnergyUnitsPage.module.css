@@ -48,14 +48,6 @@
   white-space: nowrap;
 }
 
-.fieldHint {
-  display: block;
-  margin-top: 5px;
-  color: #7b8794;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
 .helpContent {
   display: grid;
   gap: 16px;

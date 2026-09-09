@@ -308,7 +308,6 @@
 
 .chartSub,
 .exportHint,
-.subtleCount,
 .balanceCaption {
   margin-top: 4px;
   color: var(--muted);
@@ -2144,6 +2143,9 @@
 }
 
 .flowMain {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   padding: 14px 16px;
 }
 
@@ -2226,7 +2228,8 @@
   flex-wrap: wrap;
   gap: 14px;
   align-items: center;
-  min-height: 34px;
+  min-height: 48px;
+  padding-bottom: 8px;
   color: var(--text-secondary);
   font-size: 12px;
 }
@@ -2250,9 +2253,10 @@
 }
 
 .sankeyWrap :global(.sankey) {
+  font-family: Arial, "Microsoft YaHei", sans-serif;
   display: block;
   width: 100%;
-  min-width: 1040px;
+  min-width: 1180px;
   min-height: 350px;
 }
 
@@ -2269,16 +2273,17 @@
 }
 
 .sankeyWrap :global(.flow.muted) {
-  opacity: .08;
+  opacity: .04;
+  pointer-events: none;
+}
+
+.sankeyWrap :global(.node.muted) {
+  opacity: .42;
 }
 
 .sankeyWrap :global(.node) {
   cursor: pointer;
   transition: opacity .2s;
-}
-
-.sankeyWrap :global(.node.muted) {
-  opacity: .22;
 }
 
 .sankeyWrap :global(.node:hover rect),
@@ -2339,28 +2344,6 @@
   border-radius: 7px;
 }
 
-.flowSelectionBar {
-  display: flex;
-  min-height: 42px;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 10px 6px 13px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  background: #f1faf6;
-  border-left: 3px solid var(--brand);
-  border-radius: 0 7px 7px 0;
-}
-
-.flowSelectionBar > span {
-  flex: 1;
-}
-
-.flowSelectionBar .button {
-  height: 31px;
-  padding: 0 11px;
-}
-
 .flowMethodNote {
   margin-top: 10px;
   padding: 11px 14px;
@@ -2378,6 +2361,11 @@
   border: 0;
   border-top: 1px dashed #dfe7e5;
   border-radius: 0;
+}
+
+.sankeyWrap :global(.return-flow) {
+  opacity: .8;
+  stroke-linejoin: round;
 }
 
 .flowNoteTitle {
@@ -2421,7 +2409,7 @@
 }
 
 .flowReadingItem .available { background: #00a870; }
-.flowReadingItem .external { background: #f79009; }
+.flowReadingItem .external { background: #8547ff; }
 .flowReadingItem .unallocated { background: #98a2b3; }
 .flowReadingItem .overAllocated { background: #e5484d; }
 .flowReadingItem .conversion { background: #7f56d9; }
@@ -2686,63 +2674,6 @@
   line-height: 1.5;
 }
 
-.balanceStatusSummary {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 12px;
-  padding: 10px 13px;
-  border: 1px solid #dce8e3;
-  border-radius: 8px;
-}
-
-.balanceStatusWarn {
-  background: #fff8f5;
-  border-color: #f3d4ca;
-}
-
-.balanceStatusOk {
-  background: #f5fbf8;
-}
-
-.balanceStatusDot {
-  display: grid;
-  width: 25px;
-  height: 25px;
-  color: #fff;
-  background: #df5b45;
-  border-radius: 50%;
-  font-size: 13px;
-  font-weight: 700;
-  place-items: center;
-}
-
-.balanceStatusOk .balanceStatusDot {
-  background: #0a9667;
-}
-
-.balanceStatusSummary strong {
-  color: #2d3d49;
-  font-size: 13px;
-}
-
-.balanceStatusSummary p {
-  margin: 3px 0 0;
-  color: #6d7c87;
-  font-size: 12px;
-}
-
-.balanceStatusLink {
-  margin-left: auto;
-  padding: 5px 9px;
-  color: #1677ff;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
 .balanceHead {
   margin-bottom: 10px;
 }
@@ -2752,37 +2683,294 @@
   line-height: 1.7;
 }
 
-.energyBalanceTable {
-  min-width: 980px;
+.balanceLedgerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
 }
 
-.energyBalanceTable th,
-.energyBalanceTable td:not(:first-child) {
+.balanceToolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.balanceToolbar > span {
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.balanceTableFrame {
+  border: 1px solid #e3eae6;
+  border-radius: 8px;
+}
+
+.balanceTableFrame .energyBalanceTable {
+  min-width: 980px !important;
+  table-layout: fixed;
+  font-variant-numeric: tabular-nums;
+}
+
+.balanceEnergyColumn {
+  width: 104px;
+}
+
+.balanceConsumptionColumn {
+  width: 108px;
+}
+
+.balanceDifferenceColumn {
+  width: 166px;
+}
+
+.energyBalanceTable td,
+.energyBalanceTable thead tr:nth-child(2) th {
   text-align: right;
 }
 
-.energyBalanceTable th:first-child,
-.energyBalanceTable td:first-child {
+.balanceTableFrame .energyBalanceTable th,
+.balanceTableFrame .energyBalanceTable td {
+  padding: 10px;
+  border-bottom-color: #edf1ef;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.balanceTableFrame .energyBalanceTable tbody tr {
+  height: 46px;
+}
+
+.balanceTableFrame .energyBalanceTable thead th {
+  white-space: normal;
+  background: #f7f9f8;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.energyBalanceTable th[scope="row"],
+.energyBalanceTable thead th[rowspan]:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
   text-align: left;
+  background: #fff;
 }
 
-.energyBalanceTable .balanceSectionRow th {
-  height: 42px;
+.energyBalanceTable th[scope="row"] {
+  font-weight: 500;
+}
+
+.balanceTableFrame .balanceGroupHead th {
+  padding: 12px 10px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom-color: #e3eae6;
+}
+
+.balanceTableFrame .energyBalanceTable .balanceSourceHead {
+  color: #087e59;
+  background: #f0f7f3;
+}
+
+.balanceTableFrame .energyBalanceTable .balanceUseHead {
+  color: #425b50;
+  background: #f4f7f5;
+  border-left: 1px solid #e3eae6;
+}
+
+.balanceTableFrame .energyBalanceTable .balanceResultHead {
+  background: #f7f9f8;
+  border-left: 1px solid #e3eae6;
+}
+
+.balanceResultHead span {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.energyBalanceTable .balanceSubtotal {
+  font-weight: 600;
+  background: #fafcfb;
+}
+
+.energyBalanceTable tbody td:nth-child(6),
+.energyBalanceTable tfoot td:nth-child(6),
+.energyBalanceTable thead tr:nth-child(2) th:nth-child(5) {
+  border-left: 1px solid #e8eeea;
+}
+
+.energyBalanceTable .balanceResult {
+  border-left: 1px solid #e8eeea;
+}
+
+.balanceResultContent {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.balanceResultContent strong {
+  font-weight: 600;
+}
+
+.balanceResultContent span {
+  min-width: 64px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 400;
+  text-align: center;
+}
+
+.balancePending {
+  color: #9b600c;
+}
+
+.balancePending span {
+  background: #fff4dd;
+}
+
+.balanceExcess {
+  color: #c7473b;
+}
+
+.balanceExcess span {
+  background: #fff0ec;
+}
+
+.balanceMatched strong,
+.balanceMatched span {
+  color: #84928b;
+}
+
+.energyBalanceTable tbody tr:hover td,
+.energyBalanceTable tbody tr:hover th {
+  background: #f7faf8;
+}
+
+.balanceTableFrame .energyBalanceTable .balanceTotalRow th,
+.balanceTableFrame .energyBalanceTable .balanceTotalRow td {
+  height: 48px;
+  font-weight: 600;
+  background: #f0f6f2;
+  border-top: 1px solid #dce7e0;
+  border-bottom: 0;
+}
+
+.balanceDefinitions {
+  margin-top: 20px;
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.balanceDefinitionHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 18px;
+  margin-bottom: 14px;
+}
+
+.balanceDefinitionHeader h3 {
+  margin: 0;
   color: var(--text);
-  font-size: 14px;
-  background: #f7f9fb;
+  font-size: 13px;
+  font-weight: 600;
 }
 
-.energyBalanceTable .balanceTotalRow th,
-.energyBalanceTable .balanceTotalRow td {
-  font-weight: 700;
-  background: #f1f8f5;
+.balanceDefinitionHeader p {
+  margin: 0;
+  color: var(--text-secondary);
 }
 
-.energyBalanceTable .balanceDifferenceRow th,
-.energyBalanceTable .balanceDifferenceRow td {
-  font-weight: 700;
-  background: #fffaf0;
+.balanceDefinitionGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  margin: 0 0 14px;
+  padding: 16px 18px;
+  background: #f7faf8;
+  border-radius: 6px;
+}
+
+.balanceDefinitionGrid > div + div {
+  padding-left: 24px;
+  border-left: 1px solid #e2eae5;
+}
+
+.balanceDefinitionGrid dt {
+  margin-bottom: 4px;
+  color: #43574b;
+  font-weight: 600;
+}
+
+.balanceDefinitionGrid dd {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.balanceAccountingNotes p {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin: 4px 0;
+  color: var(--text-secondary);
+}
+
+.balanceAccountingNotes strong {
+  flex: 0 0 60px;
+  color: #5f7066;
+  font-weight: 500;
+}
+
+.balanceScopeNote {
+  margin: 10px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid #edf1ee;
+  color: #88958e;
+  font-size: 11px;
+}
+
+@media (max-width: 1500px) {
+  .balanceTableFrame .energyBalanceTable th,
+  .balanceTableFrame .energyBalanceTable td {
+    padding: 9px 7px;
+    font-size: 12px;
+  }
+
+  .balanceEnergyColumn {
+    width: 92px;
+  }
+
+  .balanceDifferenceColumn {
+    width: 156px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .balanceLedgerHeader {
+    flex-wrap: wrap;
+  }
+
+  .balanceDefinitionGrid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .balanceDefinitionGrid > div + div {
+    padding: 12px 0 0;
+    border-left: 0;
+    border-top: 1px solid #e2eae5;
+  }
 }
 
 .balanceValueLink {
@@ -2796,10 +2984,6 @@
   cursor: pointer;
 }
 
-.flowDetailTab {
-  padding: 8px 0 4px;
-}
-
 .flowDetailTable {
   min-width: 980px;
 }
@@ -2807,15 +2991,6 @@
 .flowDetailTable th,
 .flowDetailTable td {
   vertical-align: middle;
-}
-
-.flowGroupCell {
-  width: 78px;
-  color: var(--text);
-  background: #f7f9fb;
-  font-weight: 700;
-  text-align: center !important;
-  white-space: nowrap;
 }
 
 .flowDetailGroupRow th {
@@ -2851,55 +3026,6 @@
 
 .flowDetailSummary strong {
   color: var(--text);
-}
-
-.miniLink {
-  display: block;
-  margin-top: 2px;
-  padding: 0;
-  color: var(--blue);
-  font-size: 11px;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.detailFilters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 11px;
-  padding: 10px 12px;
-  background: #f8fafb;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-.detailFilters select,
-.detailFilters > input {
-  width: 180px;
-  height: 34px;
-  padding: 0 10px;
-  background: #fff;
-  border: 1px solid #d7dee7;
-  border-radius: 6px;
-}
-
-.detailFilters > input {
-  width: 220px;
-}
-
-.detailFilters label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.detailFilters label input {
-  accent-color: var(--brand);
 }
 
 .differenceStrip {
@@ -2985,17 +3111,6 @@
   border-top: 1px solid var(--border);
 }
 
-.drawerOverlay {
-  position: fixed;
-  z-index: 110;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgb(16 24 40 / 35%);
-}
-
 .traceDrawer {
   position: absolute;
   top: 0;
@@ -3045,64 +3160,6 @@
   padding: 18px 20px;
 }
 
-.traceDialog {
-  display: flex;
-  width: min(760px, 100%);
-  max-height: min(760px, 92vh);
-  flex-direction: column;
-  overflow: hidden;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 18px 50px rgb(16 24 40 / 22%);
-}
-
-.traceDialog > header {
-  display: flex;
-  min-height: 72px;
-  flex: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 24px;
-  border-bottom: 1px solid var(--border);
-}
-
-.traceDialog h2 {
-  margin: 0;
-  font-size: 19px;
-}
-
-.traceDialog header span {
-  display: block;
-  margin-top: 5px;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.traceDialog header button {
-  color: var(--muted);
-  font-size: 25px;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.traceDialogBody {
-  flex: 1;
-  overflow: auto;
-  padding: 22px 24px;
-}
-
-.traceDialog > footer {
-  display: flex;
-  min-height: 64px;
-  flex: none;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 0 24px;
-  border-top: 1px solid var(--border);
-}
-
 .traceDrawer > footer {
   display: flex;
   min-height: 58px;
@@ -3111,136 +3168,6 @@
   justify-content: flex-end;
   padding: 0 20px;
   border-top: 1px solid var(--border);
-}
-
-.traceSection {
-  margin-top: 18px;
-}
-
-.traceSection h3 {
-  margin: 0 0 10px;
-  font-size: 15px;
-}
-
-.traceSection > p {
-  margin: 0 0 10px;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.traceRecord {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-.traceRecord > div {
-  min-width: 0;
-  padding: 10px 12px;
-  border-right: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-}
-
-.traceRecord > div:nth-child(2n) {
-  border-right: 0;
-}
-
-.traceRecord > div:nth-last-child(-n+2) {
-  border-bottom: 0;
-}
-
-.traceRecord span,
-.traceRecord strong {
-  display: block;
-}
-
-.traceRecord span {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.traceRecord strong {
-  margin-top: 4px;
-  overflow: hidden;
-  color: var(--text);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.traceValueGrid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.traceValueGrid > div {
-  border-bottom: 0;
-}
-
-.traceValueGrid > div:nth-child(2n) {
-  border-right: 1px solid var(--border);
-}
-
-.traceValueGrid > div:last-child {
-  border-right: 0;
-}
-
-.traceValueGrid > div:nth-last-child(-n+2) {
-  border-bottom: 1px solid var(--border);
-}
-
-.traceValueGrid > .traceResult {
-  background: #f0f8ff;
-}
-
-.traceValueGrid > .traceResult span,
-.traceValueGrid > .traceResult strong {
-  color: #1677ff;
-}
-
-.traceFormula {
-  padding: 16px 18px;
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.7;
-  background: #f2faf7;
-  border: 1px solid #d7ebe2;
-  border-radius: 8px;
-}
-
-@media (max-width: 640px) {
-  .drawerOverlay {
-    padding: 12px;
-  }
-
-  .traceDialog {
-    max-height: 94vh;
-  }
-
-  .traceDialog > header,
-  .traceDialogBody,
-  .traceDialog > footer {
-    padding-right: 16px;
-    padding-left: 16px;
-  }
-
-  .traceValueGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .traceValueGrid > div,
-  .traceValueGrid > div:nth-child(2n),
-  .traceValueGrid > div:last-child {
-    border-right: 0;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .traceValueGrid > div:last-child {
-    border-bottom: 0;
-  }
 }
 
 .detailGrid {
