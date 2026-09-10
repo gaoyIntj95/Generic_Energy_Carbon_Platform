@@ -1,6 +1,8 @@
+import { energyConversionPresets, energyConversionFields, energyRelationError } from '../../modules/data-management/energyConversionRelations';
+import { listV11EnergyTypes } from '../../mocks/dataManagementV11Store';
 import { useDataYear } from './useDataYear';
 import { DATA_YEARS } from '../../mocks/annualData';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   addChildEnergyUnit,
@@ -587,6 +589,7 @@ function EnergyUnitFormDialog({
     energyUnitName: target?.energyUnitName ?? '',
     remark: target?.remark ?? '',
     conversionScenarios: target?.conversionScenarios ?? [],
+    energyRelations: target?.energyRelations ?? [{ inputEnergyTypeId: '', outputEnergyTypeId: '' }],
   });
   const [rootCategory, setRootCategory] = useState<RootCategory | ''>(
     isRootForm ? rootCategoryOf(target?.unitType ?? '') : '',
@@ -596,6 +599,22 @@ function EnergyUnitFormDialog({
       ? target.unitType
       : '',
   );
+  const isPowerCenterForm = (parent?.energyUnitId ?? target?.parentEnergyUnitId) === 'eu-utilities';
+  const isPowerCenterSecondaryUnit = isPowerCenterForm && form.unitType === '公辅系统';
+  const energyTypes = listV11EnergyTypes(Number(year));
+  const selectedRelationFields = energyConversionFields(form.energyRelations, energyTypes);
+  const availablePresets = energyConversionPresets.flatMap((preset) => {
+    const input = energyTypes.find((type) => type.energyTypeName === preset.input);
+    const output = energyTypes.find((type) => type.energyTypeName === preset.output);
+    return input && output ? [{ ...preset, inputEnergyTypeId: input.energyTypeId, outputEnergyTypeId: output.energyTypeId }] : [];
+  });
+  const relation = form.energyRelations?.[0] ?? { inputEnergyTypeId: '', outputEnergyTypeId: '' };
+  const presetIndex = availablePresets.findIndex((preset) => preset.inputEnergyTypeId === relation.inputEnergyTypeId && preset.outputEnergyTypeId === relation.outputEnergyTypeId);
+  const [isCustomRelation, setIsCustomRelation] = useState(() => Boolean(relation.inputEnergyTypeId || relation.outputEnergyTypeId) && presetIndex < 0);
+  const hasMultipleRelations = isPowerCenterForm && (form.energyRelations?.length ?? 0) > 1;
+  const relationHintId = useId();
+  const relationTooltipId = useId();
+  const [showRelationHelp, setShowRelationHelp] = useState(false);
   const [error, setError] = useState('');
   const [isChangingChildType, setIsChangingChildType] = useState(false);
 
@@ -609,26 +628,45 @@ function EnergyUnitFormDialog({
           : '编辑下级用能单元';
   const save = () => {
     setError('');
+    if (hasMultipleRelations) {
+      setError('此单元包含多条历史转换关系，当前版本暂不支持编辑，原有数据已保留。');
+      return;
+    }
+    if (isPowerCenterSecondaryUnit && !isCustomRelation && presetIndex < 0) {
+      setError('请选择常用能源转换关系，或切换到自定义。');
+      return;
+    }
     if ((isRootForm && (!rootCategory || (rootCategory === '非生产类用能单元' && !nonProductionType))) || (!isRootForm && !form.unitType) || !form.energyUnitName.trim()) {
       setError('请选择单元类型并填写用能单元名称。');
       return;
     }
+    if (isPowerCenterSecondaryUnit && !selectedRelationFields) {
+      setError(energyRelationError(form.energyRelations, energyTypes) ?? '请检查能源转换关系。');
+      return;
+    }
+    const normalizedForm = {
+      ...form,
+      energyRelations: isPowerCenterSecondaryUnit ? selectedRelationFields?.energyRelations : undefined,
+      conversionScenarios: isPowerCenterSecondaryUnit ? selectedRelationFields?.conversionScenarios : form.conversionScenarios,
+    };
     const submitForm = isRootForm
-      ? { ...form, unitType: rootCategory === '生产类用能单元' ? '生产单元' as const : nonProductionType as EnergyUnitType, conversionScenarios: [] }
+      ? { ...normalizedForm, unitType: rootCategory === '生产类用能单元' ? '生产单元' as const : nonProductionType as EnergyUnitType, conversionScenarios: [] }
       : level === 'level2' && form.unitType === '公辅系统'
-        ? form
-        : { ...form, conversionScenarios: [] };
+        ? normalizedForm
+        : { ...normalizedForm, conversionScenarios: [] };
     const result =
       dialog.type === 'addRoot'
         ? createEnergyUnit(submitForm, Number(year))
         : dialog.type === 'addChild'
-          ? addChildEnergyUnit(dialog.parentEnergyUnitId, form, Number(year))
+          ? addChildEnergyUnit(dialog.parentEnergyUnitId, submitForm, Number(year))
           : updateEnergyUnit(dialog.energyUnitId, submitForm, Number(year));
 
     if (!result.ok) {
       setError(
         result.error === 'duplicateName'
           ? '同一所属单元下已存在该名称，请使用其他名称。'
+          : result.error === 'invalidEnergyRelation'
+            ? '请补全能源转换关系，并检查是否存在重复组合或无效能源品种。'
           : result.error === 'maxLevel'
             ? '用能单元最多设置为两级，二级单元不能继续添加下级。'
             : '保存失败，请检查当前记录是否仍然存在。',
@@ -642,9 +680,16 @@ function EnergyUnitFormDialog({
   };
 
   return (
-    <Modal title={`${title}（${year}年度）`} width={760} onClose={onClose} onSubmit={save}>
-      <div className={styles.formGrid}>
-        {dialog.type === 'addChild' && parent && (
+    <Modal title={`${title}（${year}年度）`} width={isPowerCenterForm ? 620 : 760} onClose={onClose} onSubmit={save}>
+      <div className={[styles.formGrid, isPowerCenterForm ? styles.compactForm : ''].join(' ')}>
+        {isPowerCenterForm && parent ? (
+          <div className={styles.compactContext}>
+            <span>所属单元：<strong>{parent.energyUnitName}</strong></span>
+            <span>{levelLabels[level]}</span>
+            <span>{form.unitType}</span>
+            {!isChangingChildType && <button type="button" className={styles.action} onClick={() => setIsChangingChildType(true)}>修改类型</button>}
+          </div>
+        ) : dialog.type === 'addChild' && parent && (
           <div className={styles.context}>
             <div>
               <span>所属单元</span>
@@ -656,7 +701,7 @@ function EnergyUnitFormDialog({
             </div>
           </div>
         )}
-        <Field label="单元类型" required>
+        {(!isPowerCenterForm || !isAddingChild || isChangingChildType) && <Field label="单元类型" required>
           {isRootForm ? (
             <div className={styles.rootTypeFields}>
               <select aria-label="单元类型" required value={rootCategory} onChange={(event) => {
@@ -727,7 +772,7 @@ function EnergyUnitFormDialog({
               )}
             </div>
           )}
-        </Field>
+        </Field>}
         <Field label="用能单元名称" required>
           <input
             aria-label="用能单元名称"
@@ -739,7 +784,67 @@ function EnergyUnitFormDialog({
             }
           />
         </Field>
-        {level === 'level2' && form.unitType === '公辅系统' && (
+        {isPowerCenterSecondaryUnit && (
+          <fieldset className={styles.energyRelationGroup} aria-label="能源转换关系" aria-describedby={relationHintId}>
+            <legend>
+              <span className={styles.requiredMark} aria-hidden="true">*</span> 能源转换关系
+              <span className={styles.relationHelp} onMouseEnter={() => setShowRelationHelp(true)} onMouseLeave={() => setShowRelationHelp(false)}>
+                <button
+                  type="button"
+                  aria-label="能源转换关系选择说明"
+                  aria-describedby={showRelationHelp ? relationTooltipId : undefined}
+                  onFocus={() => setShowRelationHelp(true)}
+                  onBlur={() => setShowRelationHelp(false)}
+                  onClick={() => setShowRelationHelp(true)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') { event.stopPropagation(); setShowRelationHelp(false); }
+                  }}
+                >?</button>
+                {showRelationHelp && <span id={relationTooltipId} role="tooltip" className={styles.relationTooltip}>请按实际投入和产出的能源配置，不限定企业的单元名称。一期每个单元配置一种投入和一种产出。关系配置不代替数量填报，也不会自动重复计入投入。自定义组合从本年度能源品种中选择，缺少品种时请先在“能源品种”维护。余热产汽的产出同样选择“蒸汽”，回收来源由投入能源及转换记录保留。</span>}
+              </span>
+            </legend>
+            <p id={relationHintId}>选择一种投入能源和一种产出能源。</p>
+            {hasMultipleRelations ? (
+              <p>此单元包含多条历史转换关系，当前版本暂不支持编辑，原有数据已保留。</p>
+            ) : (
+              <>
+                <div className={styles.relationMode} role="group" aria-label="关系配置方式">
+                  <button type="button" aria-pressed={!isCustomRelation} onClick={() => { setIsCustomRelation(false); setError(''); }}>常用关系</button>
+                  <button type="button" aria-pressed={isCustomRelation} onClick={() => { setIsCustomRelation(true); setError(''); }}>自定义</button>
+                </div>
+                {isCustomRelation ? (
+                  <div className={styles.customRelationFields}>
+                    <Field label="投入能源"><select aria-label="投入能源" aria-required="true" value={relation.inputEnergyTypeId} onChange={(event) => {
+                      setForm((current) => ({ ...current, energyRelations: [{ ...relation, inputEnergyTypeId: event.target.value }] }));
+                      setError('');
+                    }}><option value="">请选择投入能源</option>{energyTypes.map((type) => <option key={type.energyTypeId} value={type.energyTypeId}>{type.energyTypeName}</option>)}</select></Field>
+                    <span aria-hidden="true">→</span>
+                    <Field label="产出能源"><select aria-label="产出能源" aria-required="true" value={relation.outputEnergyTypeId} onChange={(event) => {
+                      setForm((current) => ({ ...current, energyRelations: [{ ...relation, outputEnergyTypeId: event.target.value }] }));
+                      setError('');
+                    }}><option value="">请选择产出能源</option>{energyTypes.map((type) => <option key={type.energyTypeId} value={type.energyTypeId}>{type.energyTypeName}</option>)}</select></Field>
+                  </div>
+                ) : (
+                  <select aria-label="常用能源转换关系" aria-required="true" value={presetIndex >= 0 ? String(presetIndex) : ''} onChange={(event) => {
+                    const preset = availablePresets[Number(event.target.value)];
+                    setForm((current) => ({ ...current, energyRelations: [{ inputEnergyTypeId: preset.inputEnergyTypeId, outputEnergyTypeId: preset.outputEnergyTypeId }] }));
+                    setError('');
+                  }}>
+                    <option value="" disabled>请选择能源转换关系</option>
+                    {[...new Set(availablePresets.map((preset) => preset.output))].map((output) => (
+                      <optgroup key={output} label={'产出' + output}>
+                        {availablePresets.map((preset, optionIndex) => preset.output === output && (
+                          <option key={optionIndex} value={optionIndex}>{preset.input} → {preset.output}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                )}
+              </>
+            )}
+          </fieldset>
+        )}
+        {!isPowerCenterSecondaryUnit && level === 'level2' && form.unitType === '公辅系统' && (
           <div className={styles.full}>
             <Field label="适用转换场景">
               <div className={styles.checkboxGroup}>
@@ -762,6 +867,12 @@ function EnergyUnitFormDialog({
             </Field>
           </div>
         )}
+        {isPowerCenterForm ? (
+          <details className={styles.optionalRemark} open={target?.remark ? true : undefined}>
+            <summary>备注（选填）</summary>
+            <textarea aria-label="备注" value={form.remark} placeholder="填写补充说明" rows={2} onChange={(event) => setForm((current) => ({ ...current, remark: event.target.value }))} />
+          </details>
+        ) : (
         <div className={styles.full}>
           <Field label="备注">
             <textarea
@@ -774,6 +885,7 @@ function EnergyUnitFormDialog({
             />
           </Field>
         </div>
+        )}
         {error && (
           <div className={`${styles.full} ${styles.error}`} role="alert">
             {error}

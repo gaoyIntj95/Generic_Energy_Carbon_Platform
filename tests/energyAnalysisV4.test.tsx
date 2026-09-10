@@ -665,6 +665,14 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(container.textContent).toContain('仓储物流区域');
     expect(container.textContent).toContain('办公区域');
     expect(container.innerHTML).toContain('全厂一级能源分配视图');
+    for (const id of ['v11-energy-steam', 'v11-energy-electricity']) {
+      const node = container.querySelector(`g[data-key="medium:${id}"]`)!;
+      const text = [...node.querySelectorAll('text')].map((line) => line.textContent).join(' ');
+      expect(text).toContain('可供总量');
+      expect(text).toContain('企业输入');
+      expect(text).toContain('转换产出');
+      expect(text).toContain('回收产出');
+    }
     expect(container.textContent).not.toContain('重点用能单元 TOP5');
     expect(container.textContent).toContain('转换损失');
     expect(container.textContent).toContain('能流口径说明');
@@ -693,8 +701,8 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(container.textContent).toContain('待分配');
     expect(container.textContent).toContain('收支差额');
     const balance = container.querySelector('table[aria-label="全厂能源平衡表"]')!;
-    const steamRow = [...balance.querySelectorAll('tbody tr')].find((row) => row.querySelector('th')?.textContent === '回收蒸汽')!;
-    expect(steamRow.querySelectorAll('td')[2].textContent).toBe('37.51');
+    const steamRow = [...balance.querySelectorAll('tbody tr')].find((row) => row.querySelector('th')?.textContent === '蒸汽')!;
+    expect(steamRow.querySelectorAll('td')[2].textContent).toBe('194.37');
     expect(steamRow.querySelectorAll('td')[1].textContent).toBe('—');
     expect(balance.textContent).not.toContain('-0.00');
     expect(balance.querySelectorAll('[class*="balanceExcess"]')).toHaveLength(0);

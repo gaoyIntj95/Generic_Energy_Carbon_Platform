@@ -1,4 +1,5 @@
-import { listV11EnergyRecords, listV11OperationMetrics, listV11KeyDevices, listV11ConversionOutputs } from './dataManagementV11Store';
+import { energyConversionFields } from '../modules/data-management/energyConversionRelations';
+import { listV11EnergyTypes, listV11EnergyRecords, listV11OperationMetrics, listV11KeyDevices, listV11ConversionOutputs } from './dataManagementV11Store';
 import { createAnnualStore } from './annualData';
 import type {
   EnergyUnit,
@@ -112,6 +113,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     energyUnitId: 'eu-compressed-air',
     organizationId: DEMO_ORGANIZATION_ID,
     energyUnitName: '空压系统',
+    energyRelations: [{ inputEnergyTypeId: 'v11-energy-electricity', outputEnergyTypeId: 'v11-energy-compressed-air' }],
     conversionScenarios: ['空压产气/压缩空气'],
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
@@ -123,6 +125,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     energyUnitId: 'eu-waste-heat-power',
     organizationId: DEMO_ORGANIZATION_ID,
     energyUnitName: '余热发电机组',
+    energyRelations: [{ inputEnergyTypeId: 'v11-energy-waste-heat', outputEnergyTypeId: 'v11-energy-electricity' }],
     conversionScenarios: ['余热发电'],
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
@@ -134,6 +137,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     energyUnitId: 'eu-captive-power',
     organizationId: DEMO_ORGANIZATION_ID,
     energyUnitName: '自备发电机组',
+    energyRelations: [{ inputEnergyTypeId: 'v11-energy-coal', outputEnergyTypeId: 'v11-energy-electricity' }],
     conversionScenarios: ['其他转换'],
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
@@ -145,6 +149,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     energyUnitId: 'eu-waste-heat-utilization',
     organizationId: DEMO_ORGANIZATION_ID,
     energyUnitName: '余热回收利用系统',
+    energyRelations: [{ inputEnergyTypeId: 'v11-energy-waste-heat', outputEnergyTypeId: 'v11-energy-steam' }],
     conversionScenarios: ['回收利用'],
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
@@ -156,6 +161,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     energyUnitId: 'eu-pressure-recovery',
     organizationId: DEMO_ORGANIZATION_ID,
     energyUnitName: '余压回收系统',
+    energyRelations: [{ inputEnergyTypeId: 'v11-energy-waste-pressure', outputEnergyTypeId: 'v11-energy-compressed-air' }],
     conversionScenarios: ['回收利用'],
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
@@ -167,6 +173,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     energyUnitId: 'eu-gas-boiler',
     organizationId: DEMO_ORGANIZATION_ID,
     energyUnitName: '锅炉系统',
+    energyRelations: [{ inputEnergyTypeId: 'v11-energy-natural-gas', outputEnergyTypeId: 'v11-energy-steam' }],
     conversionScenarios: ['锅炉产汽/产热'],
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
@@ -210,7 +217,7 @@ const annualUnits = createAnnualStore(seedEnergyUnits);
 let nextMockId = 100;
 
 function cloneUnits(units: EnergyUnit[]): EnergyUnit[] {
-  return units.map((unit) => ({ ...unit, conversionScenarios: unit.conversionScenarios ? [...unit.conversionScenarios] : undefined }));
+  return units.map((unit) => ({ ...unit, energyRelations: unit.energyRelations?.map((relation) => ({ ...relation })), conversionScenarios: unit.conversionScenarios ? [...unit.conversionScenarios] : undefined }));
 }
 
 function normalizeName(name: string) {
@@ -265,7 +272,7 @@ export function listEnergyUnits(year = 2026) {
 export function getEnergyUnit(energyUnitId: string, year = 2026) {
   const energyUnits = annualUnits.get(year);
   const unit = energyUnits.find((item) => item.energyUnitId === energyUnitId);
-  return unit ? { ...unit } : undefined;
+  return unit ? cloneUnits([unit])[0] : undefined;
 }
 
 export function createEnergyUnit(input: EnergyUnitWriteInput, year = 2026): EnergyUnitMutationResult {
@@ -284,7 +291,7 @@ export function createEnergyUnit(input: EnergyUnitWriteInput, year = 2026): Ener
     conversionScenarios: input.conversionScenarios ? [...input.conversionScenarios] : undefined,
   };
   energyUnits.push(unit);
-  return { ok: true, unit: { ...unit } };
+  return { ok: true, unit: cloneUnits([unit])[0] };
 }
 
 export function addChildEnergyUnit(
@@ -302,6 +309,12 @@ export function addChildEnergyUnit(
     return { ok: false, error: 'duplicateName' };
   }
 
+  const relationFields = parentEnergyUnitId === 'eu-utilities' && input.unitType === '公辅系统'
+    ? energyConversionFields(input.energyRelations, listV11EnergyTypes(year)) : undefined;
+  if (parentEnergyUnitId === 'eu-utilities' && input.unitType === '公辅系统' && !relationFields) {
+    return { ok: false, error: 'invalidEnergyRelation' };
+  }
+
   const unit: EnergyUnit = {
     energyUnitId: makeId(),
     organizationId: parent.organizationId,
@@ -311,10 +324,11 @@ export function addChildEnergyUnit(
     unitType: input.unitType,
     displayOrder: nextDisplayOrder(parentEnergyUnitId, year),
     remark: input.remark?.trim() ?? '',
-    conversionScenarios: input.conversionScenarios ? [...input.conversionScenarios] : undefined,
+    energyRelations: relationFields?.energyRelations,
+    conversionScenarios: relationFields?.conversionScenarios ?? (input.conversionScenarios ? [...input.conversionScenarios] : undefined),
   };
   energyUnits.push(unit);
-  return { ok: true, unit: { ...unit } };
+  return { ok: true, unit: cloneUnits([unit])[0] };
 }
 
 export function updateEnergyUnit(
@@ -329,13 +343,20 @@ export function updateEnergyUnit(
     return { ok: false, error: 'duplicateName' };
   }
 
+  const relationFields = unit.parentEnergyUnitId === 'eu-utilities' && input.unitType === '公辅系统'
+    ? energyConversionFields(input.energyRelations, listV11EnergyTypes(year)) : undefined;
+  if (unit.parentEnergyUnitId === 'eu-utilities' && input.unitType === '公辅系统' && !relationFields) {
+    return { ok: false, error: 'invalidEnergyRelation' };
+  }
+
   Object.assign(unit, {
     energyUnitName: normalizeName(input.energyUnitName),
     unitType: input.unitType,
     remark: input.remark?.trim() ?? '',
-    conversionScenarios: input.conversionScenarios ? [...input.conversionScenarios] : undefined,
+    energyRelations: relationFields?.energyRelations,
+    conversionScenarios: relationFields?.conversionScenarios ?? (input.conversionScenarios ? [...input.conversionScenarios] : undefined),
   });
-  return { ok: true, unit: { ...unit } };
+  return { ok: true, unit: cloneUnits([unit])[0] };
 }
 
 export function reorderEnergyUnits(
@@ -386,7 +407,7 @@ export function deleteEnergyUnit(energyUnitId: string, year = 2026): EnergyUnitM
   }
 
   energyUnits.splice(energyUnits.findIndex((item) => item.energyUnitId === energyUnitId), 1);
-  return { ok: true, unit: { ...unit } };
+  return { ok: true, unit: cloneUnits([unit])[0] };
 }
 
 export function resetEnergyUnitMockStore() {

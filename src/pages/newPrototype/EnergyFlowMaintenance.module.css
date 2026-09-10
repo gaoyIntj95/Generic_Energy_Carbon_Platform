@@ -100,5 +100,8 @@
 
 .monthInputGrid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
 .monthInputGrid label { min-width: 0; }
+.annualSummary { margin: 0 0 18px; }
+.annualSummaryGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
+.annualSummary label, .annualSummaryGrid label { min-width: 0; }
 @media(max-width: 1100px) { .monthInputGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-@media(max-width: 640px) { .monthInputGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media(max-width: 640px) { .monthInputGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.annualSummaryGrid { grid-template-columns: 1fr; } }

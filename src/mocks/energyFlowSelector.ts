@@ -502,8 +502,7 @@ function objectTypeLabel(unit: EnergyUnit) {
 }
 
 function mediumName(energyTypeId: string, fallback: string) {
-  if (energyTypeId === 'v11-energy-steam') return '锅炉蒸汽';
-  if (energyTypeId === 'v11-energy-recovered-steam') return '回收蒸汽';
+  if (energyTypeId === 'v11-energy-steam') return '蒸汽';
   return fallback;
 }
 
@@ -1053,6 +1052,22 @@ export function buildFlowAnalysisDataset(
     const outputLink = links.find((link) => link.linkId === `conversion-medium:${item.conversion.conversionOutputId}`);
     if (outputLink) outputLink.standardCoalAmount += item.external.standard;
     else links.push({ linkId: `conversion-medium:${item.conversion.conversionOutputId}`, sourceNodeId: `conversion:${item.conversion.conversionOutputId}`, targetNodeId: medium.nodeId, standardCoalAmount: item.external.standard, flowType: item.conversion.inputMode === 'recovery' ? 'recovery_output' : 'conversion_output' });
+  });
+
+  // 来源明细使用当期台账；回收装置的产出是普通能源，不能再计为过程回收投入。
+  nodes.filter((node) => node.stage === 'medium').forEach((node) => {
+    const energyTypeId = node.nodeId.slice('medium:'.length);
+    const input = inputByType.get(energyTypeId)?.standard ?? 0;
+    const outputs = conversionAmounts.filter((item) => item.outputType?.energyTypeId === energyTypeId);
+    const converted = sum(outputs.filter((item) => item.conversion.inputMode !== 'recovery').map((item) => item.output.standard));
+    const recovered = sum(outputs.filter((item) => item.conversion.inputMode === 'recovery').map((item) => item.output.standard));
+    if ([input, converted, recovered].filter((amount) => amount > 0).length < 2) return;
+    node.valueLabel = `可供总量 ${amountLabel(node.standardCoalAmount)}`;
+    node.detailLabelSecondary = [
+      input > 0 ? `企业输入 ${amountLabel(input)}` : '',
+      converted > 0 ? `转换产出 ${amountLabel(converted)}` : '',
+      recovered > 0 ? `回收产出 ${amountLabel(recovered)}` : '',
+    ].filter(Boolean).join('｜');
   });
 
   if (viewLevel === 'level1') {

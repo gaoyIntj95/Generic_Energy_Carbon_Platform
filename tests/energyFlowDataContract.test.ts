@@ -90,9 +90,52 @@ describe('energy flow phase-one data contract', () => {
     expect(recoverySystem?.nodeType).toBe('能源回收与循环利用');
     expect(recoverySystem?.sourceLabel).toContain('生产车间B');
     expect(result.links.some((link) => link.targetNodeId === recoverySystem?.nodeId && link.flowType === 'recovery_input' && link.sourceNodeId.startsWith('distribution:'))).toBe(true);
-    expect(result.nodes.filter((node) => node.stage === 'medium').map((node) => node.name)).toContain('锅炉蒸汽');
-    expect(result.nodes.filter((node) => node.stage === 'medium').map((node) => node.name)).toContain('回收蒸汽');
+    const steamNodes = result.nodes.filter((node) => node.stage === 'medium' && node.name === '蒸汽');
+    expect(steamNodes).toHaveLength(1);
+    expect(result.links).toEqual(expect.arrayContaining([
+      expect.objectContaining({ sourceNodeId: 'conversion:v11-output-201', targetNodeId: steamNodes[0].nodeId, flowType: 'conversion_output' }),
+      expect.objectContaining({ sourceNodeId: 'conversion:v11-output-202', targetNodeId: steamNodes[0].nodeId, flowType: 'recovery_output' }),
+    ]));
+    const balance = result.levelOneBalanceRows.filter((row) => row.energyTypeName === '蒸汽');
+    expect(balance).toHaveLength(1);
+    expect(balance[0].conversionOutputStandardAmount).toBeCloseTo((4600 + 1100) * 0.0341, 8);
+    expect(balance[0].internalRecoveryStandardAmount).toBe(0);
+    const source = listV11ConversionOutputs().find((row) => row.conversionOutputId === 'v11-output-202')!;
+    expect(source).toMatchObject({ outputEnergyTypeId: 'v11-energy-steam', outputEnergyName: '蒸汽', inputMode: 'recovery', recoveryEnergyName: '余热', recoverySourceEnergyUnitId: 'eu-cement-grinding-line' });
+    expect(source.monthlyOutputAmounts?.[5]).toBe(1100);
+    expect(source.monthlyLossAmounts?.[5]).toBe(20);
+    expect(listV11EnergyTypes().some((type) => type.energyTypeName === '回收蒸汽')).toBe(false);
   });
+  it('shows concise mixed-source pools while preserving net totals across periods', () => {
+    for (const year of [2025, 2026]) {
+      for (const month of [0, 1, 6, 12]) {
+        const data = buildFlowAnalysisDataset({ year, grain: month ? 'month' : 'year', month: month || 6 }, 'level1');
+        for (const id of ['v11-energy-electricity', 'v11-energy-steam', 'v11-energy-compressed-air']) {
+          const node = data.nodes.find((item) => item.nodeId === `medium:${id}`)!;
+          if (year === 2025 && id === 'v11-energy-compressed-air') {
+            expect(node.detailLabelSecondary).toBeUndefined();
+            continue;
+          }
+          expect(node.valueLabel).toContain('可供总量');
+          expect(node.detailLabelSecondary).toContain('转换产出');
+          expect(node.detailLabelSecondary).toContain('回收产出');
+          const incoming = data.links.filter((link) => link.targetNodeId === node.nodeId).reduce((total, link) => total + link.standardCoalAmount, 0);
+          expect(node.standardCoalAmount).toBeCloseTo(incoming, 8);
+          if (id !== 'v11-energy-compressed-air') expect(node.detailLabelSecondary).toContain('企业输入');
+          else expect(node.detailLabelSecondary).not.toContain('企业输入');
+        }
+      }
+    }
+    const data = buildFlowAnalysisDataset({ year: 2026, grain: 'month', month: 6 }, 'level1');
+    const steam = data.nodes.find((node) => node.nodeId === 'medium:v11-energy-steam')!;
+    expect(steam.standardCoalAmount).toBeCloseTo((1000 + 4600 + 1100 - 20) * 0.0341);
+    for (const node of data.nodes.filter((item) => item.stage === 'medium')) {
+      expect(node.detailLabelSecondary ?? '').not.toMatch(/损失|转换投入|差额/);
+    }
+    expect(data.nodes.find((node) => node.nodeId === 'conversion:v11-output-202')?.detailLabelSecondary).toContain('损失');
+    expect(data.nodes.find((node) => node.nodeId === 'medium:v11-energy-coal')?.detailLabelSecondary).toBeUndefined();
+  });
+
   it('rejects conversion external supply that exceeds the output ledger', () => {
     const result = saveV11ExternalSupplyRecord({
       year: 2026,
@@ -111,7 +154,7 @@ describe('energy flow phase-one data contract', () => {
     const result = buildFlowAnalysisDataset({ year: 2026, grain: 'month', month: 6 }, 'level1');
     const steam = result.levelOneBalanceRows.find((row) => row.energyTypeId === 'v11-energy-steam');
 
-    expect(steam?.distributionAmount).toBe(5450);
+    expect(steam?.distributionAmount).toBe(5450 + 1080);
     expect(steam?.overAllocatedAmount).toBe(0);
     expect(result.links.some((link) => link.linkId === 'conversion-distribution:v11-output-201')).toBe(false);
   });

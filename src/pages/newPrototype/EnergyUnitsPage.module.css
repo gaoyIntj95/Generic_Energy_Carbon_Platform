@@ -520,3 +520,155 @@
   font-size: 12px;
 }
 
+
+.energyRelationGroup {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.energyRelationGroup legend {
+  padding: 0;
+  color: #5f6b7a;
+  font-size: 12px;
+}
+
+.requiredMark {
+  color: #f04438;
+}
+
+.energyRelationGroup > p {
+  margin: 8px 0 10px;
+  color: #687b87;
+  font-size: 12px;
+}
+
+.relationHelp {
+  position: relative;
+  display: inline-flex;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.relationHelp > button {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  place-items: center;
+  color: #687b87;
+  background: #fff;
+  border: 1px solid #a8b7be;
+  border-radius: 50%;
+  font-size: 12px;
+  cursor: help;
+}
+
+.relationHelp > button:focus-visible {
+  outline: 2px solid #159d72;
+  outline-offset: 2px;
+}
+
+.relationTooltip {
+  position: absolute;
+  z-index: 2;
+  top: 100%;
+  left: 0;
+  width: 300px;
+  max-width: 65vw;
+  padding: 10px 12px;
+  color: #fff;
+  background: #26343d;
+  border-radius: 5px;
+  box-shadow: 0 4px 12px rgb(18 31 38 / 18%);
+  line-height: 1.7;
+}
+
+.compactForm {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.compactContext {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  color: #687b87;
+  font-size: 12px;
+}
+
+.compactContext strong {
+  color: #172033;
+}
+
+.compactContext > span + span {
+  padding-left: 12px;
+  border-left: 1px solid #dce8e4;
+}
+
+.relationMode {
+  display: inline-flex;
+  gap: 3px;
+  margin-bottom: 12px;
+  padding: 3px;
+  background: #f3f6f5;
+  border: 1px solid #dce8e4;
+  border-radius: 6px;
+}
+
+.relationMode button {
+  min-width: 90px;
+  padding: 6px 16px;
+  color: #596670;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.relationMode button[aria-pressed='true'] {
+  color: #00875a;
+  background: #fff;
+  border-color: #bfe9d9;
+  font-weight: 600;
+}
+
+.relationMode button:focus-visible {
+  outline: 2px solid #159d72;
+  outline-offset: 1px;
+}
+
+.customRelationFields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr);
+  align-items: end;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 6px;
+  background: #f8fbfa;
+}
+
+.customRelationFields > span {
+  padding-bottom: 8px;
+  color: #687b87;
+}
+
+.optionalRemark {
+  color: #687b87;
+  font-size: 12px;
+}
+
+.optionalRemark summary {
+  width: fit-content;
+  cursor: pointer;
+}
+
+.optionalRemark textarea {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  margin-top: 10px;
+}

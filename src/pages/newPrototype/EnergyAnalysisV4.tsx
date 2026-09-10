@@ -2362,7 +2362,7 @@ function EnergyBalanceLedger({ data }: { data: FlowAnalysisDataset }) {
       <section className={styles.balanceDefinitions} aria-label="能源平衡口径说明">
         <div className={styles.balanceDefinitionHeader}>
           <h3>口径说明</h3>
-          <p>“回收蒸汽”是能源品种；“过程回收、转换产出”是来源环节，分别在表内核对。</p>
+          <p>蒸汽按能源品种统一汇总；锅炉产汽、余热回收产汽的来源由转换装置及记录区分。余热投入列入“过程回收”和“转换投入”，产生的蒸汽列入“转换产出”。</p>
         </div>
         <dl className={styles.balanceDefinitionGrid}>
           <div><dt>过程回收</dt><dd>生产过程中回收的余热、余压等，进入回收装置时同时列入“转换投入”。</dd></div>

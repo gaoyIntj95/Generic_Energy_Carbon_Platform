@@ -44,7 +44,7 @@ describe('annual ledgers and shared monthly details', () => {
     },
   );
 
-  it('shows annual cost in the list, expands actual months, and edits all monthly fields inline', async () => {
+  it('shows annual cost in the list, expands actual months, and edits all monthly fields in a dialog', async () => {
     const item = listV11EnergyCosts().find((row) => row.year === 2026)!;
     expect(saveV11EnergyCost({ ...item, monthlyCosts: [0, 25, ...Array(10).fill(0)], monthlyReportedMonths: [true, true, ...Array(10).fill(false)], annualCost: 100 }, item.energyCostId).ok).toBe(true);
     const before = listV11EnergyCosts();
@@ -57,7 +57,7 @@ describe('annual ledgers and shared monthly details', () => {
     expect(listV11EnergyCosts()).toEqual(before);
     await click(button('收起')); expect(monthlyValues()).toHaveLength(0);
     await click(button('编辑'));
-    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
     const field = container.querySelector<HTMLInputElement>('[aria-label="3月成本"]')!;
     expect(field.value).toBe('');
     await change(field, '10'); await click(button('保存'));
@@ -80,11 +80,11 @@ describe('annual ledgers and shared monthly details', () => {
     expect(container.querySelector('[role="dialog"]')).toBeNull();
     expect(getDeviceIntensityParameter('v11-device-81', 2026, 'device-output-energy')).toEqual(before);
     await click(button('编辑'));
-    expect(container.querySelector('[role="dialog"]')).toBeNull();
-    const fields = container.querySelectorAll<HTMLInputElement>('[data-inline-editor] input');
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+    const fields = container.querySelectorAll<HTMLInputElement>('[role="dialog"] input');
     const monthFields = [...fields].filter((field) => /^\d{1,2}月/.test(field.getAttribute('aria-label') ?? ''));
     expect(monthFields).toHaveLength(12); expect(monthFields[0].value).toBe('0'); expect(monthFields[2].value).toBe('');
-    expect([...container.querySelectorAll('[data-inline-editor] button')].map((el) => el.textContent)).toEqual(['取消', '保存并重新计算']);
+    expect([...container.querySelectorAll('[role="dialog"] footer button')].map((el) => el.textContent)).toEqual(['取消', '保存并重新计算']);
 
   });
 
@@ -105,21 +105,23 @@ describe('annual ledgers and shared monthly details', () => {
     expect(listV11OperationMetrics()).toEqual(before);
   });
   it.each(['/data-management/energy-data', '/data-management/energy-data?tab=costs', '/data-management/device-output', '/data-management/operations'])(
-    'distinguishes read-only viewing from one complete inline editor on %s', async (path) => {
+    'distinguishes read-only viewing from one complete editing dialog on %s', async (path) => {
       await render(path);
       await click(button('查看'));
       const detail = container.querySelector('[aria-label="月度明细"]')!;
       expect(detail.querySelectorAll('input, select')).toHaveLength(0);
       expect([...detail.querySelectorAll('button')].some((el) => el.textContent === '编辑')).toBe(false);
+      const rowCount = container.querySelectorAll('table tbody tr').length;
       await click(button('编辑'));
-      expect(container.querySelector('[role="dialog"]')).toBeNull();
-      const form = container.querySelector('[data-inline-editor]')!;
+      expect(container.querySelectorAll('table tbody tr')).toHaveLength(rowCount);
+      expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+      const form = container.querySelector('[role="dialog"]')!;
       expect(form).not.toBeNull();
       expect([...form.querySelectorAll('button')].some((el) => el.textContent === '编辑')).toBe(false);
       expect(form.querySelectorAll('footer button')).toHaveLength(2);
       expect(form.querySelectorAll('[class*="monthGrid"] input')).toHaveLength(12);
       await click(button('取消', form));
-      expect(container.querySelector('[data-inline-editor]')).toBeNull();
+      expect(container.querySelector('[role="dialog"]')).toBeNull();
     },
   );
 

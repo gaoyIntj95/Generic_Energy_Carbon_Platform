@@ -56,10 +56,10 @@ describe('energy balance table accounting and export', () => {
     expect(csv[3].slice(-2)).toEqual(['+1.00', '待分配']);
   });
 
-  it('distinguishes recovered input from recovered steam output without merging energy types', () => {
+  it('distinguishes recovered heat input from canonical steam output', () => {
     const result = buildEnergyBalanceTable([
       fixture({ energyTypeId: 'heat', energyTypeName: '余热', internalRecoveryStandardAmount: 100, conversionInputStandardAmount: 100 }),
-      fixture({ energyTypeId: 'recovered-steam', energyTypeName: '回收蒸汽', conversionOutputStandardAmount: 90, distributionStandardAmount: 89, confirmedConversionLossStandardAmount: 1 }),
+      fixture({ energyTypeId: 'steam', energyTypeName: '蒸汽', conversionOutputStandardAmount: 90, distributionStandardAmount: 89, confirmedConversionLossStandardAmount: 1 }),
     ]);
     expect(result.rows.map((row) => row.sourceTotal)).toEqual([100, 90]);
     expect(result.rows[1].internalRecoveryStandardAmount).toBe(0);

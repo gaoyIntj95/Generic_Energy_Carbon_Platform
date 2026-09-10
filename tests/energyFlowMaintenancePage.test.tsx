@@ -39,12 +39,12 @@ async function renderIntegrated(url = '/data-management/energy-data?tab=conversi
 }
 function systemRow(text: string) { return [...container.querySelectorAll('section[aria-label="用能单元数据"] tbody tr')].find((el) => el.textContent?.includes(text))!; }
 async function openAnnualSystem(text: string) {
-  if (container.querySelector('[role="dialog"]')) await click(button('关闭'));
+  if (container.querySelector('[role="dialog"]')) await click(button('取消'));
   await click(button('编辑', systemRow(text)));
 }
 async function openSystem(text: string) { await openAnnualSystem(text); }
 async function openExternal(receiver: string) {
-  if (container.querySelector('[role="dialog"]')) await click(button('关闭'));
+  if (container.querySelector('[role="dialog"]')) await click(button('取消'));
   await click(button('编辑', externalRow(receiver)));
 }
 function outputTotal(id: string) { const row = listV11ConversionOutputs().find((item) => item.conversionOutputId === id)!; return row.monthlyOutputAmounts!.filter((_, i) => row.monthlyOutputReported?.[i] !== false).reduce((total, value) => total + value, 0).toLocaleString('zh-CN'); }
@@ -59,6 +59,45 @@ describe('minimal energy flow maintenance', () => {
     container = document.createElement('div'); document.body.append(container); root = createRoot(container);
   });
   afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
+
+  it('preserves both expanded ledgers while editing conversion and external data in dialogs', async () => {
+    await render();
+    await click(button('查看', systemRow('余热发电机组')));
+    await click(button('查看', externalRow('余热发电机组')));
+    const rows = () => container.querySelectorAll('section tbody tr').length;
+    const before = rows();
+    for (const open of [() => openSystem('余热发电机组'), () => openExternal('余热发电机组')]) {
+      await open();
+      expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+      expect(rows()).toBe(before);
+      expect(container.querySelector('[aria-label="能源产出月度明细"]')).not.toBeNull();
+      expect(container.querySelector('[aria-label="外供月度明细"]')).not.toBeNull();
+      await click(button('取消', container.querySelector('[role="dialog"]')!));
+      expect(rows()).toBe(before);
+    }
+  });
+
+  it('shows live annual summaries in conversion and external dialogs', async () => {
+    await render(); await openSystem('余热发电机组');
+    const annualInput = container.querySelector<HTMLInputElement>('[aria-label="年度能源投入"]')!;
+    const annualOutput = container.querySelector<HTMLInputElement>('[aria-label="年度产出"]')!;
+    const annualLoss = container.querySelector<HTMLInputElement>('[aria-label="年度已确认损失"]')!;
+    expect(annualInput.value).not.toBe('');
+    await change('6月产出量', '1800001');
+    await change('6月已确认损失', '12');
+    const outputTotal = [...container.querySelectorAll<HTMLInputElement>('input[aria-label$="月产出量"]')].reduce((total, input) => total + Number(input.value || 0), 0);
+    const lossTotal = [...container.querySelectorAll<HTMLInputElement>('input[aria-label$="月已确认损失"]')].reduce((total, input) => total + Number(input.value || 0), 0);
+    expect(Number(annualOutput.value)).toBe(outputTotal);
+    expect(Number(annualLoss.value)).toBe(lossTotal);
+    await click(button('取消'));
+
+    await click(button('＋ 登记外供'));
+    const annualExternal = container.querySelector<HTMLInputElement>('[aria-label="年度外供汇总"]')!;
+    expect(annualExternal.value).toBe('');
+    await select('供能来源', 'v11-output-201');
+    await change('6月外供数量', '20');
+    expect(annualExternal.value).toBe('20');
+  });
 
   it('shows one compact list, keeps supply visible, and does not require saving existing data', async () => {
     await render();
@@ -85,13 +124,13 @@ describe('minimal energy flow maintenance', () => {
 it('opens every month directly with one footer and cancels unsaved changes', async () => {
     const before = listV11ConversionOutputs();
     await render(); await openSystem('余热发电机组');
-    const form = container.querySelector('[data-inline-editor]')!;
-    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    const form = container.querySelector('[role="dialog"]')!;
+    expect(form).not.toBeNull();
     expect(form.querySelector('table')!.querySelectorAll('tbody input')).toHaveLength(24);
-    expect([...form.querySelectorAll('button')].map((el) => el.textContent)).toEqual(['取消', '保存']);
+    expect([...form.querySelectorAll('footer button')].map((el) => el.textContent)).toEqual(['取消', '保存']);
     await change('6月已确认损失', '12'); await change('6月产出量', '1800000');
     await click(button('取消'));
-    expect(container.querySelector('[data-inline-editor]')).toBeNull();
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
     expect(listV11ConversionOutputs()).toEqual(before);
     await openSystem('余热发电机组');
     expect(container.querySelector<HTMLInputElement>('[aria-label="6月产出量"]')?.value).toBe('1600000');
@@ -146,6 +185,7 @@ it('opens every month directly with one footer and cancels unsaved changes', asy
     await select('投入数据来源', 'v11-er-recovery-pressure');
     expect(container.querySelector('[aria-label="回收来源"]')).toBeNull();
     expect(container.querySelector('[aria-label="6月产出量"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="年度产出汇总"]')).not.toBeNull();
     await select('投入数据来源', 'recovery');
     expect(container.querySelector('[aria-label="回收来源"]')).not.toBeNull();
   });
@@ -171,8 +211,8 @@ it('opens every month directly with one footer and cancels unsaved changes', asy
     await click(button('重置')); expect(systemRow('锅炉系统')).toBeDefined();
   });
 
-  it('inherits new power-center children without a conversion scenario and follows master-data names', async () => {
-    const added = addChildEnergyUnit('eu-utilities', { energyUnitName: '新增供热系统', unitType: '公辅系统' });
+  it('inherits configured power-center children and follows master-data names without creating quantity records', async () => {
+    const added = addChildEnergyUnit('eu-utilities', { energyUnitName: '新增供热系统', unitType: '公辅系统', energyRelations: [{ inputEnergyTypeId: 'v11-energy-natural-gas', outputEnergyTypeId: 'v11-energy-steam' }] });
     expect(added.ok).toBe(true);
     expect(updateEnergyUnit('eu-utilities', { energyUnitName: '公用动力中心', unitType: '公辅系统' }).ok).toBe(true);
     const before = listV11ConversionOutputs();
@@ -189,6 +229,7 @@ it('opens every month directly with one footer and cancels unsaved changes', asy
     expect(section.textContent).toContain('本年度暂无外供记录');
     await click(button('＋ 登记外供', section));
     expect(container.querySelectorAll('[role="dialog"] input[aria-label$="月外供数量"]')).toHaveLength(12);
+    expect(container.querySelector('[role="dialog"]')?.textContent).not.toMatch(/\d+月（[^）]*）/);
    
     expect(container.querySelector('[role="dialog"] header')?.textContent).toContain('2020年度');
   });
@@ -199,17 +240,17 @@ it('opens every month directly with one footer and cancels unsaved changes', asy
     const row = container.querySelector('section[aria-label="对外供能台账"] tbody tr')!;
     await click(button('删除', row));
     expect(listV11ExternalSupplyRecords()).toHaveLength(before.length);
-    expect(container.querySelector('[role="dialog"], [data-inline-editor]')?.textContent).toContain('该年度全部月份');
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('该年度全部月份');
     await click(button('确认删除')); expect(listV11ExternalSupplyRecords()).toHaveLength(before.length - 1);
   });
 
   it('edits unit output even when devices exist without asking for device sources', async () => {
     await render(); await openSystem('自备发电机组');
-    expect(container.querySelector('[role="dialog"], [data-inline-editor]')?.textContent).not.toContain('关联设备');
+    expect(container.querySelector('[role="dialog"]')?.textContent).not.toContain('关联设备');
     await change('6月产出量', '850000'); await click(button('保存'));
     expect(systemRow('自备发电机组').textContent).toContain(outputTotal('v11-output-captive-power') + ' kWh');
     await openSystem('自备发电机组');
-    expect(container.querySelector('[role="dialog"], [data-inline-editor]')?.textContent).not.toContain('设置数据来源');
+    expect(container.querySelector('[role="dialog"]')?.textContent).not.toContain('设置数据来源');
     expect(container.querySelector('[aria-label="产出数据来源"]')).toBeNull();
     expect(container.querySelector('[aria-label="产出换算系数"]')).toBeNull();
   });
@@ -264,7 +305,7 @@ it('opens every month directly with one footer and cancels unsaved changes', asy
     expect(saveV11EnergyRecord({ ...source, monthlyReportedMonths: Array.from({ length: 12 }, (_, i) => i !== 5) }, source.energyRecordId).ok).toBe(true);
     await renderIntegrated(); await openSystem('余热发电机组');
     expect(container.querySelector('[aria-label="本期回收量"]')).toBeNull();
-    expect(container.querySelector('[role="dialog"], [data-inline-editor]')?.textContent).toContain('待填报');
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('待填报');
     await click(button('补充数据'));
     const url = new URL(container.querySelector('[data-testid="location"]')!.textContent!, 'http://localhost');
     expect(url.searchParams.get('recordId')).toBe(source.energyRecordId);
@@ -273,11 +314,11 @@ it('opens every month directly with one footer and cancels unsaved changes', asy
     expect(container.querySelector('[role="dialog"]')).toBeNull();
     await click(button('编辑'));
     expect(url.searchParams.get('month')).toBe('6');
-    expect(container.querySelector('[role="dialog"], [data-inline-editor]')?.textContent).toContain('2026年');
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('2026年');
     expect(container.querySelector<HTMLInputElement>('[aria-label="6月能源数量"]')?.value).toBe('');
     expect(container.querySelector('[aria-label="6月能源数量"]')).not.toBeNull();
     await change('6月能源数量', '7800'); await click(button('保存'));
-    expect(container.querySelector('[role="dialog"], [data-inline-editor]')?.textContent).toContain('7,800');
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('7,800');
     const saved = listV11EnergyRecords().find((row) => row.energyRecordId === source.energyRecordId)!;
     expect(saved.monthlyAmounts.filter((_, i) => i !== 5)).toEqual(source.monthlyAmounts.filter((_, i) => i !== 5));
     expect(saved.energyRole).toBe(source.energyRole);
@@ -290,10 +331,10 @@ it('opens every month directly with one footer and cancels unsaved changes', asy
     const source = listV11EnergyRecords().find(row => row.energyRecordId === current.inputEnergyRecordId)!;
     expect(saveV11EnergyRecord({ ...source, monthlyReportedMonths: Array.from({ length: 12 }, (_, i) => i !== 5) }, source.energyRecordId).ok).toBe(true);
     await renderIntegrated(); await openSystem('锅炉系统'); await click(button('补充数据')); await click(button('编辑'));
-    expect(container.querySelector('[role="dialog"], [data-inline-editor]')?.textContent).toContain('二级用能单元');
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('二级用能单元');
     await change('6月能源数量', '130000'); await click(button('保存'));
-    expect(container.querySelector('[role="dialog"], [data-inline-editor]')?.textContent).toContain('130,000');
-    expect(container.querySelector('[role="dialog"], [data-inline-editor]')?.textContent).not.toContain('补充投入');
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('130,000');
+    expect(container.querySelector('[role="dialog"]')?.textContent).not.toContain('补充投入');
     expect(listV11ConversionOutputs().find(row => row.conversionOutputId === current.conversionOutputId)?.monthlyOutputAmounts).toEqual(current.monthlyOutputAmounts);
     const flow = buildFlowAnalysisDataset(period);
     expect(flow.links.find(link => link.linkId === 'conversion:v11-output-201:input')?.calculation?.physicalAmount).toBe(130000);
@@ -323,7 +364,7 @@ it('opens every month directly with one footer and cancels unsaved changes', asy
     expect(source.monthlyReportedMonths?.filter(Boolean)).toHaveLength(1);
     expect(source.monthlyAmounts.filter((_, i) => i !== 5)).toEqual(Array(11).fill(0));
     expect(after.monthlyOutputAmounts).toEqual(before.monthlyOutputAmounts);
-    expect(container.querySelector('[role="dialog"], [data-inline-editor]')?.textContent).toContain('175');
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('175');
   });
 
   it('adds a recovery system from existing input and only asks for its missing output', async () => {
@@ -331,9 +372,9 @@ it('opens every month directly with one footer and cancels unsaved changes', asy
     const inputCount = listV11EnergyRecords().length;
     await render(); await openSystem('余热回收利用系统');
     await select('投入数据来源', 'v11-er-recovery-device-70');
-    await select('产出能源', 'v11-energy-recovered-steam');
+    await select('产出能源', 'v11-energy-steam');
     await click(button('保存'));
-    expect(container.querySelector('[role="dialog"], [data-inline-editor]')).toBeNull();
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
     const added = listV11ConversionOutputs().find((row) => row.conversionEnergyUnitId === 'eu-waste-heat-utilization' && row.year === 2026)!;
     expect(container.querySelectorAll('section[aria-label="用能单元数据"] tbody tr')).toHaveLength(6);
     expect(button('编辑', systemRow('余热回收利用系统'))).toBeDefined();
@@ -355,7 +396,7 @@ it('opens every month directly with one footer and cancels unsaved changes', asy
     await select('投入数据来源', 'v11-er-recovery-pressure');
     await select('产出能源', 'v11-energy-compressed-air');
     await change('6月产出量', '60000'); await click(button('保存'));
-    expect(container.querySelector('[role="dialog"], [data-inline-editor]')).toBeNull();
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
     expect(systemRow('余压回收系统').textContent).toContain('60,000 Nm³');
     expect(button('编辑', systemRow('余压回收系统'))).toBeDefined();
     const saved = listV11ConversionOutputs().find((row) => row.conversionEnergyUnitId === 'eu-pressure-recovery' && row.year === 2026)!;
@@ -399,12 +440,12 @@ it('distinguishes zero and missing months while exposing all monthly inputs', as
     const months = container.querySelectorAll('[aria-label="能源产出月度明细"] [data-month] strong');
     expect(months[0].textContent).toBe('0'); expect(months[1].textContent).toBe('—');
     await openSystem('余热发电机组');
-    expect(container.querySelectorAll('[data-inline-editor] tbody tr')).toHaveLength(12);
+    expect(container.querySelectorAll('[role="dialog"] tbody tr')).toHaveLength(12);
     expect(listV11ConversionOutputs()).toEqual(before);
     await change('2月产出量', '1500000'); await click(button('保存'));
     const saved = listV11ConversionOutputs().find((row) => row.conversionOutputId === missing.conversionOutputId)!;
     expect(saved.monthlyOutputAmounts?.[1]).toBe(1500000); expect(saved.monthlyOutputReported?.filter(Boolean)).toHaveLength(1);
-    await select('数据年度', '2025'); expect(container.querySelector('[data-inline-editor]')).toBeNull();
+    await select('数据年度', '2025'); expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 
   it('registers external data for the selected year and month', async () => {
@@ -442,7 +483,7 @@ it('distinguishes zero and missing months while exposing all monthly inputs', as
     await render('/data-management/energy-data?tab=conversion&grain=year&year=2026');
     expect(systemRow('锅炉系统').textContent).toContain('123,456');
     await openSystem('锅炉系统');
-    expect(container.querySelector('[role="dialog"], [data-inline-editor]')?.textContent).toContain('待填报');
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('待填报');
     expect(button('编辑', systemRow('锅炉系统'))).toBeDefined();
     expect(listV11EnergyRecords().find((row) => row.energyRecordId === source.energyRecordId)?.monthlyReportedMonths?.some(Boolean)).toBe(false);
   });
@@ -450,7 +491,7 @@ it('distinguishes zero and missing months while exposing all monthly inputs', as
   it('saves a positive loss without a remark and can add or clear its optional remark later', async () => {
     const before = listV11ConversionOutputs().find((row) => row.conversionOutputId === 'v11-output-200')!;
     await render(); await openSystem('余热发电机组'); 
-    expect(container.querySelector('[role="dialog"], [data-inline-editor]')?.textContent).not.toContain('确认依据');
+    expect(container.querySelector('[role="dialog"]')?.textContent).not.toContain('确认依据');
     expect(container.querySelector<HTMLInputElement>('[aria-label="损失备注"]')?.required).toBe(false);
     await change('6月已确认损失', '100'); await click(button('保存'));
     const saved = listV11ConversionOutputs().find((row) => row.conversionOutputId === before.conversionOutputId)!;
@@ -468,16 +509,16 @@ it('distinguishes zero and missing months while exposing all monthly inputs', as
   });
 
 
-  it('cancels the complete inline editor with escape without saving a draft', async () => {
+  it('cancels the editing dialog with escape without saving a draft', async () => {
     const before = listV11ConversionOutputs();
     await render(); await openSystem('锅炉系统');
-    const form = container.querySelector<HTMLElement>('[data-inline-editor]')!;
-    expect(form).not.toBeNull(); expect(container.querySelector('[role="dialog"]')).toBeNull();
+    const form = container.querySelector<HTMLElement>('[role="dialog"]')!;
+    expect(form).not.toBeNull();
     await change('6月产出量', '9999');
     await act(async () => form.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape',bubbles:true,cancelable:true})));
-    expect(container.querySelector('[data-inline-editor]')).toBeNull();
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
     expect(listV11ConversionOutputs()).toEqual(before);
-    expect(container.querySelector('[aria-label="能源产出月度明细"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="能源产出月度明细"]')).toBeNull();
   });
 
   it('clears annual conversion quantities without cascading to external records or another year', async () => {
@@ -498,6 +539,7 @@ it('clears one external month without changing the others', async () => {
     const after = listV11ExternalSupplyRecords().find((row) => row.externalSupplyId === before.externalSupplyId)!;
     expect(after.monthlyReported?.[5]).toBe(false);
     expect(after.monthlyAmounts?.filter((_, i) => i !== 5)).toEqual(before.monthlyAmounts?.filter((_, i) => i !== 5));
+    await click(button('查看', externalRow('余热发电机组')));
     expect(container.querySelector('[aria-label="外供月度明细"] [data-month="6"]')?.textContent).toContain('—');
   });
 
@@ -535,9 +577,9 @@ it('opens twelve external quantity inputs without repeated buttons and refreshes
     await render(); await click(button('查看', externalRow('余热发电机组')));
     expect(container.querySelector('[aria-label="外供月度明细"] input')).toBeNull();
     await openExternal('余热发电机组');
-    const form = container.querySelector('[data-inline-editor]')!;
+    const form = container.querySelector('[role="dialog"]')!;
     expect([...form.querySelectorAll('input')].filter((el) => /月外供数量$/.test(el.getAttribute('aria-label') ?? ''))).toHaveLength(12);
-    expect([...form.querySelectorAll('button')].map((el) => el.textContent)).toEqual(['取消', '保存']);
+    expect([...form.querySelectorAll('footer button')].map((el) => el.textContent)).toEqual(['取消', '保存']);
     await change('6月外供数量', '1234'); await click(button('保存'));
     const saved = listV11ExternalSupplyRecords().find((row) => row.externalSupplyId === before.externalSupplyId)!;
     expect(saved.monthlyAmounts?.[5]).toBe(1234);
@@ -549,12 +591,12 @@ it('retains invalid loss drafts without saving any month until corrected', async
     const before = listV11ConversionOutputs().find((row) => row.conversionOutputId === 'v11-output-200')!;
     await render(); await openSystem('余热发电机组');
     await change('5月产出量', '1700000'); await change('6月已确认损失', '999999999'); await click(button('保存'));
-    expect(container.querySelector('[data-inline-editor] [role="alert"]')).not.toBeNull();
+    expect(container.querySelector('[role="dialog"] [role="alert"]')).not.toBeNull();
     expect(listV11ConversionOutputs().find((row) => row.conversionOutputId === before.conversionOutputId)).toEqual(before);
     await change('6月已确认损失', '0'); await click(button('保存'));
     const saved = listV11ConversionOutputs().find((row) => row.conversionOutputId === before.conversionOutputId)!;
     expect(saved.monthlyLossAmounts?.[5]).toBe(0); expect(saved.monthlyOutputAmounts?.[4]).toBe(1700000);
-    expect(container.querySelector('[data-inline-editor]')).toBeNull();
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 
 });

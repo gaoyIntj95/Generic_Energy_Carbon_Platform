@@ -1,20 +1,17 @@
-import { type ReactNode } from 'react';
 import styles from './DataManagementV11.module.css';
 
-export function MonthlyDataDetails({ values, reported, annualValue, annualSupplemented = false, unit, title = '月度明细', editor, onCollapse }: {
+export function MonthlyDataDetails({ values, reported, annualValue, annualSupplemented = false, unit, title = '月度明细', onCollapse }: {
   values: Array<number | null | undefined>;
   reported?: boolean[];
   annualValue?: number;
   annualSupplemented?: boolean;
   unit: string;
   title?: string;
-  editor?: ReactNode;
   onCollapse?: () => void;
 }) {
   const visibleMonths = Array.from({ length: 12 }, (_, index) =>
     values[index] != null && (reported?.[index] ?? true));
   const format = (value: number) => value.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
-  if (editor) return <div className={styles.detailPanel} role="region" aria-label={title}>{editor}</div>;
   return <div className={styles.detailPanel} role="region" aria-label={title}>
     <div className={styles.detailHead}><span>{title}</span><span>计量单位：{unit}</span></div>
     <div className={styles.monthDetailGrid}>{visibleMonths.map((visible, index) => <div key={index} data-month={index + 1}>

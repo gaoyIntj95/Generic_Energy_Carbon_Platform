@@ -72,7 +72,7 @@ describe('unified second-level conversion inputs', () => {
 
   it('edits recovered heat in the same list without changing its role, output, or enterprise purchases', async () => {
     const before = output('v11-output-200'); const originalSource = source(before.conversionOutputId); const originalFlow = buildFlowAnalysisDataset(period);
-    await render(); await clickButton('编辑', inputRow('余热发电机组下的余热')); await clickButton('编辑', container.querySelector('[aria-label="月度明细"] [data-month="6"]')!);
+    await render(); await clickButton('编辑', inputRow('余热发电机组下的余热'));
     expect(container.querySelector('[data-inline-editor], [role="dialog"]')?.textContent).toContain('动力中心');
     expect(container.querySelector('[data-inline-editor], [role="dialog"]')?.textContent).not.toContain('余热产生设备');
     await changeMonth('7800'); await clickButton('保存');
@@ -91,10 +91,10 @@ describe('unified second-level conversion inputs', () => {
     expect(container.querySelector('[role="dialog"]')).toBeNull();
     expect(container.querySelector<HTMLInputElement>('[aria-label="能源消费关键字"]')?.value).toBe('锅炉系统');
     expect(container.querySelector('[data-testid="location"]')?.textContent).toContain('scopeLevel=');
-    await clickButton('编辑', inputRow('锅炉系统下的天然气')); await clickButton('编辑', container.querySelector('[aria-label="月度明细"] [data-month="6"]')!);
+    await clickButton('编辑', inputRow('锅炉系统下的天然气'));
     expect(container.querySelector<HTMLInputElement>('[aria-label="6月能源数量"]')?.value).toBe('');
     await changeMonth('130000'); await clickButton('保存');
-    expect(container.querySelector('[data-inline-editor], [role="dialog"]')?.textContent).toContain('130,000 Nm³');
+    expect(container.querySelector('[role="dialog"] [data-month="6"] td:nth-child(2)')?.textContent).toBe('130,000');
     expect(container.querySelector('[data-inline-editor], [role="dialog"]')?.textContent).not.toContain('补充数据');
     expect(source('v11-output-201').monthlyAmounts.filter((_, i) => i !== 5)).toEqual(original.monthlyAmounts.filter((_, i) => i !== 5));
   });
@@ -116,14 +116,15 @@ describe('unified second-level conversion inputs', () => {
     expect(source(id).monthlyAmounts[5]).toBe(175);
     expect(source(id).monthlyReportedMonths?.filter(Boolean)).toHaveLength(1);
     expect(output(id).monthlyOutputAmounts).toEqual(row.monthlyOutputAmounts);
-    expect(container.querySelector('[data-inline-editor], [role="dialog"]')?.textContent).not.toContain('补充数据');
+    expect(container.querySelector('[role="dialog"] [data-month="6"] td:nth-child(2)')?.textContent).toBe('175');
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('补充数据');
   });
 
   it('treats explicitly reported zero input as complete', async () => {
     const original = source('v11-output-201');
     expect(saveV11EnergyRecord({ ...original, monthlyAmounts: original.monthlyAmounts.map((value, i) => i === 5 ? 0 : value), monthlyReportedMonths: Array(12).fill(true) }, original.energyRecordId).ok).toBe(true);
     await render(editUrl('v11-output-201'));
-    expect(container.querySelector('[data-inline-editor], [role="dialog"]')?.textContent).toContain('0 Nm³');
+    expect(container.querySelector('[role="dialog"] [data-month="6"] td:nth-child(2)')?.textContent).toBe('0');
     expect(container.querySelector('[data-inline-editor], [role="dialog"]')?.textContent).not.toContain('补充数据');
   });
 });

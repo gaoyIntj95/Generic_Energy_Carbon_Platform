@@ -1,4 +1,4 @@
-import { resetDataManagementV11Store } from '../src/mocks/dataManagementV11Store';
+import { resetDataManagementV11Store, listV11EnergyTypes, saveV11EnergyType, deleteV11EnergyType } from '../src/mocks/dataManagementV11Store';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   addChildEnergyUnit,
@@ -42,6 +42,51 @@ describe('energy unit centralized mock store', () => {
       parentEnergyUnitId: 'eu-clinker-line-1',
       unitLevel: 'level2',
     });
+  });
+
+  it('stores multiple relations for one unit and derives each conversion scenario', () => {
+    const relations = [
+      { inputEnergyTypeId: 'v11-energy-coal', outputEnergyTypeId: 'v11-energy-electricity' },
+      { inputEnergyTypeId: 'v11-energy-coal', outputEnergyTypeId: 'v11-energy-steam' },
+    ];
+    const result = addChildEnergyUnit('eu-utilities', {
+      energyUnitName: '企业热电联产装置', unitType: '公辅系统', energyRelations: relations,
+    });
+    expect(result.ok).toBe(true);
+    const id = result.unit!.energyUnitId;
+    expect(getEnergyUnit(id)).toMatchObject({ energyRelations: relations, conversionScenarios: ['其他转换', '锅炉产汽/产热'] });
+    relations[0].outputEnergyTypeId = '';
+    result.unit!.energyRelations![1].outputEnergyTypeId = '';
+    getEnergyUnit(id)!.energyRelations![0].inputEnergyTypeId = '';
+    expect(getEnergyUnit(id)!.energyRelations).toHaveLength(2);
+    expect(getEnergyUnit(id)!.energyRelations!.every((row) => row.inputEnergyTypeId && row.outputEnergyTypeId)).toBe(true);
+    const updated = updateEnergyUnit(id, { ...getEnergyUnit(id)!, energyRelations: [getEnergyUnit(id)!.energyRelations![1]] });
+    expect(updated.unit?.conversionScenarios).toEqual(['锅炉产汽/产热']);
+    expect(getEnergyUnit(id, 2025)).toBeUndefined();
+  });
+
+  it('supports custom dictionary energy, stable references and protects referenced types', () => {
+    const template = listV11EnergyTypes().find((type) => type.energyTypeId === 'v11-energy-natural-gas')!;
+    expect(saveV11EnergyType({ ...template, energyTypeName: '企业副产煤气' }).ok).toBe(true);
+    const custom = listV11EnergyTypes().find((type) => type.energyTypeName === '企业副产煤气')!;
+    const input = { energyUnitName: '自定义装置', unitType: '公辅系统' as const, energyRelations: [{ inputEnergyTypeId: custom.energyTypeId, outputEnergyTypeId: 'v11-energy-steam' }] };
+    const result = addChildEnergyUnit('eu-utilities', input);
+    expect(result.ok).toBe(true);
+    expect(deleteV11EnergyType(custom.energyTypeId).ok).toBe(false);
+    expect(addChildEnergyUnit('eu-utilities', input, 2025)).toMatchObject({ ok: false, error: 'invalidEnergyRelation' });
+    saveV11EnergyType({ ...custom, energyTypeName: '副产煤气（改名）' }, custom.energyTypeId);
+    expect(getEnergyUnit(result.unit!.energyUnitId)?.energyRelations?.[0].inputEnergyTypeId).toBe(custom.energyTypeId);
+    expect(saveV11EnergyType({ ...template, energyTypeName: '回收蒸汽' }).ok).toBe(false);
+  });
+
+  it('rejects incomplete, unknown, identical and duplicate energy combinations without writes', () => {
+    const original = getEnergyUnit('eu-gas-boiler')!;
+    const relation = original.energyRelations![0];
+    for (const invalid of [undefined, [], [{}], [{ inputEnergyTypeId: 'unknown', outputEnergyTypeId: 'v11-energy-steam' }], [{ inputEnergyTypeId: 'v11-energy-steam', outputEnergyTypeId: 'v11-energy-steam' }], [relation, relation]]) {
+      expect(updateEnergyUnit(original.energyUnitId, { ...original, energyRelations: invalid as typeof original.energyRelations }))
+        .toMatchObject({ ok: false, error: 'invalidEnergyRelation' });
+      expect(getEnergyUnit(original.energyUnitId)).toEqual(original);
+    }
   });
 
   it('prevents adding below a second-level unit', () => {
