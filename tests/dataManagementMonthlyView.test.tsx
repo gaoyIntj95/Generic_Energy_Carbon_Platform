@@ -44,18 +44,23 @@ describe('annual ledgers and shared monthly details', () => {
     },
   );
 
-  it('shows annual cost in the list, expands actual months, and edits all monthly fields in a dialog', async () => {
+  it('shows twelve cost months in a horizontally scrollable table and edits all monthly fields in a dialog', async () => {
     const item = listV11EnergyCosts().find((row) => row.year === 2026)!;
     expect(saveV11EnergyCost({ ...item, monthlyCosts: [0, 25, ...Array(10).fill(0)], monthlyReportedMonths: [true, true, ...Array(10).fill(false)], annualCost: 100 }, item.energyCostId).ok).toBe(true);
     const before = listV11EnergyCosts();
     await render('/data-management/energy-data?tab=costs&year=2026');
-    expect([...container.querySelectorAll('th')].map((el) => el.textContent)).toEqual(['能源品种', '年度合计（万元）', '年份', '操作']);
-    expect(monthlyValues()).toHaveLength(0);
-    await click(button('查看'));
-    expect(monthlyValues()).toEqual(['0', '25', ...Array(10).fill('—')]);
-    expect(container.querySelector('[aria-label="月度明细"]')?.textContent).toContain('年度总量（补录）');
+    expect([...container.querySelectorAll('th')].map((el) => el.textContent)).toEqual([
+      '能源品种',
+      ...Array.from({ length: 12 }, (_, index) => `${index + 1}月成本（万元）`),
+      '年度合计（万元）',
+      '操作',
+    ]);
+    const table = container.querySelector('table[class*="costTable"]')!;
+    expect(table).not.toBeNull();
+    expect(table.parentElement?.className).toContain('tableWrap');
+    expect([...table.querySelectorAll('tbody tr:first-child td')].slice(1, 13).map((el) => el.textContent)).toEqual(['0', '25', ...Array(10).fill('—')]);
+    expect([...table.querySelectorAll('tbody button')].map((el) => el.textContent)).not.toContain('查看');
     expect(listV11EnergyCosts()).toEqual(before);
-    await click(button('收起')); expect(monthlyValues()).toHaveLength(0);
     await click(button('编辑'));
     expect(container.querySelector('[role="dialog"]')).not.toBeNull();
     const field = container.querySelector<HTMLInputElement>('[aria-label="3月成本"]')!;
@@ -65,7 +70,7 @@ describe('annual ledgers and shared monthly details', () => {
     expect(saved.monthlyCosts).toEqual([0, 25, 10, ...Array(9).fill(0)]);
     expect(saved.monthlyReportedMonths?.slice(0, 4)).toEqual([true, true, true, false]);
     await change(container.querySelector('select')!, '2025');
-    expect(monthlyValues()).toHaveLength(0);
+    expect(container.querySelector('[aria-label="月度明细"]')).toBeNull();
     expect(container.querySelector('[role="dialog"]')).toBeNull();
     expect(listV11EnergyCosts().filter((row) => row.year === 2025)).toEqual(before.filter((row) => row.year === 2025));
   });
@@ -104,15 +109,20 @@ describe('annual ledgers and shared monthly details', () => {
     expect(container.querySelector('[aria-label="月度明细"]')?.textContent).toContain('仅有年度数据，暂无月度明细');
     expect(listV11OperationMetrics()).toEqual(before);
   });
-  it.each(['/data-management/energy-data', '/data-management/energy-data?tab=costs', '/data-management/device-output', '/data-management/operations'])(
+  it.each(['/data-management/energy-data?scopeLevel=企业', '/data-management/device-output', '/data-management/operations?scopeLevel=企业'])(
     'distinguishes read-only viewing from one complete editing dialog on %s', async (path) => {
       await render(path);
-      await click(button('查看'));
+      const row = [...container.querySelectorAll('tbody tr')].find((item) => {
+        const actions = [...item.querySelectorAll('button')].map((element) => element.textContent);
+        return actions.includes('查看') && actions.includes('编辑');
+      })!;
+      await click(button('查看', row));
       const detail = container.querySelector('[aria-label="月度明细"]')!;
       expect(detail.querySelectorAll('input, select')).toHaveLength(0);
       expect([...detail.querySelectorAll('button')].some((el) => el.textContent === '编辑')).toBe(false);
       const rowCount = container.querySelectorAll('table tbody tr').length;
-      await click(button('编辑'));
+      const expandedRow = [...container.querySelectorAll('tbody tr')].find((item) => [...item.querySelectorAll('button')].some((element) => element.textContent === '编辑'))!;
+      await click(button('编辑', expandedRow));
       expect(container.querySelectorAll('table tbody tr')).toHaveLength(rowCount);
       expect(container.querySelector('[role="dialog"]')).not.toBeNull();
       const form = container.querySelector('[role="dialog"]')!;

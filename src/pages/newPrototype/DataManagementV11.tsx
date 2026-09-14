@@ -9,6 +9,7 @@ import {
   deleteV11EnergyCost,
   deleteV11EnergyRecord,
   deleteV11EnergyType,
+  disableV11EnergyType,
   listV11EnergyTypeReferences,
   isV11EnergyTypeEnabled,
   deleteV11KeyDevice,
@@ -17,6 +18,7 @@ import {
   listV11EnergyCosts,
   listV11EnergyRecords,
   listV11ConversionOutputs,
+  listV11ExternalSupplyRecords,
   saveFlowConversion,
   listV11EnergyTypes,
   listV11KeyDevices,
@@ -242,14 +244,13 @@ function EnergyTypesPage() {
       <Pagination count={rows.length} />
     </section>
     {editing && <EnergyTypeDialog item={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} onSaved={(message) => { setEditing(null); setVersion((value) => value + 1); notify(message); }} />}
-    {deleting && <Modal title={`删除能源品种（${maintenanceYear}年度）`} width={520} submitText="确认删除" onClose={() => setDeleting(null)} onSubmit={() => {
+    {deleting && <Modal variant="delete" title="删除能源品种" width={640} submitText="确认删除" onClose={() => setDeleting(null)} onSubmit={() => {
       const result = deleteV11EnergyType(deleting.energyTypeId, Number(maintenanceYear));
       if (!result.ok) return notify(result.error);
       setDeleting(null); setVersion((value) => value + 1); notify('能源品种已删除');
-    }}><div className={styles.warning}>确认删除能源品种“{deleting.energyTypeName}”吗？</div></Modal>}
-    {blocked && <Modal title="无法删除能源品种" width={580} cancelText="关闭" onClose={() => setBlocked(null)}>
-      <div className={styles.warning}>能源品种“{blocked.item.energyTypeName}”存在业务引用。请先处理引用后再删除。</div>
-      <ul className={styles.referenceList}>{blocked.references.map((reference) => <li key={reference.kind}><span>{reference.label}</span><strong>{reference.count} 项</strong></li>)}</ul>
+    }}><p>确认删除能源品种“<strong>{deleting.energyTypeName}</strong>”吗？</p></Modal>}
+    {blocked && <Modal variant="delete" title="无法删除能源品种" width={780} footer={<><Button primary onClick={() => { disableV11EnergyType(blocked.item.energyTypeId, Number(maintenanceYear)); setBlocked(null); setVersion((value) => value + 1); notify('能源品种已停用'); }}>停用品种</Button><Button onClick={() => setBlocked(null)}>我知道了</Button></>} onClose={() => setBlocked(null)}>
+      <p>能源品种“<strong>{blocked.item.energyTypeName}</strong>”存在业务引用。为保证历史数据完整，暂不支持物理删除。</p>
     </Modal>}
   </Page>;
 }
@@ -331,6 +332,7 @@ function EnergyQuantityPage() {
   });
   const [newUnitId, setNewUnitId] = useState(params.get('unitId') ?? '');
   const [deleting, setDeleting] = useState<V11EnergyRecord | null>(null);
+  const [deleteBlocked, setDeleteBlocked] = useState<V11EnergyRecord | null>(null);
   const closeEditor = () => { setEditing(null); setNewUnitId(''); if (returnTo && params.get('entry') !== 'list') returnToOrigin(); };
   const savedEditor = (message: string) => { setEditing(null); setNewUnitId(''); setVersion((value) => value + 1); if (returnTo) returnToOrigin(); else notify(message); };
   const showDetails = (id: string | null) => guard(() => { setEditing(null); setExpanded(id); });
@@ -342,6 +344,11 @@ function EnergyQuantityPage() {
   const visibleLevels = energyRole === '回收能源' ? (['二级用能单元'] as const) : levels;
   const devices = listV11KeyDevices(Number(maintenanceYear));
   const records = listV11EnergyRecords();
+  const requestDelete = (record: V11EnergyRecord) => {
+    const referenced = listV11ConversionOutputs().some((item) => item.inputEnergyRecordId === record.energyRecordId)
+      || listV11ExternalSupplyRecords().some((item) => item.inputEnergyRecordId === record.energyRecordId);
+    if (referenced) setDeleteBlocked(record); else setDeleting(record);
+  };
   const units = listEnergyUnits(Number(maintenanceYear));
   const unitById = new Map(units.map((unit) => [unit.energyUnitId, unit]));
   const energyTypeOrder = new Map(types.map((type, index) => [type.energyTypeId, index]));
@@ -458,7 +465,7 @@ function EnergyQuantityPage() {
           const device = devices.find((item) => item.deviceId === row.scopeId);
           const total = v11EnergyRecordAnnualAmount(row);
           const detail = expanded === row.energyRecordId;
-          return [<tr key={row.energyRecordId}><td className={styles.strong}>{device?.deviceName ?? '设备档案已移除'}</td><td>{v11ScopeName(device?.energyUnitId ?? row.energyUnitId, Number(maintenanceYear))}</td><td>{device?.deviceType ?? '—'}</td><td>{type?.analysisCategory}</td><td>{type?.energyTypeName}</td><td>{energyDataProgress(row)}</td><td className={styles.number}>{format(total, 2)} {type?.measurementUnit}</td><td>{row.year}年</td><td><Actions viewLabel={detail ? '收起' : '查看'} onView={() => showDetails(detail ? null : row.energyRecordId)} onEdit={() => editMonth(row, 0)} onDelete={() => guard(() => { setEditing(null); setDeleting(row); })} /></td></tr>,
+          return [<tr key={row.energyRecordId}><td className={styles.strong}>{device?.deviceName ?? '设备档案已移除'}</td><td>{v11ScopeName(device?.energyUnitId ?? row.energyUnitId, Number(maintenanceYear))}</td><td>{device?.deviceType ?? '—'}</td><td>{type?.analysisCategory}</td><td>{type?.energyTypeName}</td><td>{energyDataProgress(row)}</td><td className={styles.number}>{format(total, 2)} {type?.measurementUnit}</td><td>{row.year}年</td><td><Actions viewLabel={detail ? '收起' : '查看'} onView={() => showDetails(detail ? null : row.energyRecordId)} onEdit={() => editMonth(row, 0)} onDelete={() => guard(() => { setEditing(null); requestDelete(row); })} /></td></tr>,
           detail && <tr className={styles.detailRow} key={`${row.energyRecordId}-detail`}><td colSpan={8}>{renderEnergyDetails(row, total, type?.measurementUnit ?? '')}</td></tr>];
         }) : <EmptyRow colSpan={8} />}</tbody>
       </table></div> : level === '一级用能单元' ? <div className={styles.tableWrap}><table className={`${styles.wideTable} ${styles.quantityTable}`}><thead><tr><th>{energyRole === '回收能源' ? '产生单元 / 回收能源' : '归属范围 / 能源品种'}</th><th>归属层级</th><th>能源分析类别</th><th>单位</th><th>数据进度</th><th>年度合计</th><th>年份</th><th>操作</th></tr></thead><tbody>{levelOneUnitGroups.flatMap(({ unit, records: unitRows }) => [
@@ -468,7 +475,7 @@ function EnergyQuantityPage() {
           const isCollapsed = collapsedScopes.has(scopeKey);
           const groupRow = <tr className={styles.scopeGroupRow} key={`${scopeKey}-group`}><td><div className={styles.scopeCell}><button type="button" className={styles.scopeToggle} aria-label={`${isCollapsed ? '展开' : '折叠'}${unit.energyUnitName}`} onClick={() => setCollapsedScopes((current) => { const next = new Set(current); if (next.has(scopeKey)) next.delete(scopeKey); else next.add(scopeKey); return next; })}>{isCollapsed ? '+' : '−'}</button><i /><span><b>{unit.energyUnitName}</b></span></div></td><td colSpan={6} /><td className={styles.scopeGroupActionCell}><button type="button" className={styles.scopeAddButton} onClick={() => guard(() => { setEditing(null); setExpanded(null);  setNewUnitId(unit.energyUnitId); setEditing('new'); })}>＋ 新增能源消费</button></td></tr>;
           if (isCollapsed) return [groupRow];
-          return [groupRow, ...(unitRows.length ? unitRows.flatMap((row) => { const type = types.find((item) => item.energyTypeId === row.energyTypeId); const total = v11EnergyRecordAnnualAmount(row); const detail = expanded === row.energyRecordId; return [<tr className={styles.scopeRecordRow} key={row.energyRecordId}><td><div className={styles.scopeChild}><span>└─ {type?.energyTypeName}</span></div></td><td>一级用能单元</td><td>{type?.analysisCategory}</td><td>{type?.measurementUnit}</td><td>{energyDataProgress(row)}</td><td className={styles.number}>{format(total, 2)}</td><td>{row.year}年</td><td><Actions viewLabel={detail ? '收起' : '查看'} onView={() => showDetails(detail ? null : row.energyRecordId)} onEdit={() => editMonth(row, 0)} onDelete={() => guard(() => { setEditing(null); setDeleting(row); })} /></td></tr>, detail && <tr className={styles.detailRow} key={`${row.energyRecordId}-detail`}><td colSpan={8}>{renderEnergyDetails(row, total, type?.measurementUnit ?? '')}</td></tr>]; }) : [<tr key={`${scopeKey}-empty`}><td colSpan={8} className={styles.emptyRow}>暂无能源数据</td></tr>])];
+          return [groupRow, ...(unitRows.length ? unitRows.flatMap((row) => { const type = types.find((item) => item.energyTypeId === row.energyTypeId); const total = v11EnergyRecordAnnualAmount(row); const detail = expanded === row.energyRecordId; return [<tr className={styles.scopeRecordRow} key={row.energyRecordId}><td><div className={styles.scopeChild}><span>└─ {type?.energyTypeName}</span></div></td><td>一级用能单元</td><td>{type?.analysisCategory}</td><td>{type?.measurementUnit}</td><td>{energyDataProgress(row)}</td><td className={styles.number}>{format(total, 2)}</td><td>{row.year}年</td><td><Actions viewLabel={detail ? '收起' : '查看'} onView={() => showDetails(detail ? null : row.energyRecordId)} onEdit={() => editMonth(row, 0)} onDelete={() => guard(() => { setEditing(null); requestDelete(row); })} /></td></tr>, detail && <tr className={styles.detailRow} key={`${row.energyRecordId}-detail`}><td colSpan={8}>{renderEnergyDetails(row, total, type?.measurementUnit ?? '')}</td></tr>]; }) : [<tr key={`${scopeKey}-empty`}><td colSpan={8} className={styles.emptyRow}>暂无能源数据</td></tr>])];
         })(),
       ])}</tbody></table></div> : level === '全部层级' ? <div className={styles.tableWrap}><table className={`${styles.wideTable} ${styles.quantityTable}`}><thead><tr><th>{energyRole === '回收能源' ? '产生单元 / 回收能源' : '归属范围 / 能源品种'}</th><th>归属层级</th><th>能源分析类别</th><th>单位</th><th>数据进度</th><th>年度合计</th><th>年份</th><th>操作</th></tr></thead><tbody>{allLevelTableRows.length ? allLevelTableRows : <EmptyRow colSpan={8} />}</tbody></table></div> : <div className={styles.tableWrap}><table className={`${styles.wideTable} ${styles.quantityTable}`}><thead><tr><th>{energyRole === '回收能源' ? '产生单元 / 回收能源' : '归属范围 / 能源品种'}</th><th>归属层级</th><th>能源分析类别</th><th>单位</th><th>数据进度</th><th>年度合计</th><th>年份</th><th>操作</th></tr></thead>
       <tbody>{pageRows.length ? pageRows.flatMap((row, index) => {
@@ -493,18 +500,19 @@ function EnergyQuantityPage() {
           const canAddForScope = level === '二级用能单元'
             && scopeType === 'energyUnit' && Boolean(row.energyUnitId);
           const groupRow = isScopeStart ? <tr className={styles.scopeGroupRow} key={`${currentScopeKey}-group`}><td><div className={`${styles.scopeCell} ${styles[`scopeDepth${depth}`]}`}><button type="button" className={styles.scopeToggle} aria-label={`${isCollapsed ? '展开' : '折叠'}${scopeName}`} onClick={() => setCollapsedScopes((current) => { const next = new Set(current); if (next.has(currentScopeKey)) next.delete(currentScopeKey); else next.add(currentScopeKey); return next; })}>{isCollapsed ? '+' : '−'}</button><i /><span><b>{scopeName}</b>{device && <small>所属：{v11ScopeName(device.energyUnitId, Number(maintenanceYear))}</small>}</span></div></td><td colSpan={6} /><td className={styles.scopeGroupActionCell}>{canAddForScope && <button type="button" className={styles.scopeAddButton} onClick={() => guard(() => { setEditing(null); setExpanded(null);  setNewUnitId(row.energyUnitId ?? ''); setEditing('new'); })}>＋ {energyRole === '回收能源' ? '新增回收能源' : '新增能源消费'}</button>}</td></tr> : null;
-          return [groupRow, <tr className={styles.scopeRecordRow} key={row.energyRecordId}><td><div className={`${styles.scopeChild} ${styles[`scopeDepth${depth}`]}`} aria-label={`${scopeName}下的${type?.energyTypeName ?? '能源记录'}`}><span>└─ {type?.energyTypeName}</span></div></td><td>{scopeLevel}</td><td>{type?.analysisCategory}</td><td>{type?.measurementUnit}</td><td>{energyDataProgress(row)}</td><td className={styles.number}>{format(total, 2)}</td><td>{row.year}年</td><td><Actions viewLabel={detail ? '收起' : '查看'} onView={() => showDetails(detail ? null : row.energyRecordId)} onEdit={() => editMonth(row, 0)} onDelete={() => guard(() => { setEditing(null); setDeleting(row); })} /></td></tr>,
+          return [groupRow, <tr className={styles.scopeRecordRow} key={row.energyRecordId}><td><div className={`${styles.scopeChild} ${styles[`scopeDepth${depth}`]}`} aria-label={`${scopeName}下的${type?.energyTypeName ?? '能源记录'}`}><span>└─ {type?.energyTypeName}</span></div></td><td>{scopeLevel}</td><td>{type?.analysisCategory}</td><td>{type?.measurementUnit}</td><td>{energyDataProgress(row)}</td><td className={styles.number}>{format(total, 2)}</td><td>{row.year}年</td><td><Actions viewLabel={detail ? '收起' : '查看'} onView={() => showDetails(detail ? null : row.energyRecordId)} onEdit={() => editMonth(row, 0)} onDelete={() => guard(() => { setEditing(null); requestDelete(row); })} /></td></tr>,
           detail && <tr className={styles.detailRow} key={`${row.energyRecordId}-detail`}><td colSpan={8}>{renderEnergyDetails(row, total, type?.measurementUnit ?? '')}</td></tr>];
         }) : requestedUnit?.unitLevel === 'level2' && level === '二级用能单元' && (!appliedFilters.keyword || requestedUnit.energyUnitName.includes(appliedFilters.keyword)) ? <><tr className={styles.scopeGroupRow}><td><div className={styles.scopeCell}><i /><b>{requestedUnit.energyUnitName}</b></div></td><td colSpan={6} /><td><button type="button" className={styles.scopeAddButton} onClick={() => guard(() => { setEditing(null); setExpanded(null);  setNewUnitId(requestedUnit.energyUnitId); setEditing('new'); })}>＋ 新增能源消费</button></td></tr><tr><td colSpan={8} className={styles.emptyRow}>暂无能源数据，请手动新增。</td></tr></> : <EmptyRow colSpan={8} />}</tbody>
       </table></div>}
       <Pagination count={rows.length} currentPage={safePage} onPageChange={level === '全部层级' ? undefined : (page) => guard(() => { setEditing(null); setExpanded(null); setCurrentPage(page); })} />
     </section>
     {editing && <EnergyRecordDialog key={`${editing === 'new' ? 'new' : editing.energyRecordId}:${version}`} item={editing === 'new' ? undefined : editing} dataYear={editing === 'new' ? Number(appliedFilters.year) : editing.year} energyRole={editing === 'new' ? requestedConversion?.inputMode === 'recovery' ? '回收能源' : energyRole : editing.energyRole} lockedScopeLevel={editing === 'new' && level !== '全部层级' ? level : undefined} initialUnitId={editing === 'new' ? newUnitId : undefined} initialDeviceId={linkedDeviceId} initialEnergyTypeId={linkedEnergyTypeId} initialMonth={editing === 'new' ? Number(params.get('month')) || undefined : editingMonth || undefined} conversionInputId={params.get('conversionInputId') ?? undefined} onClose={closeEditor} onSaved={savedEditor} />}
-    {deleting && <Modal title={`删除能源数据（${deleting.year}年度）`} width={520} submitText="确认删除" onClose={() => setDeleting(null)} onSubmit={() => {
+    {deleting && <Modal variant="delete" title="删除能源数据" width={640} submitText="确认删除" onClose={() => setDeleting(null)} onSubmit={() => {
       const result = deleteV11EnergyRecord(deleting.energyRecordId);
       if (!result.ok) return notify(result.error);
       setDeleting(null); setVersion((value) => value + 1); notify('能源数据已删除');
-    }}><div className={styles.warning}>确认删除当前能源数据吗？</div></Modal>}
+    }}><p>确认删除当前能源数据吗？</p></Modal>}
+    {deleteBlocked && <Modal variant="delete" title="删除能源数据" width={640} cancelText="关闭" onClose={() => setDeleteBlocked(null)}><p>该能源数据已被能源回收、转换与外供记录引用，禁止删除。</p></Modal>}
   </Page>;
 }
 
@@ -607,10 +615,8 @@ function EnergyCostsPage() {
   const year = maintenanceYear;
   const setYear = changeMaintenanceYear;
   const [typeId, setTypeId] = useState('');
-  const [expanded, setExpanded] = useState<string | null>(null);
   const [editing, setEditing] = useState<V11EnergyCost | 'new' | null>(null);
   const [deleting, setDeleting] = useState<V11EnergyCost | null>(null);
-  const showDetails = (id: string | null) => guard(() => { setEditing(null); setExpanded(id); });
   const editRecord = (row: V11EnergyCost) => guard(() => setEditing(row));
   const types = listV11EnergyTypes(Number(maintenanceYear));
   const rows = listV11EnergyCosts().filter((item) => item.year === Number(year) && (!typeId || item.energyTypeId === typeId));
@@ -618,19 +624,14 @@ function EnergyCostsPage() {
   return <Page toast={toast}>{confirmation}<section className={styles.card}>
     <Toolbar actions={<Button primary onClick={() => guard(() => setEditing('new'))}>＋ 新增成本数据</Button>}>
       <Field label="年度"><select value={year} onChange={(event) => setYear(event.target.value)}>{yearOptions.map((option) => <option key={option}>{option}</option>)}</select></Field>
-      <Field label="能源品种"><select value={typeId} onChange={(event) => { const next = event.target.value; guard(() => { setEditing(null); setExpanded(null); setTypeId(next); }); }}><option value="">全部</option>{types.map((type) => <option key={type.energyTypeId} value={type.energyTypeId}>{type.energyTypeName}</option>)}</select></Field>
+      <Field label="能源品种"><select value={typeId} onChange={(event) => { const next = event.target.value; guard(() => { setEditing(null); setTypeId(next); }); }}><option value="">全部</option>{types.map((type) => <option key={type.energyTypeId} value={type.energyTypeId}>{type.energyTypeName}</option>)}</select></Field>
     </Toolbar>
-    <div className={styles.tableWrap}><table className={styles.costTable}><thead><tr><th>能源品种</th><th>年度合计（万元）</th><th>年份</th><th>操作</th></tr></thead>
-      <tbody>{rows.length ? rows.flatMap((row) => {
-        const total = annual(row.monthlyCosts, row.annualCost);
-        const detail = expanded === row.energyCostId;
-        return [<tr key={row.energyCostId}><td className={styles.strong}>{types.find((type) => type.energyTypeId === row.energyTypeId)?.energyTypeName}</td><td className={styles.number}>{format(total, 2)}</td><td>{row.year}年</td><td><Actions viewLabel={detail ? '收起' : '查看'} onView={() => showDetails(detail ? null : row.energyCostId)} onEdit={() => editRecord(row)} onDelete={() => guard(() => { setEditing(null); setDeleting(row); })} /></td></tr>,
-          detail && <tr className={styles.detailRow} key={`${row.energyCostId}-detail`}><td colSpan={4}><MonthDetail onCollapse={() => showDetails(null)} values={row.monthlyCosts} reported={row.monthlyReportedMonths ?? row.monthlyCosts.map((value) => value > 0)} annualValue={total} annualSupplemented={(row.annualCost ?? 0) > 0} unit="万元" /></td></tr>];
-      }) : <EmptyRow colSpan={4} />}</tbody>
+    <div className={styles.tableWrap}><table className={styles.costTable}><thead><tr><th>能源品种</th>{months.map((month) => <th key={month}>{month}成本（万元）</th>)}<th>年度合计（万元）</th><th>操作</th></tr></thead>
+      <tbody>{rows.length ? rows.map((row) => <tr key={row.energyCostId}><td className={styles.strong}>{types.find((type) => type.energyTypeId === row.energyTypeId)?.energyTypeName}</td>{row.monthlyCosts.map((value, index) => <td key={index}>{row.monthlyReportedMonths?.[index] ?? value > 0 ? format(value, 2) : '—'}</td>)}<td className={styles.number}>{format(annual(row.monthlyCosts, row.annualCost), 2)}</td><td><Actions onEdit={() => editRecord(row)} onDelete={() => guard(() => { setEditing(null); setDeleting(row); })} /></td></tr>) : <EmptyRow colSpan={15} />}</tbody>
     </table></div><Pagination count={rows.length} />
   </section>
   {editing && <EnergyCostDialog key={`${editing === 'new' ? 'new' : editing.energyCostId}:${version}`} item={editing === 'new' ? undefined : editing} dataYear={editing === 'new' ? Number(year) : editing.year} onClose={() => setEditing(null)} onSaved={(message) => { setEditing(null); setVersion((value) => value + 1); notify(message); }} />}
-  {deleting && <Modal title={`删除成本数据（${deleting.year}年度）`} width={480} submitText="确认删除" onClose={() => setDeleting(null)} onSubmit={() => { deleteV11EnergyCost(deleting.energyCostId); setDeleting(null); setVersion((value) => value + 1); notify('成本数据已删除'); }}><div className={styles.warning}>确认删除能源成本数据吗？</div></Modal>}
+  {deleting && <Modal variant="delete" title="删除成本数据" width={640} submitText="确认删除" onClose={() => setDeleting(null)} onSubmit={() => { deleteV11EnergyCost(deleting.energyCostId); setDeleting(null); setVersion((value) => value + 1); notify('成本数据已删除'); }}><p>确认删除能源成本数据吗？</p></Modal>}
   </Page>;
 }
 function EnergyCostDialog({ item, dataYear, onClose, onSaved }: { item?: V11EnergyCost; dataYear: number; onClose: () => void; onSaved: (message: string) => void }) {
@@ -782,7 +783,7 @@ function OperationsPage() {
     }) : <EmptyRow colSpan={8} />}</tbody></table></div><Pagination count={rows.length} />
   </section>
   {editing && <OperationDialog key={`${editing === 'new' ? 'new' : editing.operationMetricId}:${version}`} item={editing === 'new' ? undefined : editing} dataYear={editing === 'new' ? Number(filters.year) : editing.year} scopeContext={editing === 'new' ? newScopeLevel ?? undefined : undefined} initialUnitId={editing === 'new' ? newUnitId : undefined} initialCategory={editing === 'new' ? newMetricPreset?.category : requestedCategory} initialMetricName={editing === 'new' ? newMetricPreset?.metricName : requestedMetricName} onClose={() => { setEditing(null); setNewScopeLevel(null); setNewUnitId(''); setNewMetricPreset(undefined); if (returnTo) returnToOrigin(); }} onSaved={(message) => { setEditing(null); setNewScopeLevel(null); setNewUnitId(''); setNewMetricPreset(undefined); setVersion((value) => value + 1); if (returnTo) returnToOrigin(); else notify(message); }} />}
-  {deleting && <Modal title={`删除运营数据（${deleting.year}年度）`} width={500} submitText="确认删除" onClose={() => setDeleting(null)} onSubmit={() => { deleteV11OperationMetric(deleting.operationMetricId); setDeleting(null); setVersion((value) => value + 1); notify('运营数据已删除，相关分析将按最新数据重新计算'); }}><div className={styles.warning}>确认删除“{deleting.metricName}”数据吗？</div></Modal>}
+  {deleting && <Modal variant="delete" title="删除运营数据" width={640} submitText="确认删除" onClose={() => setDeleting(null)} onSubmit={() => { deleteV11OperationMetric(deleting.operationMetricId); setDeleting(null); setVersion((value) => value + 1); notify('运营数据已删除，相关分析将按最新数据重新计算'); }}><p>确认删除“<strong>{deleting.metricName}</strong>”数据吗？</p></Modal>}
   {allocationEditing && <ProductAllocationDialog product={allocationEditing.product} energyUnitId={allocationEditing.energyUnitId} year={Number(filters.year)} onClose={() => setAllocationEditing(null)} onSaved={() => { setAllocationEditing(null); setVersion((value) => value + 1); notify('产品能源分配已保存，相关能耗指标将重新计算'); }} />}
   </Page>;
 }
@@ -838,7 +839,7 @@ function DeviceOutputPage() {
     <Pagination count={rows.length} />
   </section>
   {editing && <DeviceOutputDialog key={`${editing.device.deviceId}:${editing.metricCode}:${version}`} device={editing.device} year={Number(filters.year)} metricCode={editing.metricCode} onClose={() => setEditing(null)} onSaved={(message) => { setEditing(null); setVersion((value) => value + 1); if (returnTo) returnToOrigin(); else notify(message); }} />}
-  {deleting && <Modal title={`删除设备产出数据（${deleting.year}年度）`} width={520} submitText="确认删除" onClose={() => setDeleting(null)} onSubmit={() => { deleteDeviceIntensityParameter(deleting.device.deviceId, deleting.year, deleting.metricCode); setDeleting(null); setVersion((value) => value + 1); notify('设备产出数据已删除'); }}><div className={styles.warning}>确认删除“{deleting.device.deviceName}”{deleting.year}年度的全部产出数据（含月度及年度值）吗？</div><p className={styles.modalNote}>设备档案和其他年度数据保留；本年度相关设备能耗指标将缺少产出数据。</p></Modal>}
+  {deleting && <Modal variant="delete" title="删除设备产出数据" width={640} submitText="确认删除" onClose={() => setDeleting(null)} onSubmit={() => { deleteDeviceIntensityParameter(deleting.device.deviceId, deleting.year, deleting.metricCode); setDeleting(null); setVersion((value) => value + 1); notify('设备产出数据已删除'); }}><p>确认删除“<strong>{deleting.device.deviceName}</strong>”{deleting.year}年度的全部产出数据（含月度及年度值）吗？</p></Modal>}
   </Page>;
 }
 
@@ -1039,7 +1040,6 @@ function DevicesPage() {
     }).filter((group) => !filters.levelOneUnitId || group.unit.energyUnitId === filters.levelOneUnitId);
   void version;
   const blockedInspection = deleteBlocked ? inspectV11KeyDeviceDeletion(deleteBlocked.deviceId, Number(maintenanceYear)) : null;
-  const blockedReferences = blockedInspection && !blockedInspection.ok ? blockedInspection.references : null;
 
   const renderDeviceRow = (row: V11KeyDevice) => {
     const energyType = types.find((type) => type.energyTypeId === row.mainEnergyTypeId);
@@ -1085,19 +1085,14 @@ function DevicesPage() {
   </section>
   {editing && <DeviceDialog item={editing !== 'new' && !('rootUnitId' in editing) ? editing : undefined} dialogPreset={editing !== 'new' && 'rootUnitId' in editing ? editing : undefined} onClose={() => setEditing(null)} onSaved={(message) => { setEditing(null); setVersion((value) => value + 1); notify(message); }} />}
   {configuringIndicator && <DeviceIndicatorBindingDialog device={configuringIndicator} year={Number(maintenanceYear)} onClose={() => setConfiguringIndicator(null)} onSaved={() => { setConfiguringIndicator(null); setVersion((value) => value + 1); notify('设备指标配置已保存'); }} />}
-  {deleteBlocked && <Modal title="无法删除重点设备" width={520} cancelText="我知道了" onClose={() => setDeleteBlocked(null)}>
-    <div className={styles.warning}>{blockedInspection?.ok ? '当前设备的关联状态已变化，请关闭后重新操作。' : `重点设备“${deleteBlocked.deviceName}”已关联业务数据，暂不能删除。请先处理关联数据。`}</div>
-    {blockedReferences && <ul className={styles.referenceList}>
-      {blockedReferences.energyRecordCount > 0 && <li><span>设备能源数据</span><strong>{blockedReferences.energyRecordCount} 项</strong></li>}
-      {blockedReferences.indicatorBindingCount > 0 && <li><span>设备指标配置</span><strong>{blockedReferences.indicatorBindingCount} 项</strong></li>}
-      {blockedReferences.benchmarkTargetCount > 0 && <li><span>设备指标目标</span><strong>{blockedReferences.benchmarkTargetCount} 项</strong></li>}
-    </ul>}
+  {deleteBlocked && <Modal variant="delete" title="无法删除重点设备" width={640} cancelText="我知道了" onClose={() => setDeleteBlocked(null)}>
+    <p>{blockedInspection?.ok ? '当前设备的关联状态已变化，请关闭后重新操作。' : <>重点设备“<strong>{deleteBlocked.deviceName}</strong>”已关联业务数据，暂不能删除。<br />请先处理关联数据。</>}</p>
   </Modal>}
-  {deleting && <Modal title={`删除重点设备（${maintenanceYear}年度）`} width={520} submitText="确认删除" onClose={() => setDeleting(null)} onSubmit={() => {
+  {deleting && <Modal variant="delete" title="删除重点设备" width={640} submitText="确认删除" onClose={() => setDeleting(null)} onSubmit={() => {
     const result = deleteV11KeyDevice(deleting.deviceId, Number(maintenanceYear));
     if (!result.ok) return notify(result.error);
     setDeleting(null); setVersion((value) => value + 1); notify('重点设备已删除');
-  }}><div className={styles.warning}>确认删除重点设备“{deleting.deviceName}”吗？</div></Modal>}
+  }}><p>确认删除重点设备“<strong>{deleting.deviceName}</strong>”吗？</p></Modal>}
   </Page>;
 }
 

@@ -5,6 +5,8 @@ import { DataCollectionPage } from './newPrototype/DataCollectionPage';
 import { DataManagementV11 } from './newPrototype/DataManagementV11';
 import { EnergyAnalysisV4 } from './newPrototype/EnergyAnalysisV4';
 import { BalanceOptimizationPage } from './newPrototype/BalanceOptimizationPage';
+import { SupplierCarbonManagement } from './newPrototype/SupplierCarbonManagement';
+import { ProductCarbonFootprint } from './newPrototype/ProductCarbonFootprint';
 
 /**
  * Route-level module dispatcher.
@@ -28,6 +30,12 @@ export function PlatformPage() {
   if (pathname.startsWith('/asset-strategy/')) {
     if (pathname === '/asset-strategy/balance') return <BalanceOptimizationPage />;
     return <AssetOperationsV2 pathname={pathname} />;
+  }
+  if (pathname.startsWith('/supply-chain-carbon/')) {
+    return <SupplierCarbonManagement />;
+  }
+  if (pathname.startsWith('/product-carbon-footprint/')) {
+    return <ProductCarbonFootprint pathname={pathname} />;
   }
   return <DataCollectionPage />;
 }

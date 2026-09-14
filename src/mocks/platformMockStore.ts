@@ -4,6 +4,7 @@ import type {
   CarbonAsset,
   CarbonAssetWriteInput,
   CarbonActivityRecord,
+  CarbonAccountingTask,
   CarbonMarketConfig,
   CarbonSnapshot,
   DataCollectionSource,
@@ -164,14 +165,24 @@ const seedCarbonSnapshots: CarbonSnapshot[] = [
     carbonTaskId: 'ct-2025',
     year: 2025,
     version: 2,
-    totalEmission: 13_290.1,
-    directEmission: 720.4,
-    purchasedEnergyEmission: 12_250.7,
-    otherIndirectEmission: 319,
-    monthlyEmissions: spread(13_290.1),
-    sourceItems: [],
+    totalEmission: 12_683.03,
+    directEmission: 687.95,
+    purchasedEnergyEmission: 11_995.08,
+    otherIndirectEmission: 0,
+    monthlyEmissions: spread(12_683.03),
+    sourceItems: emissionSources.filter((item) => item.emissionCategory !== '交通运输产生的排放').map((item) => ({
+      ...item,
+      emissionSourceId: `${item.emissionSourceId}-2025`,
+      carbonTaskId: 'ct-2025',
+      sourceRecordId: item.sourceRecordId.replace('2026', '2025'),
+    })),
   },
 ];
+const seedCarbonTasks: CarbonAccountingTask[] = [
+  { carbonTaskId: 'ct-2026', taskName: '2026年度组织温室气体核算', year: 2026, organizationName: 'XX科技有限公司', industry: '通用工业企业', standardName: 'GB/T 32150—2025', organizationBoundary: '企业法人边界', status: 'pending', currentSnapshotId: 'cs-2026-v1' },
+  { carbonTaskId: 'ct-2025', taskName: '2025年度组织温室气体核算', year: 2025, organizationName: 'XX科技有限公司', industry: '通用工业企业', standardName: 'GB/T 32150—2025', organizationBoundary: '企业法人边界', status: 'confirmed', currentSnapshotId: 'cs-2025-v2' },
+];
+let carbonTasks = seedCarbonTasks.map((item) => ({ ...item }));
 let carbonSnapshots = seedCarbonSnapshots.map((item) => ({ ...item, monthlyEmissions: [...item.monthlyEmissions], sourceItems: item.sourceItems.map((source) => ({ ...source })) }));
 carbonSnapshots = carbonSnapshots.map((item) => ({
   ...item,
@@ -382,6 +393,14 @@ export function saveCarbonMarketConfig(config: CarbonMarketConfig) {
 }
 export function listEmissionSources() { return clone(emissionSources); }
 export function listCarbonActivityRecords() { return clone(carbonActivityRecords); }
+export function listCarbonAccountingTasks() { return clone(carbonTasks); }
+export function getCarbonAccountingTask(carbonTaskId: string) { return carbonTasks.find((item) => item.carbonTaskId === carbonTaskId) ? { ...carbonTasks.find((item) => item.carbonTaskId === carbonTaskId)! } : undefined; }
+export function saveCarbonAccountingTask(task: CarbonAccountingTask) {
+  const index = carbonTasks.findIndex((item) => item.carbonTaskId === task.carbonTaskId);
+  if (index >= 0) carbonTasks[index] = { ...task };
+  else carbonTasks.push({ ...task });
+  return { ...task };
+}
 export function replaceEmissionSourcesForTask(carbonTaskId: string, sources: EmissionSource[]) {
   const replacementSources = sources.filter((item) => item.carbonTaskId === carbonTaskId).map((item) => ({ ...item }));
   const replacementActivityRecords = replacementSources
@@ -402,8 +421,8 @@ export function replaceEmissionSourcesForTask(carbonTaskId: string, sources: Emi
   return listEmissionSources();
 }
 export function saveEmissionSource(input: Omit<EmissionSource, 'emissionSourceId'>, emissionSourceId?: string) {
-  const duplicate = emissionSources.find((item) => item.sourceName.trim() === input.sourceName.trim() && item.emissionSourceId !== emissionSourceId);
-  if (duplicate) return { ok: false as const, error: '同一核算任务中排放源名称不能重复。' };
+  const duplicate = emissionSources.find((item) => item.carbonTaskId === input.carbonTaskId && item.sourceName.trim() === input.sourceName.trim() && item.emissionSourceId !== emissionSourceId);
+  if (duplicate) return { ok: false as const, error: '同一核算年度中排放源名称不能重复。' };
   if (emissionSourceId) {
     const index = emissionSources.findIndex((item) => item.emissionSourceId === emissionSourceId);
     if (index < 0) return { ok: false as const, error: '排放源记录不存在。' };
@@ -438,9 +457,13 @@ export function latestCarbonSnapshot(year = 2026) {
   const snapshot = carbonSnapshots.filter((item) => item.year === year).sort((a, b) => b.version - a.version)[0];
   return snapshot ? { ...snapshot, monthlyEmissions: [...snapshot.monthlyEmissions], sourceItems: snapshot.sourceItems.map((source) => ({ ...source })), activityRecords: snapshot.activityRecords?.map((record) => ({ ...record, evidenceFileIds: [...record.evidenceFileIds] })) } : undefined;
 }
+export function latestCarbonSnapshotForTask(carbonTaskId: string) {
+  const snapshot = carbonSnapshots.filter((item) => item.carbonTaskId === carbonTaskId).sort((a, b) => b.version - a.version)[0];
+  return snapshot ? { ...snapshot, monthlyEmissions: [...snapshot.monthlyEmissions], sourceItems: snapshot.sourceItems.map((source) => ({ ...source })), activityRecords: snapshot.activityRecords?.map((record) => ({ ...record, evidenceFileIds: [...record.evidenceFileIds] })) } : undefined;
+}
 export function publishCarbonSnapshot(carbonTaskId = 'ct-2026', year = 2026) {
   const taskSources = emissionSources.filter((item) => item.carbonTaskId === carbonTaskId);
-  const directGroups = new Set(['化石燃料燃烧排放', '生产过程排放', '废弃物处理排放', '逸散排放']);
+  const directGroups = new Set(['化石燃料燃烧排放', '生产过程排放', '废弃物处理处置排放', '逸散排放']);
   const purchasedGroup = '购入的电力与热力产生的排放';
   const directEmission = taskSources.filter((item) => directGroups.has(item.emissionGroup)).reduce((sum, item) => sum + item.emissionAmount, 0);
   const purchasedEnergyEmission = taskSources.filter((item) => item.emissionGroup === purchasedGroup).reduce((sum, item) => sum + item.emissionAmount, 0);
@@ -567,6 +590,7 @@ export function resetPlatformMockStore() {
     sourceItems: item.sourceItems.map((source) => ({ ...source })),
     activityRecords: item.activityRecords?.map((record) => ({ ...record, evidenceFileIds: [...record.evidenceFileIds] })),
   }));
+  carbonTasks = seedCarbonTasks.map((item) => ({ ...item }));
   carbonAssets = clone(seedCarbonAssets);
   keyDevices = clone(seedKeyDevices);
   carbonMarketConfig = {

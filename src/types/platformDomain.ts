@@ -109,6 +109,18 @@ export interface CarbonSnapshot {
   activityRecords?: CarbonActivityRecord[];
 }
 
+export interface CarbonAccountingTask {
+  carbonTaskId: string;
+  taskName: string;
+  year: number;
+  organizationName: string;
+  industry: string;
+  standardName: string;
+  organizationBoundary: string;
+  status: 'draft' | 'confirmed' | 'pending';
+  currentSnapshotId?: string;
+}
+
 export interface CarbonActivityRecord {
   activityRecordId: string;
   emissionSourceId: string;

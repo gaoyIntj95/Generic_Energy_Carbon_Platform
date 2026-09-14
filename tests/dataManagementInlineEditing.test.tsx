@@ -57,17 +57,21 @@ describe('consistent data editing dialogs', () => {
     expect(scope.querySelectorAll('tbody tr')).toHaveLength(rowCount);
     expect(scenario.read()[5]).toBe(Number(original) + 1);
     expect(scenario.read().filter((_, i) => i !== 5)).toEqual(before.filter((_, i) => i !== 5));
-    await click(button('查看', row));
-    const detail = container.querySelector('[aria-label="' + scenario.region + '"]')!;
-    expect(detail).not.toBeNull();
-    expect(detail.querySelector('input')).toBeNull();
-    const expandedCount = scope.querySelectorAll('tbody tr').length;
-    await click(button('编辑', row));
-    expect(input().value).toBe(String(Number(original) + 1));
-    expect(scope.querySelectorAll('tbody tr')).toHaveLength(expandedCount);
-    await click(button('取消', container.querySelector('[role="dialog"]')!));
-    await click(button('收起明细'));
-    expect(container.querySelector('[aria-label="' + scenario.region + '"]')).toBeNull();
+    if (scenario.name === '能源成本') {
+      expect([...row.querySelectorAll('td')].slice(1, 13).map((cell) => cell.textContent)).toContain(String(Number(original) + 1));
+    } else {
+      await click(button('查看', row));
+      const detail = container.querySelector('[aria-label="' + scenario.region + '"]')!;
+      expect(detail).not.toBeNull();
+      expect(detail.querySelector('input')).toBeNull();
+      const expandedCount = scope.querySelectorAll('tbody tr').length;
+      await click(button('编辑', row));
+      expect(input().value).toBe(String(Number(original) + 1));
+      expect(scope.querySelectorAll('tbody tr')).toHaveLength(expandedCount);
+      await click(button('取消', container.querySelector('[role="dialog"]')!));
+      await click(button('收起明细'));
+      expect(container.querySelector('[aria-label="' + scenario.region + '"]')).toBeNull();
+    }
   });
 
   it.each(scenarios.slice(0, 3))('$name keeps annual supplementation in a dialog without filling missing months', async (scenario) => {
@@ -85,14 +89,22 @@ describe('consistent data editing dialogs', () => {
     }
     const before = [...scenario.read()];
     await act(async () => root.render(<MemoryRouter initialEntries={[scenario.path]}><DataManagementV11 pathname={scenario.path.split('?')[0]} /></MemoryRouter>));
-    await click(button('查看')); await click(button('编辑'));
+    if (scenario.name !== '能源成本') await click(button('查看'));
+    await click(button('编辑'));
     expect(container.querySelector('[role="dialog"]')).not.toBeNull();
     const form = container.querySelector('[role="dialog"]')!;
-    const field = [...form.querySelectorAll('label')].find((label) => label.textContent?.startsWith('年度'))!.querySelector('input')!;
+    const field = [...form.querySelectorAll('label')].find((label) => label.textContent?.startsWith('年度') && label.querySelector('input:not([readonly])'))!.querySelector('input')!;
     expect(field.value).toBe('100'); await change(field, '200'); await click(button(scenario.save));
     expect(scenario.read()).toEqual(before);
-    expect(container.querySelector('[aria-label="月度明细"]')?.textContent).toContain('200');
-    expect([...container.querySelectorAll('[aria-label="月度明细"] [data-month] > strong')].map((item) => item.textContent)).toEqual(['10', ...Array(11).fill('—')]);
-    await click(button('收起明细')); expect(container.querySelector('[role="dialog"]')).toBeNull();
+    if (scenario.name === '能源成本') {
+      const cells = [...container.querySelectorAll('table[class*="costTable"] tbody tr:first-child td')].map((item) => item.textContent);
+      expect(cells.slice(1, 13)).toEqual(['10', ...Array(11).fill('—')]);
+      expect(cells).toContain('200');
+    } else {
+      expect(container.querySelector('[aria-label="月度明细"]')?.textContent).toContain('200');
+      expect([...container.querySelectorAll('[aria-label="月度明细"] [data-month] > strong')].map((item) => item.textContent)).toEqual(['10', ...Array(11).fill('—')]);
+      await click(button('收起明细'));
+    }
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 });

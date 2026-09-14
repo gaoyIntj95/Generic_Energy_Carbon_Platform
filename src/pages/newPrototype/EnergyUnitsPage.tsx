@@ -496,15 +496,15 @@ function AnnualEnergyUnitsPage() {
       {dialog?.type === 'deleteBlocked' && (
         <DeleteBlockedDialog
           unit={dialog.unit}
-          references={dialog.references}
           onClose={() => setDialog(null)}
         />
       )}
 
       {dialog?.type === 'deleteConfirm' && (
         <Modal
+          variant="delete"
           title="删除用能单元"
-          width={520}
+          width={640}
           submitText="确认删除"
           onClose={() => setDialog(null)}
           onSubmit={() => {
@@ -516,9 +516,7 @@ function AnnualEnergyUnitsPage() {
             }
           }}
         >
-          <div className={styles.confirmBox}>
-            确认删除用能单元“<strong>{dialog.unit.energyUnitName}</strong>”吗？
-          </div>
+          <p>确认删除用能单元“<strong>{dialog.unit.energyUnitName}</strong>”吗？</p>
         </Modal>
       )}
 
@@ -972,35 +970,14 @@ function namePlaceholder(unitType: EnergyUnitType | '') {
 
 function DeleteBlockedDialog({
   unit,
-  references,
   onClose,
 }: {
   unit: EnergyUnit;
-  references: EnergyUnitReferenceSummary;
   onClose: () => void;
 }) {
-  const [year] = useDataYear();
-  const referenceItems = [
-    { label: '下级用能单元', count: references.childCount },
-    { label: '能源消费数据', count: references.energyRecordCount },
-    { label: '运营数据', count: references.operationRecordCount },
-    { label: '重点设备档案', count: references.deviceCount },
-    { label: '能源流转关系', count: references.conversionRelationCount },
-  ].filter((item) => item.count > 0);
-
   return (
-    <Modal title={`无法删除用能单元（${year}年度）`} width={560} cancelText="我知道了" onClose={onClose}>
-      <p className={styles.blockerIntro}>
-        用能单元“{unit.energyUnitName}”已关联数据，无法删除。
-      </p>
-      <ul className={styles.blockerList}>
-        {referenceItems.map((item) => (
-          <li key={item.label}>
-            <span>{item.label}</span>
-            <strong>{item.count} 项</strong>
-          </li>
-        ))}
-      </ul>
+    <Modal variant="delete" title="无法删除用能单元" width={640} cancelText="我知道了" onClose={onClose}>
+      <p>用能单元“<strong>{unit.energyUnitName}</strong>”存在关联内容。为保证历史数据和分析结果完整，暂不支持删除。</p>
     </Modal>
   );
 }

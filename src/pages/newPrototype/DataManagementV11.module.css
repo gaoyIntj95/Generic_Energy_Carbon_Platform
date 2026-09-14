@@ -254,12 +254,7 @@
 }
 
 .costTable {
-  min-width: 640px !important;
-  table-layout: fixed !important;
-}
-
-.costTable th {
-  width: calc(100% / 3);
+  min-width: 2050px !important;
 }
 
 .deviceOutputTable {

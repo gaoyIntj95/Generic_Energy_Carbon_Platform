@@ -43,23 +43,22 @@ const carbonAccountingItems: NavItem[] = [
   { label: '碳核算清单', path: '/carbon-accounting/inventory', description: '按排放类别维护排放源活动数据、计算参数与排放结果。' },
   { label: '碳核查支撑', path: '/carbon-accounting/support', description: '维护核算基础材料和排放源支撑材料。' },
   { label: '碳排放报告', path: '/carbon-accounting/report', description: '基于正式核算清单生成企业温室气体排放报告，并导出报告及核查凭证资料。' },
-  { label: '碳因子参数', path: '/carbon-accounting/factors', description: '管理综合因子、基础参数、参数组、企业实测值和历史版本。', disabled: true },
+  { label: '碳排放因子库', path: '/carbon-accounting/factors', description: '按排放源类别和行业企业类别管理碳排放因子及参数。' },
 ];
 
-const carbonFootprintPlanning: NavPlaceholder = {
-  key: 'carbon-footprint-accounting',
-  label: '碳足迹核算',
-  description: '产品碳足迹核算能力规划入口，当前版本暂不开发。',
-  planned: true,
-  badge: '规划中',
-};
+const productCarbonFootprintItems: NavItem[] = [
+  { label: '项目管理', pageTitle: '产品碳足迹项目', path: '/product-carbon-footprint/projects', description: '以产品项目为中心管理生命周期模型、活动数据、核算结果和报告。' },
+  { label: '数据管理', pageTitle: '产品碳足迹数据管理', path: '/product-carbon-footprint/data', description: '集中查询并维护各产品项目的生命周期活动数据。' },
+  { label: '核算结果', pageTitle: '产品碳足迹核算结果', path: '/product-carbon-footprint/results', description: '按产品查看单位碳足迹、生命周期贡献和主要排放来源。' },
+  { label: '报告管理', pageTitle: '产品碳足迹报告', path: '/product-carbon-footprint/reports', description: '生成、预览和下载产品碳足迹量化报告。' },
+  { label: '碳足迹因子库', path: '/product-carbon-footprint/factors', description: '维护产品碳足迹核算所用的排放因子与数据来源。' },
+];
 
-const supplyChainPlanning: NavPlaceholder = {
-  key: 'supply-chain-carbon',
+const supplyChainCarbonItem: NavItem = {
   label: '供应链碳管理',
-  description: '供应链碳管理能力规划入口，当前版本暂不开发。',
-  planned: true,
-  badge: '规划中',
+  pageTitle: '供应链碳管理',
+  path: '/supply-chain-carbon/suppliers',
+  description: '集中维护供应商提供的材料/产品碳足迹数据、必要的供应业务数据及证明材料，为产品碳足迹核算和供应链碳分析提供数据基础。',
 };
 
 const assetStrategyItems: NavItem[] = [
@@ -74,7 +73,7 @@ export const navigation: NavGroup[] = [
   {
     key: 'carbon-accounting',
     label: '碳排放核算与合规',
-    items: carbonAccountingItems,
+    items: [...carbonAccountingItems, ...productCarbonFootprintItems, supplyChainCarbonItem],
     display: [
       {
         key: 'carbon-calculation',
@@ -87,8 +86,8 @@ export const navigation: NavGroup[] = [
         ],
       },
       carbonAccountingItems[4],
-      supplyChainPlanning,
-      carbonFootprintPlanning,
+      supplyChainCarbonItem,
+      { key: 'product-carbon-footprint', label: '产品碳足迹', items: productCarbonFootprintItems },
     ],
   },
   { key: 'asset-strategy', label: '能碳资产运营与策略', items: assetStrategyItems },
