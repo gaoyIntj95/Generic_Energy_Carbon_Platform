@@ -48,7 +48,7 @@ const carbonAccountingItems: NavItem[] = [
 
 const productCarbonFootprintItems: NavItem[] = [
   { label: '项目管理', pageTitle: '产品碳足迹项目', path: '/product-carbon-footprint/projects', description: '以产品项目为中心管理生命周期模型、活动数据、核算结果和报告。' },
-  { label: '数据管理', pageTitle: '产品碳足迹数据管理', path: '/product-carbon-footprint/data', description: '集中查询并维护各产品项目的生命周期活动数据。' },
+  { label: '核算清单', pageTitle: '产品碳足迹核算清单', path: '/product-carbon-footprint/data', description: '按产品项目维护生命周期排放活动、活动数据、排放因子与核算结果。' },
   { label: '核算结果', pageTitle: '产品碳足迹核算结果', path: '/product-carbon-footprint/results', description: '按产品查看单位碳足迹、生命周期贡献和主要排放来源。' },
   { label: '报告管理', pageTitle: '产品碳足迹报告', path: '/product-carbon-footprint/reports', description: '生成、预览和下载产品碳足迹量化报告。' },
   { label: '碳足迹因子库', path: '/product-carbon-footprint/factors', description: '维护产品碳足迹核算所用的排放因子与数据来源。' },
