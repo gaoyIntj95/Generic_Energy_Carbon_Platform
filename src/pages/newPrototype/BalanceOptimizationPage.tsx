@@ -21,7 +21,6 @@ import {
   buildIntensityCalculationViews,
   type CalculatedIntensityMetric,
 } from '../../mocks/energyIntensitySelector';
-import { AssetAiAnalysis, type AssetAiConfig } from './AssetAiAnalysis';
 import { Button, Drawer, Field, Modal, Tag, Toast } from './PrototypeUI';
 import styles from './AssetOperationsV2.module.css';
 
@@ -207,6 +206,7 @@ function buildDataCompletenessMap(year: number, period: FlowPeriod) {
       return [view.object.objectId, {
         status: 'incomplete' as const,
         reason: view.pendingReasons[0] ?? '缺少能源数据或运营数据',
+        issues: view.pendingReasons,
       }];
     }
     if (period.grain === 'month') {
@@ -214,9 +214,10 @@ function buildDataCompletenessMap(year: number, period: FlowPeriod) {
       return [view.object.objectId, {
         status: hasCurrentMonthData ? 'complete' as const : 'incomplete' as const,
         reason: hasCurrentMonthData ? '当前期间能源与运营数据完整' : `当前期间缺少${period.month}月能耗指标数据`,
+        issues: hasCurrentMonthData ? [] : view.pendingReasons.length ? view.pendingReasons : [`当前期间缺少${period.month}月能耗指标数据`],
       }];
     }
-    return [view.object.objectId, { status: 'complete' as const, reason: '年度能源与运营数据完整' }];
+    return [view.object.objectId, { status: 'complete' as const, reason: '年度能源与运营数据完整', issues: [] }];
   }));
 }
 
@@ -275,6 +276,8 @@ export function buildStrategyEfficiencySignals(year: number, period: FlowPeriod)
       ruleCode,
       actionCode,
       evidence,
+      dataIssue: complete?.reason ?? '缺少能源数据或运营数据',
+      dataIssues: complete?.issues ?? [complete?.reason ?? '缺少能源数据或运营数据'],
       metricName: intensityRow?.metricName ?? benchmarkRow?.metricName ?? '能耗指标',
       value: intensityRow?.value ?? null,
       unit: intensityRow?.unit ?? '—',
@@ -404,7 +407,6 @@ export function BalanceOptimizationPage() {
   const [year, setYear] = useState(initialFilters.year);
   const [period, setPeriod] = useState<'month' | 'year'>(initialFilters.period);
   const [month, setMonth] = useState(initialFilters.month);
-  const [aiVersion, setAiVersion] = useState(0);
   const [applied, setApplied] = useState({
     ...initialFilters,
   });
@@ -413,14 +415,14 @@ export function BalanceOptimizationPage() {
     window.setTimeout(() => setToast(''), 1800);
   };
   const levelOneUnits = useMemo(
-    () => listEnergyUnits().filter((unit) => unit.unitLevel === 'level1'),
-    [],
+    () => listEnergyUnits(applied.year).filter((unit) => unit.unitLevel === 'level1'),
+    [applied.year],
   );
   const analysisPeriod = useMemo<FlowPeriod>(() => ({
     year: applied.year,
     grain: applied.period,
     month: applied.month,
-  }), [applied.month, applied.period]);
+  }), [applied.month, applied.period, applied.year]);
   const levelOneDataset = useMemo(
     () => buildFlowAnalysisDataset(analysisPeriod, 'level1'),
     [analysisPeriod],
@@ -435,11 +437,11 @@ export function BalanceOptimizationPage() {
   );
   const benchmarkDeviations = useMemo(
     () => buildBenchmarkDeviationMap(applied.year, analysisPeriod),
-    [analysisPeriod],
+    [analysisPeriod, applied.year],
   );
   const dataCompleteness = useMemo(
     () => buildDataCompletenessMap(applied.year, analysisPeriod),
-    [analysisPeriod],
+    [analysisPeriod, applied.year],
   );
   const allUnitRows = useMemo(
     () => buildUnitBalanceRows(levelTwoDataset.levelTwoBalanceRows, levelOneUnits, levelOneDataset, intensityDeviations, benchmarkDeviations, dataCompleteness),
@@ -467,100 +469,16 @@ export function BalanceOptimizationPage() {
     + (unmatchedEnergy > 0 && enterpriseFlowStatus !== '已完成' ? 1 : 0);
   const allocation = useMemo(() => visibleUnitRows.reduce((result, row) => {
     if (row.unitType === '生产单元') result.production += row.energyInputStandardAmount;
-    else if (row.unitType === '公辅系统') result.power += row.energyInputStandardAmount;
+    else if (row.unitType === '能源转换系统' || row.unitType === '能源转换子系统') result.power += row.energyInputStandardAmount;
     else result.auxiliary += row.energyInputStandardAmount;
     return result;
   }, { production: 0, power: 0, auxiliary: 0 }), [visibleUnitRows]);
-  const selectedScopeName = '全企业';
-  const ranks = [...visibleUnitRows]
-    .filter((row) => {
-      const flowIssue = row.energyInputStandardAmount > 0 && Math.abs(row.deviationRate ?? 0) > 10;
-      const benchmarkIssue = (benchmarkGap(row) ?? 0) >= ENERGY_DEVIATION_ATTENTION;
-      const trendIssue = trendNeedsAction(row);
-      return flowIssue || benchmarkIssue || trendIssue;
-    })
-    .sort((left, right) => {
-      const score = (row: UnitBalanceRow) => {
-        const flowIssue = row.energyInputStandardAmount > 0 && Math.abs(row.deviationRate ?? 0) > 10 ? 8 : 0;
-        return Math.max(benchmarkGap(row) ?? 0, 0) * 3
-          + Math.max(Math.abs(row.intensityYoYDeviation ?? 0), Math.abs(row.intensityMoMDeviation ?? 0))
-          + flowIssue
-          + Math.min(row.energyInputStandardAmount / 1000, 5);
-      };
-      return score(right) - score(left);
-    })
-    .slice(0, 5);
-  const topIssue = ranks[0];
-  const pendingIntensityCount = visibleUnitRows.length - ranks.length;
-  const periodText = applied.period === 'year' ? `${applied.year}年度` : `${applied.year}年${applied.month}月`;
-  const aiConfig = useMemo<AssetAiConfig>(() => ({
-    tone: 'aiBalance',
-    title: '能源平衡与优化调度',
-    reportTitle: '能源平衡与优化调度分析报告',
-    generateLabel: '开始优化诊断',
-    description: '结合能效对标、能流分析和运行数据，辅助优化工艺、设备运行参数，实现能源平衡与优化调度。',
-    period: periodText,
-    scope: selectedScopeName,
-    cutoff: applied.period === 'year' ? '2026-12-31' : `2026-${String(applied.month).padStart(2, '0')}-30`,
-    level: topIssue ? `优先级：${Math.max(Math.abs(topIssue.intensityYoYDeviation ?? 0), Math.abs(topIssue.intensityMoMDeviation ?? 0)) >= ENERGY_DEVIATION_HIGH ? '高' : '中'}` : '运行平稳',
-    reasoningType: '规则命中后的跨指标深度诊断与优化方向识别',
-    judgement: topIssue
-      ? `${topIssue.energyUnitName}目前是优先优化对象。系统结合能效对标、能耗变化和能源分配结果，建议先核对数据，再调整工艺、设备或用能安排。`
-      : '当前全企业范围内暂无具备完整同比数据的异常能效指标。',
-    logic: `规则引擎负责识别异常与生成任务；AI仅在规则命中后，关联能效指标、趋势变化和能源分配关系生成可能原因、核查顺序与优化建议。当前能源输入${format(totals.input, 1)} tce，已关联去向${format(confirmedAmount, 1)} tce，未匹配能源${format(unmatchedEnergy, 1)} tce。`,
-    evidence: [
-      { label: '能源输入量', value: `${format(totals.input, 1)} tce`, note: '当前统计范围能源输入' },
-      { label: '能源平衡率', value: `${format(confirmationRate, 2)}%`, note: '已关联去向 ÷ 能源输入量' },
-      { label: '重点异常对象', value: `${diagnosticRows.length} 个`, note: '存在异常诊断结果的用能单元' },
-      { label: '未匹配能源', value: `${format(unmatchedEnergy, 1)} tce`, note: '输入但未完成明确归属或分配' },
-    ],
-    actionLabel: '下一步行动',
-    priorityAction: topIssue
-      ? `先核对${topIssue.energyUnitName}的能源记录、产量和分配情况；确认数据无误后，再结合生产负荷调整工艺、设备运行参数和用能安排。`
-      : '保持当前数据维护频率，并持续关注重点设备运行负荷和单位产出能耗变化。',
-    uncertainty: '未匹配能源用于管理分析，不直接等同于物理损失；AI输出仅基于当前数据快照，原因仍需结合现场运行参数确认。',
-    inputs: ['能效指标', '同比', '能源输入', '能源分配', '能效对标', '趋势变化'],
-    deepAnalysis: topIssue ? {
-      evidenceChain: [
-        `${topIssue.intensityMetricName}${topIssue.intensityDeviationLabel}${topIssue.intensityDeviation === null ? '暂无变化数据' : `${topIssue.intensityDeviation >= 0 ? '+' : ''}${format(topIssue.intensityDeviation, 1)}%`}`,
-        topIssue.benchmarkDeviation === null ? '当前对象缺少可用能效对标目标' : `能效对标偏差 ${topIssue.benchmarkDeviation >= 0 ? '+' : ''}${format(topIssue.benchmarkDeviation, 1)}%`,
-        `当前范围未匹配能源 ${format(unmatchedEnergy, 1)} tce，平衡率 ${format(confirmationRate, 2)}%`,
-      ],
-      hypotheses: [
-        { level: '较高可能', text: '能源记录、统计期间、产量分母或折标口径存在不一致，需要先排除数据口径影响。' },
-        { level: '待核实', text: '生产负荷、运行策略或设备状态变化可能造成指标波动，需结合现场运行数据验证。' },
-      ],
-      verificationSteps: [
-        `核对${topIssue.energyUnitName}的能源记录、计量来源与统计期间。`,
-        `复核${topIssue.intensityMetricName}的分子、分母及对标目标口径。`,
-        '数据确认后，结合生产负荷与设备运行状态评估可执行的运行优化措施。',
-      ],
-      limitation: '当前未接入设备工况、维修记录等现场数据，AI不能确认具体设备原因或直接测算节能量。',
-    } : undefined,
-  }), [
-    applied.month,
-    applied.period,
-    periodText,
-    selectedScopeName,
-    topIssue,
-    totals.difference,
-    totals.effectiveUse,
-    totals.external,
-    totals.input,
-    totals.recovered,
-    confirmedAmount,
-    confirmationRate,
-    diagnosticRows.length,
-    unmatchedEnergy,
-  ]);
-
   const applyFilters = () => {
     const next = { year, period, month };
     setApplied(next);
     setTaskStatuses(listBalanceTaskStatuses({ year, grain: period, month }));
     setTaskRecords(listBalanceTaskRecords({ year, grain: period, month }));
     navigate({ pathname: '/asset-strategy/balance', search: `?${new URLSearchParams({ year: String(year), grain: period, month: String(month) })}` }, { replace: true });
-    setAiVersion((value) => value + 1);
     notify('已按当前条件更新能效平衡分析');
   };
 
@@ -572,7 +490,6 @@ export function BalanceOptimizationPage() {
     setTaskStatuses(listBalanceTaskStatuses({ year: 2026, grain: 'month', month: 6 }));
     setTaskRecords(listBalanceTaskRecords({ year: 2026, grain: 'month', month: 6 }));
     navigate('/asset-strategy/balance', { replace: true });
-    setAiVersion((value) => value + 1);
     notify('筛选条件已重置');
   };
 
@@ -698,7 +615,6 @@ export function BalanceOptimizationPage() {
         onEnterpriseTracking={openEnterpriseTracking}
       />
     </section>
-    <AssetAiAnalysis analysisKey="balance" invalidationVersion={aiVersion} notify={notify} configOverride={aiConfig} />
     {selectedUnit && <BalanceDiagnosisDrawer
       selection={selectedUnit}
       mode={selectedDiagnosisMode}
@@ -785,7 +701,7 @@ function BalanceOverview({
         <text className={styles.balanceNodeValueSmall} x="342" y="158">{format(confirmed, 1)} tce</text>
       </g>
       <BalanceOverviewNode x={630} y={10} label="生产系统" value={production} tone="blue" />
-      <BalanceOverviewNode x={630} y={68} label="动力系统" value={power} tone="green" />
+      <BalanceOverviewNode x={630} y={68} label="能源转换系统" value={power} tone="green" />
       <BalanceOverviewNode x={630} y={126} label="辅助系统" value={auxiliary} tone="green" />
       <BalanceOverviewNode x={630} y={184} label="外供输出" value={external} tone="orange" />
       <BalanceOverviewNode x={630} y={242} label="未匹配能源" value={unmatched} tone="red" />
@@ -894,7 +810,6 @@ function EnergyDiagnosisPanel({
       label: '能效对标诊断',
       tone: 'blue',
       rows: benchmarkIssueRows.slice(0, 1),
-      total: benchmarkIssueRows.length,
       empty: '当前期间暂无可用能效对标数据',
       detail: (row: UnitBalanceRow) => row.benchmarkDeviation === null
         ? `${row.intensityMetricName} · 未配置目标`
@@ -905,7 +820,6 @@ function EnergyDiagnosisPanel({
       label: '能耗指标变化',
       tone: 'orange',
       rows: trendIssueRows.slice(0, 1),
-      total: trendIssueRows.length,
       empty: '当前期间暂无可用同比/环比数据',
       detail: (row: UnitBalanceRow, _summary: boolean) => {
         const trends = [
@@ -920,7 +834,6 @@ function EnergyDiagnosisPanel({
       label: '数据完整性问题',
       tone: 'purple',
       rows: dataRows.slice(0, 3),
-      total: dataRows.length,
       summary: false,
       empty: '当前未发现数据完整性异常',
       detail: (row: UnitBalanceRow, _summary: boolean) => row.dataCompletenessReason,
@@ -929,13 +842,11 @@ function EnergyDiagnosisPanel({
 
   return <div className={styles.energyDiagnosisPanel}>
     {groups.map((group, index) => {
-      const total = group.total;
       return <section key={group.key} className={styles.energyDiagnosisGroup}>
       <div className={styles.energyDiagnosisGroupHead}><b className={`${styles.energyDiagnosisBadge} ${styles[`energyDiagnosis${group.tone}`]}`}>{String.fromCharCode(65 + index)}</b><strong>{group.label}</strong></div>
       {group.rows.length ? group.rows.slice(0, 1).map((row) => <div className={styles.energyDiagnosisRow} key={row.energyUnitId}>
-        <span>{row.energyUnitName}</span><em>{group.detail(row, false)}</em><Tag tone={diagnosticSignals(row).priority === '高' ? 'red' : diagnosticSignals(row).priority === '中' ? 'orange' : 'gray'}>{diagnosticSignals(row).priority}</Tag><button type="button" className={styles.energyDiagnosisAction} onClick={() => onOpen(row, group.key as DiagnosisMode)}>{group.key === 'data' ? '补充数据' : '查看详情'}</button>
+        <span>{row.energyUnitName}</span><em>{group.detail(row, false)}</em><Tag tone={diagnosticSignals(row).priority === '高' ? 'red' : diagnosticSignals(row).priority === '中' ? 'orange' : 'gray'}>{diagnosticSignals(row).priority}</Tag><button type="button" className={styles.energyDiagnosisAction} onClick={() => onOpen(row, group.key as DiagnosisMode)}>{group.key === 'data' ? dataDiagnosisActionLabel(row) : '查看详情'}</button>
       </div>) : <p className={styles.energyDiagnosisEmpty}>{group.empty}</p>}
-      {total > 1 && <button type="button" className={styles.energyDiagnosisMore} onClick={() => document.querySelector(`.${styles.tableCard}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>其余 {total - 1} 个对象已汇总到下方清单 <span>查看清单 ↓</span></button>}
     </section>;
     })}
   </div>;
@@ -1100,6 +1011,14 @@ function buildDiagnosticIssues(row: UnitBalanceRow): DiagnosticIssue[] {
   }
 
   return issues;
+}
+
+function dataDiagnosisActionLabel(row: UnitBalanceRow) {
+  const reason = row.dataCompletenessReason;
+  if (reason.includes('未找到能源消费记录') || reason.includes('缺少能源数据')) return '补充能源数据';
+  if (reason.includes('运营分母') || reason.includes('蒸汽产量') || reason.includes('产量') || reason.includes('面积') || reason.includes('吞吐量')) return '补充运营数据';
+  if (reason.includes('指标配置') || reason.includes('适用性') || reason.includes('计算口径') || reason.includes('适用典型指标') || reason.includes('必要关联关系')) return '检查指标配置';
+  return '查看缺失项';
 }
 
 function diagnosisBasis(row: UnitBalanceRow) {
@@ -1395,7 +1314,7 @@ function IntensityMonthlyDetailTable({
   const rows = values.slice(0, currentMonth).map((value, index) => ({ value, mom: momChanges[index] ?? null, yoy: yoyChanges[index] ?? null, index }));
   return <div className={styles.diagnosisDetailTableWrap}>
     <div className={styles.diagnosisDetailTableTitle}>月度明细</div>
-    <table className={styles.diagnosisDetailTable}><thead><tr><th>月份</th><th>指标值（{unit}）</th><th>环比</th><th>同比</th><th>变化状态</th></tr></thead><tbody>
+    <table className={styles.diagnosisDetailTable}><thead><tr><th>月份</th><th>指标值（{unit}）</th><th>环比变化</th><th>同比变化</th><th>变化状态</th></tr></thead><tbody>
       {rows.map((row) => {
         const risk = Math.max(Math.abs(row.mom ?? 0), Math.abs(row.yoy ?? 0));
         const status = risk >= ENERGY_DEVIATION_HIGH ? '高风险' : risk >= ENERGY_DEVIATION_ATTENTION ? '关注' : '正常';

@@ -50,7 +50,7 @@ describe('energy unit centralized mock store', () => {
       { inputEnergyTypeId: 'v11-energy-coal', outputEnergyTypeId: 'v11-energy-steam' },
     ];
     const result = addChildEnergyUnit('eu-utilities', {
-      energyUnitName: '企业热电联产装置', unitType: '公辅系统', energyRelations: relations,
+      energyUnitName: '企业热电联产装置', unitType: '能源转换子系统', energyRelations: relations,
     });
     expect(result.ok).toBe(true);
     const id = result.unit!.energyUnitId;
@@ -69,7 +69,7 @@ describe('energy unit centralized mock store', () => {
     const template = listV11EnergyTypes().find((type) => type.energyTypeId === 'v11-energy-natural-gas')!;
     expect(saveV11EnergyType({ ...template, energyTypeName: '企业副产煤气' }).ok).toBe(true);
     const custom = listV11EnergyTypes().find((type) => type.energyTypeName === '企业副产煤气')!;
-    const input = { energyUnitName: '自定义装置', unitType: '公辅系统' as const, energyRelations: [{ inputEnergyTypeId: custom.energyTypeId, outputEnergyTypeId: 'v11-energy-steam' }] };
+    const input = { energyUnitName: '自定义装置', unitType: '能源转换子系统' as const, energyRelations: [{ inputEnergyTypeId: custom.energyTypeId, outputEnergyTypeId: 'v11-energy-steam' }] };
     const result = addChildEnergyUnit('eu-utilities', input);
     expect(result.ok).toBe(true);
     expect(deleteV11EnergyType(custom.energyTypeId).ok).toBe(false);
@@ -98,6 +98,12 @@ describe('energy unit centralized mock store', () => {
     expect(result).toMatchObject({ ok: false, error: 'maxLevel' });
   });
 
+  it('enforces the configured parent-child type relationships', () => {
+    expect(createEnergyUnit({ energyUnitName: '错误根节点', unitType: '工序/环节' })).toMatchObject({ ok: false, error: 'invalidHierarchy' });
+    expect(addChildEnergyUnit('eu-clinker-line-1', { energyUnitName: '错误子单元', unitType: '能源转换子系统' })).toMatchObject({ ok: false, error: 'invalidHierarchy' });
+    expect(updateEnergyUnit('eu-packaging', { energyUnitName: '错误修改', unitType: '建筑子区域' })).toMatchObject({ ok: false, error: 'invalidHierarchy' });
+  });
+
   it('updates the original object without changing id or hierarchy', () => {
     const before = getEnergyUnit('eu-packaging')!;
     const result = updateEnergyUnit('eu-packaging', {
@@ -118,7 +124,7 @@ describe('energy unit centralized mock store', () => {
   it('rejects duplicate names within the same parent scope', () => {
     const createResult = createEnergyUnit({
       energyUnitName: '办公区域',
-      unitType: '建筑/区域',
+      unitType: '建筑区域',
     });
     const editResult = updateEnergyUnit('eu-packaging', {
       energyUnitName: '前处理区域',

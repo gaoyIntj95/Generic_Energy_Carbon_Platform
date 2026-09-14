@@ -680,7 +680,7 @@ export function buildBenchmarkDataset(year: number): BenchmarkDataset {
     const records = energyRecords.filter((record) => record.energyUnitId === unit.energyUnitId);
     const operation = operations.find((record) =>
       record.energyUnitId === unit.energyUnitId
-      && record.metricCategory === '产量'
+      && record.metricCategory === '产量指标'
       && annualOperationAmount(record) > 0);
     if (records.length && operation) {
       rows.push(unitMetric(unit.energyUnitId, unit.energyUnitName, records, operation, types, year));

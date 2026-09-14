@@ -107,7 +107,7 @@ export const navigation: NavGroup[] = [
         items: [
           { ...dataManagementItems[4], label: '能源消费', path: '/data-management/energy-data' },
           { ...dataManagementItems[4], label: '能源成本', path: '/data-management/energy-data?tab=costs' },
-          { ...dataManagementItems[4], label: '能源转换与外供', path: '/data-management/energy-data?tab=recovery' },
+          { ...dataManagementItems[4], label: '能源转换回收与外供', path: '/data-management/energy-data?tab=recovery' },
         ],
       },
       dataManagementItems[5],

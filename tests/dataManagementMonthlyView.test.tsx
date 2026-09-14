@@ -49,7 +49,7 @@ describe('annual ledgers and shared monthly details', () => {
     expect(saveV11EnergyCost({ ...item, monthlyCosts: [0, 25, ...Array(10).fill(0)], monthlyReportedMonths: [true, true, ...Array(10).fill(false)], annualCost: 100 }, item.energyCostId).ok).toBe(true);
     const before = listV11EnergyCosts();
     await render('/data-management/energy-data?tab=costs&year=2026');
-    expect([...container.querySelectorAll('th')].map((el) => el.textContent)).toEqual(['能源品种', '年度合计（万元）', '操作']);
+    expect([...container.querySelectorAll('th')].map((el) => el.textContent)).toEqual(['能源品种', '年度合计（万元）', '年份', '操作']);
     expect(monthlyValues()).toHaveLength(0);
     await click(button('查看'));
     expect(monthlyValues()).toEqual(['0', '25', ...Array(10).fill('—')]);

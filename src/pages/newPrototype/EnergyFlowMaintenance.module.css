@@ -23,17 +23,22 @@
 .card tbody tr:last-child td { border-bottom: 0; }
 .card tbody tr:hover { background: #fafcfb; }
 .card .selected { background: #f0f8f4; }
-.card .conversionTable { min-width: 1120px; }
+.card .conversionTable { min-width: 1240px; }
 .card .conversionTable th, .card .conversionTable td { padding-left: 14px; padding-right: 14px; }
-.conversionTable th { width: calc(100% / 7); }
-.conversionTable th:nth-child(n+4):nth-child(-n+6), .conversionTable td:nth-child(n+4):nth-child(-n+6), .externalTable th:nth-child(4), .externalTable td:nth-child(4) { text-align: right; }
+.conversionTable th { width: calc(100% / 9); }
+.conversionTable th:nth-child(n+4):nth-child(-n+8), .conversionTable td:nth-child(n+4):nth-child(-n+8), .externalTable th:nth-child(4), .externalTable td:nth-child(4), .externalTable th:nth-child(5), .externalTable td:nth-child(5) { text-align: right; }
 .relation { white-space: normal; color: #63766c; font-size: 13px; }
-.externalTable th { width: 20%; }
+.externalTable th { width: calc(100% / 6); }
+.conversionTable th:not(:last-child), .conversionTable td:not(:last-child), .externalTable th:not(:last-child), .externalTable td:not(:last-child) { width: auto; }
+.conversionTable th:last-child, .conversionTable td:last-child, .externalTable th:last-child, .externalTable td:last-child { width: 190px; }
 .card th:last-child { text-align: center; }
 .value { color: #263f34; font-weight: 550; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .missing { color: #a07936; font-size: 13px; font-weight: 400; }
 .inputMissing { display: grid; justify-items: end; gap: 2px; margin-top: 5px; color: #a07936; font-size: 12px; }
 .muted { color: #8d9993; font-size: 13px; }
+.statusComplete, .statusIncomplete { display: inline-block; white-space: nowrap; font-size: 13px; }
+.statusComplete { color: #07855f; }
+.statusIncomplete { color: #a66d24; }
 .link { display: inline-block; border: 0; border-radius: 4px; background: transparent; color: #07855f; cursor: pointer; padding: 5px 0; font: inherit; font-size: 13px; white-space: nowrap; }
 .link:hover:not(:disabled) { color: #005e42; text-decoration: underline; text-underline-offset: 4px; }
 .page button:focus-visible, .modalScope button:focus-visible, .modalScope summary:focus-visible { outline: 2px solid #14946e; outline-offset: 3px; }

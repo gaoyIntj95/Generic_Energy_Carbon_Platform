@@ -3,7 +3,6 @@ import { listV11EnergyTypes } from '../../mocks/dataManagementV11Store';
 import { useDataYear } from './useDataYear';
 import { DATA_YEARS } from '../../mocks/annualData';
 import { useId, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   addChildEnergyUnit,
   createEnergyUnit,
@@ -34,12 +33,13 @@ import {
 } from './PrototypeUI';
 import styles from './EnergyUnitsPage.module.css';
 
-const unitTypeOptions: EnergyUnitType[] = ['生产单元', '工序/环节', '公辅系统', '建筑/区域', '其他'];
-const rootUnitTypeOptions: EnergyUnitType[] = ['生产单元', '公辅系统', '建筑/区域', '其他'];
-const childUnitTypeOptions: EnergyUnitType[] = ['工序/环节', '公辅系统', '建筑/区域', '其他'];
+const unitTypeOptions: EnergyUnitType[] = ['生产单元', '工序/环节', '能源转换系统', '能源转换子系统', '建筑区域', '建筑子区域', '空调服务系统', '区域空调服务单元', '其他'];
+const rootUnitTypeOptions: EnergyUnitType[] = ['生产单元', '能源转换系统', '建筑区域', '其他'];
+const childUnitTypeOptions: EnergyUnitType[] = ['工序/环节', '能源转换子系统', '建筑子区域'];
 const conversionScenarioOptions: ConversionScenario[] = ['锅炉产汽/产热', '余热发电', '空压产气/压缩空气', '回收利用', '其他转换'];
+const powerCenterOutputEnergyNames = new Set(['电力', '蒸汽', '热水', '压缩空气', '冷量', '其他']);
 const rootCategoryOptions = ['生产类用能单元', '非生产类用能单元'] as const;
-const nonProductionTypeOptions: EnergyUnitType[] = ['公辅系统', '建筑/区域', '其他'];
+const nonProductionTypeOptions: EnergyUnitType[] = ['能源转换系统', '建筑区域', '其他'];
 
 type RootCategory = typeof rootCategoryOptions[number];
 
@@ -50,12 +50,25 @@ function rootCategoryOf(unitType: EnergyUnitType | ''): RootCategory | '' {
 }
 
 const childTypeRules: Record<EnergyUnitType, { defaultType: EnergyUnitType; options: EnergyUnitType[] }> = {
-  生产单元: { defaultType: '工序/环节', options: ['工序/环节', '公辅系统', '其他'] },
-  '工序/环节': { defaultType: '工序/环节', options: ['工序/环节', '公辅系统', '其他'] },
-  公辅系统: { defaultType: '公辅系统', options: ['公辅系统', '其他'] },
-  '建筑/区域': { defaultType: '建筑/区域', options: ['建筑/区域', '公辅系统', '其他'] },
-  其他: { defaultType: '其他', options: ['其他', '工序/环节', '公辅系统', '建筑/区域'] },
+  生产单元: { defaultType: '工序/环节', options: ['工序/环节'] },
+  '工序/环节': { defaultType: '工序/环节', options: [] },
+  能源转换系统: { defaultType: '能源转换子系统', options: ['能源转换子系统'] },
+  能源转换子系统: { defaultType: '能源转换子系统', options: [] },
+  建筑区域: { defaultType: '建筑子区域', options: ['建筑子区域'] },
+  建筑子区域: { defaultType: '建筑子区域', options: [] },
+  空调服务系统: { defaultType: '建筑子区域', options: ['建筑子区域'] },
+  区域空调服务单元: { defaultType: '建筑子区域', options: [] },
+  其他: { defaultType: '其他', options: [] },
 };
+
+const unitTypeTree = [
+  { label: '生产类用能单元', children: [{ label: '生产单元', value: '生产单元', children: [{ label: '工序/环节', value: '工序/环节' }] }] },
+  { label: '非生产类用能单元', children: [
+    { label: '能源转换系统', value: '能源转换系统', children: [{ label: '能源转换子系统', value: '能源转换子系统' }] },
+    { label: '建筑区域', value: '建筑区域', children: [{ label: '建筑子区域', value: '建筑子区域' }] },
+    { label: '其他', value: '其他' },
+  ] },
+] as const;
 
 const levelLabels: Record<EnergyUnitLevel, string> = {
   enterprise: '企业',
@@ -85,6 +98,48 @@ interface DisplayRow {
 }
 
 const yearOptions = DATA_YEARS.map(String);
+
+type UnitTypeTreeNode = {
+  label: string;
+  value?: EnergyUnitType;
+  children?: readonly UnitTypeTreeNode[];
+};
+
+function TypeTreeNode({ node, depth, value, onChange }: { node: UnitTypeTreeNode; depth: number; value: EnergyUnitType | ''; onChange: (next: EnergyUnitType | '') => void }) {
+  return (
+    <div className={styles.typeTreeNode} style={{ paddingLeft: `${depth * 18}px` }}>
+      {node.value ? (
+        <button type="button" className={value === node.value ? styles.typeTreeOptionActive : styles.typeTreeOption} role="treeitem" aria-selected={value === node.value} onClick={() => onChange(node.value!)}>
+          <span className={styles.typeTreeBranch}>{node.children ? '▾' : '•'}</span>{node.label}
+        </button>
+      ) : (
+        <div className={styles.typeTreeGroup} role="presentation"><span className={styles.typeTreeBranch}>▾</span>{node.label}</div>
+      )}
+      {node.children?.map((child) => <TypeTreeNode key={child.label} node={child} depth={depth + 1} value={value} onChange={onChange} />)}
+    </div>
+  );
+}
+
+function UnitTypeTreeFilter({ value, onChange }: { value: EnergyUnitType | ''; onChange: (next: EnergyUnitType | '') => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={styles.typeTreeFilter}>
+      <button type="button" className={styles.typeTreeTrigger} aria-label="单元类型树状筛选" aria-haspopup="tree" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
+        <span>{value || '全部'}</span><span aria-hidden="true">⌄</span>
+      </button>
+      {open && (
+        <div className={styles.typeTreeMenu} role="tree" aria-label="单元类型层级">
+          <button type="button" className={!value ? styles.typeTreeOptionActive : styles.typeTreeOption} role="treeitem" aria-selected={!value} onClick={() => { onChange(''); setOpen(false); }}><span className={styles.typeTreeBranch}>•</span>全部</button>
+          {unitTypeTree.map((node) => <TypeTreeNode key={node.label} node={node} depth={0} value={value} onChange={(next) => { onChange(next); setOpen(false); }} />)}
+        </div>
+      )}
+      <select className={styles.filterTypeNative} aria-label="单元类型" value={value} onChange={(event) => onChange(event.target.value as EnergyUnitType | '')} tabIndex={-1}>
+        <option value="">全部</option>
+        {unitTypeOptions.map((unitType) => <option value={unitType} key={unitType}>{unitType}</option>)}
+      </select>
+    </div>
+  );
+}
 
 function formUnitTypes(level: EnergyUnitLevel) {
   return level === 'level1' ? rootUnitTypeOptions : childUnitTypeOptions;
@@ -181,9 +236,10 @@ function AnnualEnergyUnitsPage() {
   const refreshUnits = () => setUnits(listEnergyUnits(Number(year)));
   const canReorder = !activeFilter.keyword && !activeFilter.unitType;
   const groupedRows = [
-    { category: '生产类', rows: rows.filter(({ unit }) => unitCategory(unit) === '生产类') },
-    { category: '非生产类', rows: rows.filter(({ unit }) => unitCategory(unit) === '非生产类') },
+    { category: '生产类', rows: rows.filter(({ unit }) => unitCategory(unit, units) === '生产类') },
+    { category: '非生产类', rows: rows.filter(({ unit }) => unitCategory(unit, units) === '非生产类') },
   ].filter((group) => group.rows.length > 0);
+
 
   const reorderFromDrop = (sourceId: string, targetId: string) => {
     const source = units.find((unit) => unit.energyUnitId === sourceId);
@@ -265,14 +321,20 @@ function AnnualEnergyUnitsPage() {
         </span>
       ),
     },
-    { key: 'unitType', title: '单元类型', width: 190, render: ({ unit }) => unit.unitType },
+    { key: 'unitType', title: '单元类型', width: 190, render: ({ unit }) => unitTypeLabel(unit.unitType) },
+    {
+      key: 'year',
+      title: '年份',
+      width: 110,
+      render: () => `${year}年`,
+    },
     {
       key: 'actions',
       title: '操作',
       width: 330,
       render: ({ unit, childCount }) => (
         <div className={styles.actions}>
-          {unit.unitLevel === 'level1' && <button
+          {unit.unitLevel === 'level1' && childTypeRule(unit).options.length > 0 && <button
               className={styles.action}
               type="button"
               onClick={() => setDialog({ type: 'addChild', parentEnergyUnitId: unit.energyUnitId })}
@@ -331,24 +393,10 @@ function AnnualEnergyUnitsPage() {
           />
         </Field>
         <Field label="单元类型">
-          <select
-            className={styles.filterType}
-            aria-label="单元类型"
+          <UnitTypeTreeFilter
             value={draftFilter.unitType}
-            onChange={(event) =>
-              setDraftFilter((current) => ({
-                ...current,
-                unitType: event.target.value as EnergyUnitType | '',
-              }))
-            }
-          >
-            <option value="">全部</option>
-            {unitTypeOptions.map((unitType) => (
-              <option value={unitType} key={unitType}>
-                {unitType}
-              </option>
-            ))}
-          </select>
+            onChange={(unitType) => setDraftFilter((current) => ({ ...current, unitType }))}
+          />
         </Field>
       </FilterBar>
 
@@ -417,11 +465,11 @@ function AnnualEnergyUnitsPage() {
             </section>
             <section>
               <strong>其他能源业务</strong>
-              <p>能源转换与外供请前往“数据管理 &gt; 能源数据 &gt; 能源转换与外供”维护。</p>
+              <p>能源转换回收与外供请前往“数据管理 &gt; 能源数据 &gt; 能源转换回收与外供”维护。</p>
             </section>
             <section>
               <strong>转换场景</strong>
-              <p>二级公辅系统可维护适用转换场景，转换页面仅从已配置对应场景的系统中筛选候选；该属性不表达能流关系。</p>
+              <p>二级能源转换子系统可维护适用转换场景，转换页面仅从已配置对应场景的系统中筛选候选；该属性不表达能流关系。</p>
             </section>
           </div>
         </Modal>
@@ -572,7 +620,11 @@ function EnergyUnitFormDialog({
 }) {
   const [year] = useDataYear();
   const target = dialog.type === 'edit' ? getEnergyUnit(dialog.energyUnitId, Number(year)) : undefined;
-  const parent = dialog.type === 'addChild' ? getEnergyUnit(dialog.parentEnergyUnitId, Number(year)) : undefined;
+  const parent = dialog.type === 'addChild'
+    ? getEnergyUnit(dialog.parentEnergyUnitId, Number(year))
+    : target?.parentEnergyUnitId
+      ? getEnergyUnit(target.parentEnergyUnitId, Number(year))
+      : undefined;
   const level: EnergyUnitLevel =
     dialog.type === 'addRoot'
       ? 'level1'
@@ -582,7 +634,11 @@ function EnergyUnitFormDialog({
   const isAddingChild = dialog.type === 'addChild';
   const isRootForm = level === 'level1' && !isAddingChild;
   const inheritedChildTypeRule = childTypeRule(parent);
-  const availableTypes = isAddingChild ? inheritedChildTypeRule.options : formUnitTypes(level);
+  const availableTypes = level === 'level2' && parent
+    ? childTypeRule(parent).options
+    : isAddingChild
+      ? inheritedChildTypeRule.options
+      : formUnitTypes(level);
 
   const [form, setForm] = useState<EnergyUnitWriteInput>({
     unitType: target?.unitType ?? (isAddingChild ? inheritedChildTypeRule.defaultType : ('' as EnergyUnitType)),
@@ -600,8 +656,11 @@ function EnergyUnitFormDialog({
       : '',
   );
   const isPowerCenterForm = (parent?.energyUnitId ?? target?.parentEnergyUnitId) === 'eu-utilities';
-  const isPowerCenterSecondaryUnit = isPowerCenterForm && form.unitType === '公辅系统';
+  const isPowerCenterSecondaryUnit = isPowerCenterForm && form.unitType === '能源转换子系统';
   const energyTypes = listV11EnergyTypes(Number(year));
+  const outputEnergyTypes = isPowerCenterSecondaryUnit
+    ? energyTypes.filter((type) => powerCenterOutputEnergyNames.has(type.energyTypeName))
+    : energyTypes;
   const selectedRelationFields = energyConversionFields(form.energyRelations, energyTypes);
   const availablePresets = energyConversionPresets.flatMap((preset) => {
     const input = energyTypes.find((type) => type.energyTypeName === preset.input);
@@ -651,7 +710,7 @@ function EnergyUnitFormDialog({
     };
     const submitForm = isRootForm
       ? { ...normalizedForm, unitType: rootCategory === '生产类用能单元' ? '生产单元' as const : nonProductionType as EnergyUnitType, conversionScenarios: [] }
-      : level === 'level2' && form.unitType === '公辅系统'
+      : level === 'level2' && form.unitType === '能源转换子系统'
         ? normalizedForm
         : { ...normalizedForm, conversionScenarios: [] };
     const result =
@@ -669,6 +728,8 @@ function EnergyUnitFormDialog({
             ? '请补全能源转换关系，并检查是否存在重复组合或无效能源品种。'
           : result.error === 'maxLevel'
             ? '用能单元最多设置为两级，二级单元不能继续添加下级。'
+            : result.error === 'invalidHierarchy'
+              ? '当前单元类型与所属层级不匹配，请按父级允许的类型配置。'
             : '保存失败，请检查当前记录是否仍然存在。',
       );
       return;
@@ -682,6 +743,7 @@ function EnergyUnitFormDialog({
   return (
     <Modal title={`${title}（${year}年度）`} width={isPowerCenterForm ? 620 : 760} onClose={onClose} onSubmit={save}>
       <div className={[styles.formGrid, isPowerCenterForm ? styles.compactForm : ''].join(' ')}>
+        <Field label="年度"><input aria-label="年度" value={`${year}年`} readOnly /></Field>
         {isPowerCenterForm && parent ? (
           <div className={styles.compactContext}>
             <span>所属单元：<strong>{parent.energyUnitName}</strong></span>
@@ -720,7 +782,7 @@ function EnergyUnitFormDialog({
                   setForm((current) => ({ ...current, unitType: type }));
                 }}>
                   <option value="" disabled>请选择非生产类型</option>
-                  {nonProductionTypeOptions.map((type) => <option value={type} key={type}>{type}</option>)}
+                {nonProductionTypeOptions.map((type) => <option value={type} key={type}>{unitTypeLabel(type)}</option>)}
                 </select>
               )}
             </div>
@@ -728,7 +790,7 @@ function EnergyUnitFormDialog({
             <div className={styles.defaultTypeField}>
               <div>
                 <span>系统默认</span>
-                <strong>{form.unitType}</strong>
+                <strong>{unitTypeLabel(form.unitType)}</strong>
               </div>
               {availableTypes.length > 1 && (
                 <button type="button" onClick={() => setIsChangingChildType(true)}>
@@ -754,7 +816,7 @@ function EnergyUnitFormDialog({
                 )}
                 {availableTypes.map((unitType) => (
                   <option value={unitType} key={unitType}>
-                    {unitType}
+                    {unitTypeLabel(unitType)}
                   </option>
                 ))}
               </select>
@@ -822,7 +884,7 @@ function EnergyUnitFormDialog({
                     <Field label="产出能源"><select aria-label="产出能源" aria-required="true" value={relation.outputEnergyTypeId} onChange={(event) => {
                       setForm((current) => ({ ...current, energyRelations: [{ ...relation, outputEnergyTypeId: event.target.value }] }));
                       setError('');
-                    }}><option value="">请选择产出能源</option>{energyTypes.map((type) => <option key={type.energyTypeId} value={type.energyTypeId}>{type.energyTypeName}</option>)}</select></Field>
+                    }}><option value="">请选择产出能源</option>{outputEnergyTypes.map((type) => <option key={type.energyTypeId} value={type.energyTypeId}>{type.energyTypeName}</option>)}</select></Field>
                   </div>
                 ) : (
                   <select aria-label="常用能源转换关系" aria-required="true" value={presetIndex >= 0 ? String(presetIndex) : ''} onChange={(event) => {
@@ -844,7 +906,7 @@ function EnergyUnitFormDialog({
             )}
           </fieldset>
         )}
-        {!isPowerCenterSecondaryUnit && level === 'level2' && form.unitType === '公辅系统' && (
+        {!isPowerCenterSecondaryUnit && level === 'level2' && form.unitType === '能源转换子系统' && (
           <div className={styles.full}>
             <Field label="适用转换场景">
               <div className={styles.checkboxGroup}>
@@ -900,8 +962,9 @@ function namePlaceholder(unitType: EnergyUnitType | '') {
   const placeholders: Partial<Record<EnergyUnitType, string>> = {
     生产单元: '如：生产车间A、生产车间B',
     '工序/环节': '如：加工工段、装配工段',
-    公辅系统: '如：锅炉系统、空压系统',
-    '建筑/区域': '如：办公区域、仓储物流区域',
+    能源转换子系统: '如：锅炉系统、空压系统',
+    建筑区域: '如：办公区域、仓储物流区域',
+    建筑子区域: '如：办公楼A区、仓库一号库',
     其他: '请输入具体用能单元名称',
   };
   return unitType ? (placeholders[unitType] ?? '请输入用能单元名称') : '请先选择单元类型';
@@ -917,13 +980,12 @@ function DeleteBlockedDialog({
   onClose: () => void;
 }) {
   const [year] = useDataYear();
-  const navigate = useNavigate();
   const referenceItems = [
-    { label: '下级用能单元', count: references.childCount, path: '/data-management/units' },
-    { label: '能源消费数据', count: references.energyRecordCount, path: '/data-management/energy-data' },
-    { label: '运营数据', count: references.operationRecordCount, path: '/data-management/operations' },
-    { label: '重点设备档案', count: references.deviceCount, path: '/data-management/devices' },
-    { label: '能源流转关系', count: references.conversionRelationCount, path: '/data-management/energy-data?tab=recovery' },
+    { label: '下级用能单元', count: references.childCount },
+    { label: '能源消费数据', count: references.energyRecordCount },
+    { label: '运营数据', count: references.operationRecordCount },
+    { label: '重点设备档案', count: references.deviceCount },
+    { label: '能源流转关系', count: references.conversionRelationCount },
   ].filter((item) => item.count > 0);
 
   return (
@@ -935,16 +997,35 @@ function DeleteBlockedDialog({
         {referenceItems.map((item) => (
           <li key={item.label}>
             <span>{item.label}</span>
-            <span className={styles.blockerAction}>
-              <strong>{item.count} 项</strong>
-              <button type="button" onClick={() => navigate(`${item.path}${item.path.includes('?') ? '&' : '?'}year=${year}&unitId=${unit.energyUnitId}`)}>去处理</button>
-            </span>
+            <strong>{item.count} 项</strong>
           </li>
         ))}
       </ul>
     </Modal>
   );
 }
-function unitCategory(unit: EnergyUnit) {
-  return unit.unitType === '生产单元' || unit.unitType === '工序/环节' ? '生产类' : '非生产类';
+function rootUnit(unit: EnergyUnit, units: EnergyUnit[]) {
+  let current = unit;
+  const visited = new Set<string>();
+  while (current.parentEnergyUnitId && !visited.has(current.energyUnitId)) {
+    visited.add(current.energyUnitId);
+    const parent = units.find((candidate) => candidate.energyUnitId === current.parentEnergyUnitId);
+    if (!parent) break;
+    current = parent;
+  }
+  return current;
+}
+
+function unitCategory(unit: EnergyUnit, units: EnergyUnit[]) {
+  return rootUnit(unit, units).unitType === '生产单元' ? '生产类' : '非生产类';
+}
+
+function unitTypeLabel(unitType: EnergyUnitType | '') {
+  const labels: Partial<Record<EnergyUnitType, string>> = {
+    '能源转换系统': '供能系统',
+    '能源转换子系统': '供能子系统',
+    '建筑区域': '建筑/区域',
+    '建筑子区域': '子建筑/子区域',
+  };
+  return labels[unitType as EnergyUnitType] ?? unitType;
 }

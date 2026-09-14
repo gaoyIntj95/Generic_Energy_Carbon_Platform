@@ -12,6 +12,104 @@
   min-width: 180px;
 }
 
+.typeTreeFilter {
+  position: relative;
+  width: 300px;
+  min-width: 260px;
+}
+
+.typeTreeTrigger {
+  display: flex;
+  width: 100%;
+  min-height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  color: #172033;
+  background: #fff;
+  border: 1px solid #9fd9c5;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgb(18 31 38 / 4%);
+  font: inherit;
+  cursor: pointer;
+}
+
+.typeTreeMenu {
+  position: absolute;
+  z-index: 4;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  min-width: 300px;
+  max-height: 420px;
+  overflow: auto;
+  padding: 8px 0;
+  background: #fff;
+  border: 1px solid #cbd8d3;
+  border-radius: 6px;
+  box-shadow: 0 8px 22px rgb(18 31 38 / 14%);
+}
+
+.typeTreeNode {
+  display: grid;
+}
+
+.typeTreeGroup,
+.typeTreeOption,
+.typeTreeOptionActive {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 0;
+  font-size: 13px;
+  text-align: left;
+}
+
+.typeTreeGroup {
+  color: #5f6b7a;
+  background: #f6faf8;
+  font-weight: 600;
+  border-top: 1px solid #edf4f1;
+  border-bottom: 1px solid #edf4f1;
+}
+
+.typeTreeOption,
+.typeTreeOptionActive {
+  width: 100%;
+  color: #172033;
+  background: #fff;
+  cursor: pointer;
+}
+
+.typeTreeOption:hover,
+.typeTreeOptionActive {
+  color: #00875a;
+  background: #eaf8f3;
+}
+
+.typeTreeOption:hover {
+  background: #f1faf6;
+}
+
+.typeTreeBranch {
+  width: 14px;
+  flex: 0 0 14px;
+  color: #7a9b8e;
+  text-align: center;
+}
+
+.filterTypeNative {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .notice {
   display: flex;
   align-items: center;
@@ -405,20 +503,6 @@
   border-radius: 6px;
 }
 
-.blockerAction {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.blockerAction button {
-  padding: 0;
-  color: #1677ff;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  font-size: 13px;
-}
 .blockerList strong {
   color: #d92d20;
 }

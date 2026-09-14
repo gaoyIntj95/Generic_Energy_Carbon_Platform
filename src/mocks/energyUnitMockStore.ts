@@ -105,7 +105,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     energyUnitName: '动力中心',
     parentEnergyUnitId: null,
     unitLevel: 'level1',
-    unitType: '公辅系统',
+    unitType: '能源转换系统',
     displayOrder: 30,
     remark: '',
   },
@@ -117,7 +117,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     conversionScenarios: ['空压产气/压缩空气'],
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
-    unitType: '公辅系统',
+    unitType: '能源转换子系统',
     displayOrder: 10,
     remark: '',
   },
@@ -129,7 +129,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     conversionScenarios: ['余热发电'],
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
-    unitType: '公辅系统',
+    unitType: '能源转换子系统',
     displayOrder: 20,
     remark: '',
   },
@@ -141,7 +141,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     conversionScenarios: ['其他转换'],
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
-    unitType: '公辅系统',
+    unitType: '能源转换子系统',
     displayOrder: 22,
     remark: '企业自备燃料发电设施。',
   },
@@ -153,7 +153,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     conversionScenarios: ['回收利用'],
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
-    unitType: '公辅系统',
+    unitType: '能源转换子系统',
     displayOrder: 25,
     remark: '回收余热后直接产生或补充蒸汽、热水等能源，不含余热发电。',
   },
@@ -165,7 +165,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     conversionScenarios: ['回收利用'],
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
-    unitType: '公辅系统',
+    unitType: '能源转换子系统',
     displayOrder: 27,
     remark: '回收动力中心生产过程产生的余压并转换为可利用能源。',
   },
@@ -177,7 +177,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     conversionScenarios: ['锅炉产汽/产热'],
     parentEnergyUnitId: 'eu-utilities',
     unitLevel: 'level2',
-    unitType: '公辅系统',
+    unitType: '能源转换子系统',
     displayOrder: 30,
     remark: '',
   },
@@ -187,17 +187,17 @@ const seedEnergyUnits: EnergyUnit[] = [
     energyUnitName: '办公区域',
     parentEnergyUnitId: null,
     unitLevel: 'level1',
-    unitType: '建筑/区域',
+    unitType: '建筑区域',
     displayOrder: 40,
     remark: '',
   },
   {
     energyUnitId: 'eu-office-hvac',
     organizationId: DEMO_ORGANIZATION_ID,
-    energyUnitName: '空调系统',
+    energyUnitName: '办公区域A',
     parentEnergyUnitId: 'eu-office',
     unitLevel: 'level2',
-    unitType: '公辅系统',
+    unitType: '建筑子区域',
     displayOrder: 10,
     remark: '',
   },
@@ -207,7 +207,7 @@ const seedEnergyUnits: EnergyUnit[] = [
     energyUnitName: '仓储物流区域',
     parentEnergyUnitId: null,
     unitLevel: 'level1',
-    unitType: '建筑/区域',
+    unitType: '其他',
     displayOrder: 50,
     remark: '',
   },
@@ -260,6 +260,17 @@ function nextDisplayOrder(parentEnergyUnitId: string | null, year = 2026) {
   return (siblingOrders.length ? Math.max(...siblingOrders) : 0) + 10;
 }
 
+const rootUnitTypes: EnergyUnitWriteInput['unitType'][] = ['生产单元', '能源转换系统', '建筑区域', '其他'];
+const childTypeByParent: Partial<Record<EnergyUnitWriteInput['unitType'], EnergyUnitWriteInput['unitType']>> = {
+  '生产单元': '工序/环节',
+  '能源转换系统': '能源转换子系统',
+  '建筑区域': '建筑子区域',
+};
+
+function isValidUnitType(parent: EnergyUnit | undefined, unitType: EnergyUnitWriteInput['unitType']) {
+  return parent ? childTypeByParent[parent.unitType] === unitType : rootUnitTypes.includes(unitType);
+}
+
 export function listEnergyUnits(year = 2026) {
   const energyUnits = annualUnits.get(year);
   return cloneUnits(energyUnits).sort((left, right) => {
@@ -277,6 +288,7 @@ export function getEnergyUnit(energyUnitId: string, year = 2026) {
 
 export function createEnergyUnit(input: EnergyUnitWriteInput, year = 2026): EnergyUnitMutationResult {
   const energyUnits = annualUnits.get(year);
+  if (!isValidUnitType(undefined, input.unitType)) return { ok: false, error: 'invalidHierarchy' };
   if (isDuplicateName(input.energyUnitName, null, undefined, year)) return { ok: false, error: 'duplicateName' };
 
   const unit: EnergyUnit = {
@@ -305,13 +317,14 @@ export function addChildEnergyUnit(
 
   const unitLevel = nextLevel(parent.unitLevel);
   if (!unitLevel) return { ok: false, error: 'maxLevel' };
+  if (!isValidUnitType(parent, input.unitType)) return { ok: false, error: 'invalidHierarchy' };
   if (isDuplicateName(input.energyUnitName, parentEnergyUnitId, undefined, year)) {
     return { ok: false, error: 'duplicateName' };
   }
 
-  const relationFields = parentEnergyUnitId === 'eu-utilities' && input.unitType === '公辅系统'
+  const relationFields = parentEnergyUnitId === 'eu-utilities' && input.unitType === '能源转换子系统'
     ? energyConversionFields(input.energyRelations, listV11EnergyTypes(year)) : undefined;
-  if (parentEnergyUnitId === 'eu-utilities' && input.unitType === '公辅系统' && !relationFields) {
+  if (parentEnergyUnitId === 'eu-utilities' && input.unitType === '能源转换子系统' && !relationFields) {
     return { ok: false, error: 'invalidEnergyRelation' };
   }
 
@@ -339,13 +352,17 @@ export function updateEnergyUnit(
   const energyUnits = annualUnits.get(year);
   const unit = energyUnits.find((item) => item.energyUnitId === energyUnitId);
   if (!unit) return { ok: false, error: 'notFound' };
+  const parent = unit.parentEnergyUnitId
+    ? energyUnits.find((item) => item.energyUnitId === unit.parentEnergyUnitId)
+    : undefined;
+  if (!isValidUnitType(parent, input.unitType)) return { ok: false, error: 'invalidHierarchy' };
   if (isDuplicateName(input.energyUnitName, unit.parentEnergyUnitId, energyUnitId, year)) {
     return { ok: false, error: 'duplicateName' };
   }
 
-  const relationFields = unit.parentEnergyUnitId === 'eu-utilities' && input.unitType === '公辅系统'
+  const relationFields = unit.parentEnergyUnitId === 'eu-utilities' && input.unitType === '能源转换子系统'
     ? energyConversionFields(input.energyRelations, listV11EnergyTypes(year)) : undefined;
-  if (unit.parentEnergyUnitId === 'eu-utilities' && input.unitType === '公辅系统' && !relationFields) {
+  if (unit.parentEnergyUnitId === 'eu-utilities' && input.unitType === '能源转换子系统' && !relationFields) {
     return { ok: false, error: 'invalidEnergyRelation' };
   }
 

@@ -102,14 +102,17 @@ describe('minimal energy flow maintenance', () => {
   it('shows one compact list, keeps supply visible, and does not require saving existing data', async () => {
     await render();
     expect(container.querySelectorAll('table')).toHaveLength(2);
-    expect([...container.querySelectorAll('section[aria-label="对外供能台账"] th')].map((el) => el.textContent)).toEqual(['外供能源', '供能来源', '接收方', '年度数量', '操作']);
+    expect([...container.querySelectorAll('section[aria-label="对外供能台账"] th')].map((el) => el.textContent)).toEqual(['外供能源', '供能来源', '接收方', '年度数量', '年份', '操作']);
     expect(container.textContent).not.toContain('数量已核验');
-    expect([...container.querySelectorAll('section[aria-label="用能单元数据"] th')].map((el) => el.textContent)).toEqual(['用能单元（动力中心）', '能源关系', '产出能源', '年度能源投入', '年度产出', '年度损失', '操作']);
+    expect([...container.querySelectorAll('section[aria-label="用能单元数据"] th')].map((el) => el.textContent)).toEqual(['用能单元（动力中心）', '能源关系', '产出能源', '年度能源投入', '年度产出', '状态', '年度损失', '年份', '操作']);
+    expect(systemRow('余热发电机组').textContent).toContain('2026年');
     expect(systemRow('余热发电机组').textContent).toContain(outputTotal('v11-output-200') + ' kWh');
     expect(systemRow('余热发电机组').textContent).not.toContain('动力中心');
     expect(container.textContent).not.toContain('查看本期能流图');
     expect(container.textContent).not.toContain('关联用能单元');
     expect(button('编辑', systemRow('余热发电机组'))).toBeDefined();
+    expect(systemRow('余压回收系统').textContent).toContain('数据不完整');
+    expect(button('补充', systemRow('余压回收系统'))).toBeDefined();
     expect(systemRow('余热发电机组').textContent).not.toContain('历史补录');
     expect(systemRow('余热发电机组').textContent).not.toContain('损失');
     const before = listV11ConversionOutputs();
@@ -212,9 +215,9 @@ it('opens every month directly with one footer and cancels unsaved changes', asy
   });
 
   it('inherits configured power-center children and follows master-data names without creating quantity records', async () => {
-    const added = addChildEnergyUnit('eu-utilities', { energyUnitName: '新增供热系统', unitType: '公辅系统', energyRelations: [{ inputEnergyTypeId: 'v11-energy-natural-gas', outputEnergyTypeId: 'v11-energy-steam' }] });
+    const added = addChildEnergyUnit('eu-utilities', { energyUnitName: '新增供热系统', unitType: '能源转换子系统', energyRelations: [{ inputEnergyTypeId: 'v11-energy-natural-gas', outputEnergyTypeId: 'v11-energy-steam' }] });
     expect(added.ok).toBe(true);
-    expect(updateEnergyUnit('eu-utilities', { energyUnitName: '公用动力中心', unitType: '公辅系统' }).ok).toBe(true);
+    expect(updateEnergyUnit('eu-utilities', { energyUnitName: '公用动力中心', unitType: '能源转换系统' }).ok).toBe(true);
     const before = listV11ConversionOutputs();
     await render();
     expect(container.querySelector('th')?.textContent).toBe('用能单元（公用动力中心）');
@@ -526,7 +529,7 @@ it('distinguishes zero and missing months while exposing all monthly inputs', as
     const supplies = listV11ExternalSupplyRecords();
     await render('/data-management/energy-data?tab=conversion&grain=year&year=2026');
     await click(button('删除', systemRow('余热发电机组'))); await click(button('确认删除'));
-    expect(systemRow('余热发电机组').textContent).toContain('待填报未填写');
+    expect(systemRow('余热发电机组').textContent).toContain('待填报数据不完整未填写');
     expect(externalRow('余热发电机组').textContent).toContain('待核验');
     expect(listV11ExternalSupplyRecords()).toEqual(supplies);
     expect(listV11ConversionOutputs().filter((row) => row.year === 2025)).toEqual(otherYear);

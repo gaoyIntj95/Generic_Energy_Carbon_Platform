@@ -309,7 +309,7 @@ function AnnualEnergyDetail({
       </div>
       <div className={styles.drillTableWrap}>
         <table className={styles.drillTable} aria-label="年度月明细">
-          <thead><tr><th>月份</th><th>实物量</th><th>单位</th><th>折标量（tce）</th><th>占全年</th><th>同比（较上年同月）</th><th>环比（较上月）</th><th>数据状态</th></tr></thead>
+          <thead><tr><th>月份</th><th>实物量</th><th>单位</th><th>折标量（tce）</th><th>占全年</th><th>同比变化（较上年同月）</th><th>环比变化（较上月）</th><th>数据状态</th></tr></thead>
           <tbody>{details.map((item) => (
             <tr key={item.detailId}>
               <td>{item.month}</td>
@@ -479,7 +479,7 @@ function ConsumptionQueryPage() {
             <option value="all">全厂</option>
             <option value="prodA">生产车间A</option>
             <option value="prodB">生产车间B</option>
-            <option value="utilities">公辅系统</option>
+            <option value="utilities">能源转换系统</option>
           </select>
         </FilterField>
         <div className={styles.filterSpacer} />
@@ -502,14 +502,14 @@ function ConsumptionQueryPage() {
           <strong>{format(data.total)}<small>tce</small></strong>
         </div>
         <div className={styles.summaryItem}>
-          <span>同比</span>
+          <span>同比变化</span>
           <strong className={data.yearOnYear < 0 ? styles.down : styles.up}>
             {data.yearOnYear > 0 ? '↑' : '↓'} {percent(data.yearOnYear)}
           </strong>
         </div>
         {monthMode && (
           <div className={styles.summaryItem}>
-            <span>环比</span>
+            <span>环比变化</span>
             <strong className={(data.monthOnMonth ?? 0) < 0 ? styles.down : styles.up}>
               {(data.monthOnMonth ?? 0) > 0 ? '↑' : '↓'} {percent(data.monthOnMonth)}
             </strong>
@@ -566,8 +566,8 @@ function ConsumptionQueryPage() {
             <thead><tr>
               <th>序号</th>
               {applied.scope === 'all' && <th>用能单元</th>}
-              <th>能源类别</th><th>能源品种</th><th>实物量</th><th>单位</th><th>折标量（tce）</th><th>占比</th><th>同比</th>
-              {monthMode && <th>环比</th>}
+              <th>能源类别</th><th>能源品种</th><th>实物量</th><th>单位</th><th>折标量（tce）</th><th>占比</th><th>同比变化</th>
+              {monthMode && <th>环比变化</th>}
               <th>操作</th>
             </tr></thead>
             <tbody>
@@ -648,7 +648,7 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
         </select></label>
         <label className={styles.modalField}><span>指标名称</span><input aria-label="指标名称" value={metricName} readOnly /></label>
         <label className={styles.modalField}><span className={styles.required}>能源消耗</span><select aria-label="能源消耗" defaultValue={energyTypeId} onChange={(event) => { energyTypeId = event.target.value; syncResultUnit(); }}><option value="v11-energy-electricity">电力</option><option value="v11-energy-natural-gas">天然气折标综合能耗</option></select></label>
-        <div className={styles.modalNote}>设备产出用于设备能耗指标；能流分析使用能源转换与外供中独立维护的用能单元产出。</div>
+        <div className={styles.modalNote}>设备产出用于设备能耗指标；能流分析使用能源转换回收与外供中独立维护的用能单元产出。</div>
         <label className={styles.modalField}><span className={styles.required}>产出口径</span><input aria-label="产出口径" value={denominatorName} readOnly /></label>
         <label className={styles.modalField}><span>产出计量单位（数据录入时维护）</span><input aria-label="分母单位" value={denominatorUnit} readOnly /></label>
         <label className={styles.modalField}><span>分母指标编码（选填）</span><input aria-label="分母指标编码" defaultValue={denominatorMetricCode} placeholder="例如：steam_output" onChange={(event) => { denominatorMetricCode = event.target.value; }} /></label>
@@ -696,7 +696,7 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
       : source === 'operation-data'
         ? '设备产出数据'
       : source === 'energy-conversion'
-          ? '能源转换与外供'
+          ? '能源转换回收与外供'
           : undefined;
     setDialog({
       title: '设备指标详情',
@@ -936,7 +936,7 @@ function IntensityMonthlyDetail({ metric, year, object, options, onChange, getOp
             const officeMetric = object?.objectId === 'eu-office' || metric.name.includes('建筑面积');
             const unitMetric = object?.objectType === 'unit';
             const metricName = officeMetric ? '办公建筑面积' : metric.name.includes('增加值') ? '工业增加值' : metric.name.includes('产值') ? '工业总产值' : metric.name.includes('供能量') ? '动力中心供能量' : '产品产量';
-            const category = officeMetric || metric.name.includes('供能量') ? '运行指标' : metricName === '产品产量' ? '产量' : '经济指标';
+            const category = officeMetric || metric.name.includes('供能量') ? '运行指标' : metricName === '产品产量' ? '产量指标' : '经济指标';
             const scope = unitMetric ? `&scopeLevel=${encodeURIComponent(object?.unitLevel === 'level2' ? '二级用能单元' : '一级用能单元')}&unitId=${encodeURIComponent(object?.energyUnitId ?? '')}` : '&scopeLevel=企业';
             const query = `year=${year}${scope}&category=${encodeURIComponent(category)}&metricName=${encodeURIComponent(metricName)}`;
             navigate(`/data-management/operations?${annualOnly ? query : `new=1&${query}`}`);
@@ -986,7 +986,7 @@ function IntensityMonthlyDetail({ metric, year, object, options, onChange, getOp
       </div>}
       {hasMonthlyData && showMonthlyTable && <div className={styles.tableWrap}>
         <table className={styles.intensityMonthlyTable}>
-        <thead><tr><th>月份</th><th>{inputLabels.numerator}</th><th>{object?.objectType === 'unit' ? '指标核算基数' : inputLabels.denominator}</th><th>指标值（{metric.unit}）</th><th>环比</th><th>同比</th></tr></thead>
+        <thead><tr><th>月份</th><th>{inputLabels.numerator}</th><th>{object?.objectType === 'unit' ? '指标核算基数' : inputLabels.denominator}</th><th>指标值（{metric.unit}）</th><th>环比变化</th><th>同比变化</th></tr></thead>
           <tbody>
             {metric.monthlyMetrics.map((item) => (
               <tr key={item.month}>

@@ -126,7 +126,7 @@ export interface V11OperationMetric {
   year: number;
   scopeLevel: ScopeLevel;
   energyUnitId: string | null;
-  metricCategory: '产量' | '经济指标' | '运行指标';
+  metricCategory: '产量指标' | '经济指标' | '运行指标';
   aggregationMethod: '月度求和' | '年度单值';
   metricName: string;
   metricUnit: string;
@@ -295,18 +295,18 @@ const allSeedConversionOutputs = [...seedConversionOutputs, ...historicalConvers
 
 const seedOperations: V11OperationMetric[] = [
   { operationMetricId: 'v11-operation-50', metricCode: 'industrial_added_value', productId: null, year: 2026, scopeLevel: '企业', energyUnitId: null, metricCategory: '经济指标', aggregationMethod: '年度单值', metricName: '工业增加值', metricUnit: '万元', entryMode: 'annual', annualValue: 56000, monthlyValues: [] },
-  { operationMetricId: 'v11-operation-55', metricCode: 'product_output', productId: null, year: 2026, scopeLevel: '企业', energyUnitId: null, metricCategory: '产量', aggregationMethod: '月度求和', metricName: '企业产品产量', metricUnit: 't', entryMode: 'monthly', annualValue: 0, monthlyValues: [22500,21800,23200,23800,24500,24900,25200,25100,24700,24400,25000,26000] },
-  { operationMetricId: 'v11-operation-product-a-enterprise', metricCode: 'product_output', productId: 'product-a', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-clinker-line-1', metricCategory: '产量', aggregationMethod: '年度单值', metricName: '产品产量', metricUnit: 't', entryMode: 'annual', annualValue: 956700, monthlyValues: [] },
+  { operationMetricId: 'v11-operation-55', metricCode: 'product_output', productId: null, year: 2026, scopeLevel: '企业', energyUnitId: null, metricCategory: '产量指标', aggregationMethod: '月度求和', metricName: '企业产品产量', metricUnit: 't', entryMode: 'monthly', annualValue: 0, monthlyValues: [22500,21800,23200,23800,24500,24900,25200,25100,24700,24400,25000,26000] },
+  { operationMetricId: 'v11-operation-product-a-enterprise', metricCode: 'product_output', productId: 'product-a', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-clinker-line-1', metricCategory: '产量指标', aggregationMethod: '年度单值', metricName: '产品产量', metricUnit: 't', entryMode: 'annual', annualValue: 956700, monthlyValues: [] },
   { operationMetricId: 'v11-operation-56', metricCode: 'industrial_output_value', productId: null, year: 2026, scopeLevel: '企业', energyUnitId: null, metricCategory: '经济指标', aggregationMethod: '年度单值', metricName: '工业总产值', metricUnit: '万元', entryMode: 'annual', annualValue: 286000, monthlyValues: [] },
-  { operationMetricId: 'v11-operation-51', metricCode: 'product_output', productId: 'product-a', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-clinker-line-1', metricCategory: '产量', aggregationMethod: '月度求和', metricName: '产品产量', metricUnit: 't', entryMode: 'monthly', annualValue: 0, monthlyValues: [76000,73500,78000,79200,80500,81200,82000,81600,80400,79800,81000,83500] },
-  { operationMetricId: 'v11-operation-53', metricCode: 'product_output', productId: 'product-b', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-clinker-line-1', metricCategory: '产量', aggregationMethod: '月度求和', metricName: '产品产量', metricUnit: 't', entryMode: 'monthly', annualValue: 0, monthlyValues: [30000,28500,31000,31500,32000,32500,33000,32800,32200,31800,32500,33800] },
-  { operationMetricId: 'v11-operation-product-b-annual', metricCode: 'product_output', productId: 'product-b', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-cement-grinding-line', metricCategory: '产量', aggregationMethod: '年度单值', metricName: '产品产量', metricUnit: 't', entryMode: 'annual', annualValue: 1260000, monthlyValues: [] },
-  { operationMetricId: 'v11-operation-product-b-monthly', metricCode: 'product_output', productId: 'product-b', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-cement-grinding-line', metricCategory: '产量', aggregationMethod: '月度求和', metricName: '产品产量', metricUnit: 't', entryMode: 'monthly', annualValue: 0, monthlyValues: [7600,7350,7800,7900,8000,7400,8200,8100,8000,7900,8100,8400] },
+  { operationMetricId: 'v11-operation-51', metricCode: 'product_output', productId: 'product-a', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-clinker-line-1', metricCategory: '产量指标', aggregationMethod: '月度求和', metricName: '产品产量', metricUnit: 't', entryMode: 'monthly', annualValue: 0, monthlyValues: [76000,73500,78000,79200,80500,81200,82000,81600,80400,79800,81000,83500] },
+  { operationMetricId: 'v11-operation-53', metricCode: 'product_output', productId: 'product-b', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-clinker-line-1', metricCategory: '产量指标', aggregationMethod: '月度求和', metricName: '产品产量', metricUnit: 't', entryMode: 'monthly', annualValue: 0, monthlyValues: [30000,28500,31000,31500,32000,32500,33000,32800,32200,31800,32500,33800] },
+  { operationMetricId: 'v11-operation-product-b-annual', metricCode: 'product_output', productId: 'product-b', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-cement-grinding-line', metricCategory: '产量指标', aggregationMethod: '年度单值', metricName: '产品产量', metricUnit: 't', entryMode: 'annual', annualValue: 1260000, monthlyValues: [] },
+  { operationMetricId: 'v11-operation-product-b-monthly', metricCode: 'product_output', productId: 'product-b', year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-cement-grinding-line', metricCategory: '产量指标', aggregationMethod: '月度求和', metricName: '产品产量', metricUnit: 't', entryMode: 'monthly', annualValue: 0, monthlyValues: [7600,7350,7800,7900,8000,7400,8200,8100,8000,7900,8100,8400] },
   { operationMetricId: 'v11-operation-utility-volume', metricCode: 'energy_supply', productId: null, year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-utilities', metricCategory: '运行指标', aggregationMethod: '月度求和', metricName: '动力中心供能量', metricUnit: 'GJ', entryMode: 'monthly', annualValue: 0, monthlyValues: [420,405,438,450,465,480,495,488,472,460,478,510] },
   { operationMetricId: 'v11-operation-office-area', metricCode: 'building_area', productId: null, year: 2026, scopeLevel: '一级用能单元', energyUnitId: 'eu-office', metricCategory: '运行指标', aggregationMethod: '年度单值', metricName: '办公建筑面积', metricUnit: 'm²', entryMode: 'annual', annualValue: 18500, monthlyValues: [] },
   // 仓储物流区域暂不提供“货物吞吐量”，用于展示指标待补充及跳转运营数据的场景。
   // 2025 年保留同一产量口径，用于同比计算；异常应由真实数据变化触发，而不是由断崖式 mock 值制造。
-  { operationMetricId: 'v11-operation-product-b-2025-baseline', metricCode: 'product_output', productId: 'product-b', year: 2025, scopeLevel: '一级用能单元', energyUnitId: 'eu-cement-grinding-line', metricCategory: '产量', aggregationMethod: '月度求和', metricName: '产品产量', metricUnit: 't', entryMode: 'monthly', annualValue: 0, monthlyValues: [7600,7350,7800,7900,8000,8000,8200,8100,8000,7900,8100,8400] },
+  { operationMetricId: 'v11-operation-product-b-2025-baseline', metricCode: 'product_output', productId: 'product-b', year: 2025, scopeLevel: '一级用能单元', energyUnitId: 'eu-cement-grinding-line', metricCategory: '产量指标', aggregationMethod: '月度求和', metricName: '产品产量', metricUnit: 't', entryMode: 'monthly', annualValue: 0, monthlyValues: [7600,7350,7800,7900,8000,8000,8200,8100,8000,7900,8100,8400] },
 ];
 
 /** 重点用能设备字典样例：仅保留具有显著用能、独立计量或优化价值的典型设备。 */
@@ -526,7 +526,7 @@ export function listV11EnergyTypeReferences(id: string, year = 2026): V11EnergyT
     { kind: 'energyRecords', label: '能源数据', count: energyRecords.filter((item) => item.year === year && item.energyTypeId === id).length, path: `/data-management/energy-data?energyTypeId=${encodeURIComponent(id)}&year=${year}` },
     { kind: 'energyCosts', label: '能源成本', count: energyCosts.filter((item) => item.year === year && item.energyTypeId === id).length, path: `/data-management/energy-data?tab=costs&energyTypeId=${encodeURIComponent(id)}&year=${year}` },
     { kind: 'keyDevices', label: '重点设备', count: devices.filter((item) => item.mainEnergyTypeId === id).length, path: `/data-management/devices?energyTypeId=${encodeURIComponent(id)}&year=${year}` },
-    { kind: 'conversionOutputs', label: '能源转换与外供', count: conversionOutputs.filter((item) => item.year === year && (item.inputEnergyTypeId === id || item.outputEnergyTypeId === id)).length, path: `/data-management/energy-data?tab=recovery&energyTypeId=${encodeURIComponent(id)}&year=${year}` },
+    { kind: 'conversionOutputs', label: '能源转换回收与外供', count: conversionOutputs.filter((item) => item.year === year && (item.inputEnergyTypeId === id || item.outputEnergyTypeId === id)).length, path: `/data-management/energy-data?tab=recovery&energyTypeId=${encodeURIComponent(id)}&year=${year}` },
   ];
   return references.filter((item) => item.count > 0);
 }

@@ -88,7 +88,7 @@ describe('EnergyUnitsPage behavior', () => {
     const typeFilter = container.querySelector(
       'select[aria-label="单元类型"]',
     ) as HTMLSelectElement;
-    await setSelect(typeFilter, '建筑/区域');
+    await setSelect(typeFilter, '建筑区域');
     await click(findButton('查询'));
 
     expect(container.textContent).toContain('办公区域');
@@ -108,8 +108,8 @@ describe('EnergyUnitsPage behavior', () => {
     form = modalForm();
     await setSelect(form.querySelector('select[aria-label="单元类型"]')!, '非生产类用能单元');
     const nonProductionType = form.querySelector('select[aria-label="非生产类用能单元类型"]') as HTMLSelectElement;
-    expect([...nonProductionType.options].map((option) => option.value)).toEqual(['', '公辅系统', '建筑/区域', '其他']);
-    await setSelect(nonProductionType, '建筑/区域');
+    expect([...nonProductionType.options].map((option) => option.value)).toEqual(['', '能源转换系统', '建筑区域', '其他']);
+    await setSelect(nonProductionType, '建筑区域');
     await setInput(form.querySelector('input[aria-label="用能单元名称"]')!, '办公区域');
     await click(findButton('保存', form));
 
@@ -124,18 +124,24 @@ describe('EnergyUnitsPage behavior', () => {
 
     const levelTwoRow = findRow('包装区域');
     expect(levelTwoRow.textContent).not.toContain('添加下级');
+
+    const otherRootRow = findRow('仓储物流区域');
+    expect(otherRootRow.textContent).toContain('其他');
+    expect(otherRootRow.textContent).not.toContain('添加下级');
+
+    const officeRow = findRow('办公区域');
+    expect(officeRow.textContent).toContain('添加下级');
+    expect(findRow('办公区域A').textContent).not.toContain('添加下级');
   });
 
-  it('derives a child unit type from its parent and exposes only compatible alternatives on demand', async () => {
+  it('derives a fixed child unit type from its parent', async () => {
     await click(findButton('添加下级', findRow('生产车间A')));
     const form = modalForm();
 
     expect(form.textContent).toContain('系统默认工序/环节');
     expect(form.querySelector('select[aria-label="单元类型"]')).toBeNull();
 
-    await click(findButton('修改类型', form));
-    const typeSelect = form.querySelector('select[aria-label="单元类型"]') as HTMLSelectElement;
-    expect([...typeSelect.options].map((option) => option.value)).toEqual(['工序/环节', '公辅系统', '其他']);
+    expect(form.querySelector('button')?.textContent).not.toContain('修改类型');
   });
 
   it('keeps the initial power-center form compact and saves a common relation with an optional remark', async () => {
@@ -152,7 +158,7 @@ describe('EnergyUnitsPage behavior', () => {
     await setInput(form.querySelector('textarea[aria-label="备注"]')!, '备用系统');
     await click(findButton('保存', form));
     expect(listEnergyUnits().find((unit) => unit.energyUnitName === '新增空压站')).toMatchObject({
-      unitType: '公辅系统', remark: '备用系统',
+    unitType: '能源转换子系统', remark: '备用系统',
       energyRelations: [{ inputEnergyTypeId: 'v11-energy-electricity', outputEnergyTypeId: 'v11-energy-compressed-air' }],
     });
     await click(findButton('编辑', findRow('新增空压站')));
@@ -176,11 +182,13 @@ describe('EnergyUnitsPage behavior', () => {
     expect(findButton('自定义', form).getAttribute('aria-pressed')).toBe('true');
     expect(form.querySelector<HTMLSelectElement>('select[aria-label="投入能源"]')?.value).toBe('v11-energy-coal');
     expect(form.querySelector<HTMLSelectElement>('select[aria-label="产出能源"]')?.value).toBe('v11-energy-steam');
-    await setSelect(form.querySelector('select[aria-label="产出能源"]')!, 'v11-energy-coal');
+    expect([...form.querySelector<HTMLSelectElement>('select[aria-label="产出能源"]')!.options].map((option) => option.textContent)).toEqual(['请选择产出能源', '电力', '蒸汽', '压缩空气']);
+    await setSelect(form.querySelector('select[aria-label="投入能源"]')!, 'v11-energy-electricity');
+    await setSelect(form.querySelector('select[aria-label="产出能源"]')!, 'v11-energy-electricity');
     await click(findButton('保存', form));
     expect(form.querySelector('[role="alert"]')?.textContent).toContain('投入与产出能源不能相同');
     expect(listEnergyUnits()).toHaveLength(count);
-    await setSelect(form.querySelector('select[aria-label="产出能源"]')!, 'v11-energy-electricity');
+    await setSelect(form.querySelector('select[aria-label="投入能源"]')!, 'v11-energy-coal');
     await click(findButton('常用关系', form));
     expect(form.querySelector<HTMLSelectElement>('select[aria-label="常用能源转换关系"]')?.selectedOptions[0].textContent).toBe('原煤 → 电力');
     expect(form.querySelector('select[aria-label="投入能源"]')).toBeNull();
@@ -252,33 +260,22 @@ describe('EnergyUnitsPage behavior', () => {
     expect(modalForm().querySelector<HTMLSelectElement>('select[aria-label="常用能源转换关系"]')?.selectedOptions[0].textContent).toBe('天然气 → 蒸汽');
   });
 
-  it('clears the relation when changing to another unit type', async () => {
+  it('keeps the utility child type fixed to a utility subsystem', async () => {
     await click(findButton('添加下级', findRow('动力中心')));
     const form = modalForm();
     await selectRelation(form, '天然气 → 蒸汽');
     await setInput(form.querySelector('input[aria-label="用能单元名称"]')!, '动力中心其他单元');
-    await click(findButton('修改类型', form));
-    await setSelect(form.querySelector('select[aria-label="单元类型"]')!, '其他');
-    expect(form.querySelector('select[aria-label="投入能源"]')).toBeNull();
     await click(findButton('保存', form));
     expect(listEnergyUnits().find((unit) => unit.energyUnitName === '动力中心其他单元')).toMatchObject({
-      unitType: '其他', energyRelations: undefined, conversionScenarios: [],
+      unitType: '能源转换子系统', energyRelations: [{ inputEnergyTypeId: 'v11-energy-natural-gas', outputEnergyTypeId: 'v11-energy-steam' }],
     });
   });
 
-  it('reorders sibling units without changing their parent relationship', async () => {
-    await click(findButton('调整下级顺序', findRow('生产车间A')));
-    const form = modalForm();
-    expect(form.textContent).toContain('调整“生产车间A”下级顺序');
-    const firstItem = [...form.querySelectorAll('div')].find((item) => item.textContent?.includes('加工工段') && item.textContent?.includes('下移'));
-    if (!firstItem) throw new Error('未找到加工工段排序项');
-    await click(findButton('下移', firstItem));
-    await click(findButton('保存顺序', form));
-
-    expect(listEnergyUnits()
-      .filter((unit) => unit.parentEnergyUnitId === 'eu-clinker-line-1')
-      .map((unit) => unit.energyUnitName)).toEqual(['装配工段', '加工工段', '检测工段']);
-    expect(getEnergyUnit('eu-raw-material')?.parentEnergyUnitId).toBe('eu-clinker-line-1');
+  it('uses row drag-and-drop for sibling ordering without showing a reorder button', async () => {
+    const row = findRow('生产车间A');
+    expect(row.getAttribute('draggable')).toBe('true');
+    expect(row.textContent).not.toContain('调整下级顺序');
+    expect(container.textContent).not.toContain('保存顺序');
   });
 
   it('edits the selected record without changing its id or parent relationship', async () => {
@@ -305,7 +302,7 @@ describe('EnergyUnitsPage behavior', () => {
     await click(findButton('删除', findRow('动力中心')));
     expect(modalForm().textContent).toContain('无法删除用能单元');
     expect(modalForm().textContent).toContain('下级用能单元')
-    expect(modalForm().textContent).toContain('去处理');
+    expect(modalForm().textContent).not.toContain('去处理');
     expect(modalForm().textContent).not.toContain('能源记录引用');
     await click(findButton('我知道了', modalForm()));
 

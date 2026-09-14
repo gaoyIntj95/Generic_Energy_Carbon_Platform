@@ -381,16 +381,16 @@ function utilityMetrics(object: IntensityObjectOption, year: number, energy: V11
   // 月度分析优先使用月度运营记录；年度单值只作为年度模式的回退来源。
   const output = outputCandidates.find((record) => record.entryMode === 'monthly') ?? outputCandidates[0];
   const isLogistics = output?.metricCode === 'logistics_throughput';
-  const expectedDenominator = object.unitType === '公辅系统'
+  const expectedDenominator = (object.unitType === '能源转换系统' || object.unitType === '能源转换子系统')
     ? { name: '动力中心供能量', unit: 'GJ' }
-    : object.unitType === '建筑/区域'
+    : object.unitType === '建筑区域' || object.unitType === '建筑子区域'
       ? isLogistics ? { name: '货物吞吐量', unit: 't' } : { name: '办公建筑面积', unit: 'm²' }
       : { name: '运营量', unit: '运营量' };
   const typeName = isBoiler
     ? '单位蒸汽综合能耗'
-    : object.unitType === '公辅系统'
+    : object.unitType === '能源转换系统' || object.unitType === '能源转换子系统'
       ? '单位供能量综合能耗'
-      : object.unitType === '建筑/区域'
+      : object.unitType === '建筑区域' || object.unitType === '建筑子区域'
         ? isLogistics ? '单位物流作业量综合能耗' : '单位建筑面积综合能耗'
         : output ? `单位运行能耗（按${output.metricName}）` : '单位运行能耗';
   const unit = isBoiler ? 'kgce/t' : `kgce/${output?.metricUnit ?? expectedDenominator.unit}`;

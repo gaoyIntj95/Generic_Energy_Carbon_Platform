@@ -24,7 +24,6 @@ import { buildEnergyQueryDataset } from '../../mocks/energyQuerySelector';
 import { buildIntensityCalculationView } from '../../mocks/energyIntensitySelector';
 import type { BudgetType, CarbonAsset, CarbonAssetType } from '../../types/platformDomain';
 import { Button, Drawer, Field, Modal, Tag, Toast } from './PrototypeUI';
-import { AssetAiAnalysis } from './AssetAiAnalysis';
 import { BalanceOptimizationPage, buildStrategyEfficiencySignals } from './BalanceOptimizationPage';
 import styles from './AssetOperationsV2.module.css';
 
@@ -33,7 +32,6 @@ const scopes = ['全企业', '生产车间A', '生产车间B', '动力中心', '
 const ENERGY_CHANGE_ATTENTION = 8;
 
 const strategyActionLabels = {
-  COMPLETE_DATA: '完善数据',
   GO_ENERGY_DATA: '核查能源数据',
   GO_OPERATION_DATA: '核查运营数据',
   GO_INTENSITY: '查看能耗指标',
@@ -52,6 +50,7 @@ export type CarbonForecastScenario = {
 
 export type IndustryAllocationRule = {
   ruleId: string;
+  ruleType: 'formal' | 'scenario';
   applicableIndustry: string;
   referenceYear: number;
   ruleVersion: string;
@@ -66,17 +65,18 @@ export type IndustryAllocationRule = {
 };
 
 const steelCementAluminiumAllocationRule: IndustryAllocationRule = {
-  ruleId: 'steel-cement-aluminium-2026-consultation',
+  ruleId: 'steel-cement-aluminium-2026',
+  ruleType: 'formal',
   applicableIndustry: '钢铁 / 水泥 / 铝冶炼',
   referenceYear: 2026,
-  ruleVersion: '2026年度配额方案征求意见稿',
+  ruleVersion: '2026年度正式配额方案',
   allocationMethod: '强度基准法',
   deviationRule: 'X =（行业平衡值 − 企业预计排放强度）÷ 行业平衡值',
   coefficientRule: '−20% < X < 20% 时 α = 0.15 × X；X ≥ 20% 时 α = +3%；X ≤ −20% 时 α = −3%',
   coefficientMin: -0.03,
   coefficientMax: 0.03,
-  source: '生态环境部2026年度配额方案征求意见稿（待正式发布）',
-  status: '征求意见稿·非正式核定规则',
+  source: '生态环境部《全国碳排放权交易市场2025、2026年度发电行业以及2026年度钢铁、水泥、铝冶炼行业配额总量和分配方案》',
+  status: '正式规则',
   calculateAlpha: (intensityDeviation) => intensityDeviation >= 0.2
     ? 0.03
     : intensityDeviation <= -0.2
@@ -87,10 +87,12 @@ const steelCementAluminiumAllocationRule: IndustryAllocationRule = {
 const genericScenarioAllocationRule: IndustryAllocationRule = {
   ...steelCementAluminiumAllocationRule,
   ruleId: 'generic-intensity-scenario-v2',
+  ruleType: 'scenario',
   applicableIndustry: '通用工业企业（规则待匹配）',
-  ruleVersion: '参考上一年度规则',
-  source: '平台情景估算规则（非正式核定）',
-  status: '情景估算',
+  allocationMethod: '通用工业强度情景模型',
+  ruleVersion: '平台通用情景模型 v2',
+  source: '平台管理估算模型（非正式核定）',
+  status: '管理估算',
 };
 
 export function getIndustryAllocationRule(industry?: string): IndustryAllocationRule | null {
@@ -680,7 +682,7 @@ function BalanceRuleGuide() {
     ['单位异常', '上下级单位或折标逻辑不一致', '检查能源品种、单位及折标系数'],
   ];
   return <section className={`${styles.card} ${styles.ruleGuide}`}>
-    <div><h2>规则说明与异常处置建议</h2><p>一期采用明确规则生成处置建议，不将管理差额包装为设备效率或泛化 AI 结论。</p></div>
+    <div><h2>规则说明与异常处置建议</h2><p>一期采用明确规则生成处置建议，不将管理差额包装为设备效率或泛化结论。</p></div>
     <div className={styles.ruleGrid}>{rules.map(([type, rule, action]) => <article key={type}><strong>{type}</strong><span>{rule}</span><p>{action}</p></article>)}</div>
   </section>;
 }
@@ -971,7 +973,6 @@ export function buildStrategyAnalysis(period: 'month' | 'year', scopeName: strin
 function AnalysisPage() {
   const { toast, notify } = useFeedback();
   const [period, setPeriod] = useState<'month' | 'year'>('month');
-  const [aiVersion, setAiVersion] = useState(0);
   const [selectedRow, setSelectedRow] = useState<StrategyAnalysisRow | null>(null);
   const navigateTo = (path: string) => {
     window.history.pushState({}, '', path);
@@ -979,7 +980,7 @@ function AnalysisPage() {
   };
   const analysis = useMemo(() => buildStrategyAnalysis(period, '全企业'), [period]);
   return <Page toast={toast}>
-    <CommonFilters period={period} setPeriod={(value) => { setPeriod(value); setAiVersion((current) => current + 1); }} showScope={false} onQuery={() => { setAiVersion((current) => current + 1); notify('查询条件已更新，AI结果需重新生成'); }} onReset={() => { setPeriod('month'); setAiVersion((current) => current + 1); notify('已重置查询条件，AI结果需重新生成'); }} />
+    <CommonFilters period={period} setPeriod={setPeriod} showScope={false} onQuery={() => notify('查询条件已更新')} onReset={() => { setPeriod('month'); notify('已重置查询条件'); }} />
     <div className={styles.kpiThree}><Kpi label="能源消费总量" value={format(analysis.query.total, 1)} unit="tce" icon="◔" hideSub sub={<>同比　<b className={analysis.query.yearOnYear > 0 ? styles.up : styles.down}>{analysis.query.yearOnYear >= 0 ? '+' : ''}{analysis.query.yearOnYear.toFixed(1)}%</b></>} /><Kpi label="综合能源成本" value={format(analysis.totalCost, 1)} unit="万元" icon="◉" hideSub sub={<>来自数据管理－能源成本</>} /><Kpi label="单位综合用能成本" value={analysis.query.total > 0 ? format(analysis.totalCost / analysis.query.total * 10000, 2) : '—'} unit="元/tce" icon="¥" hideSub sub={<>综合能源成本 ÷ 能源消费总量</>} /><Kpi label="单位产品综合能耗" value={analysis.intensity === null ? '—' : format(analysis.intensity, 1)} unit={analysis.intensityUnit} icon="↗" hideSub sub={<>来自能耗指标</>} /></div>
     <div className={styles.analysisInsightGrid}>
       <section className={`${styles.card} ${styles.panel} ${styles.structureDiagnosisCard}`}>
@@ -999,11 +1000,10 @@ function AnalysisPage() {
         <td>{format(row.cost, 1)}</td>
         <td>{row.efficiency?.value === null || row.efficiency?.value === undefined ? '—' : `${format(row.efficiency.value, 1)} ${row.efficiency.unit}`}</td>
         <td>{row.problem}</td>
-        <td><button type="button" className={`${styles.link} ${styles.actionLink}`} onClick={() => row.efficiencyStatus === '数据待完善' ? navigateTo('/data-management/operations?returnTo=/asset-strategy/analysis') : setSelectedRow(row)}>{row.efficiencyStatus === '数据待完善' ? '完善数据' : '查看分析'}　›</button></td>
+        <td><button type="button" className={`${styles.link} ${styles.actionLink}`} onClick={() => { if (row.efficiencyStatus === '数据待完善') { const action = incompleteDataAction(row); action.path ? navigateTo(`${action.path}?returnTo=/asset-strategy/analysis`) : setSelectedRow(row); } else setSelectedRow(row); }}>{row.efficiencyStatus === '数据待完善' ? incompleteDataAction(row).label : '查看分析'}　›</button></td>
       </tr>)}</tbody></table></div>
-      <small className={styles.structureNote}>表格用于快速识别用能单元的分析状态；数据待完善对象请先点击“完善数据”，其他对象可点击“查看分析”了解纳入原因、关键指标（含能耗量同比/环比）和判断依据。成本为参考估算值，不代表用能单元实际财务成本。</small>
+      <small className={styles.structureNote}>表格用于快速识别用能单元的分析状态；数据待完善对象根据缺失类型补充能源数据、运营数据或检查指标配置，其他对象可点击“查看分析”了解纳入原因、关键指标（含能耗量同比/环比）和判断依据。成本为参考估算值，不代表用能单元实际财务成本。</small>
     </section>
-    <AssetAiAnalysis analysisKey="analysis" invalidationVersion={aiVersion} notify={notify} />
     {selectedRow && <StrategyAnalysisModal row={selectedRow} onClose={() => setSelectedRow(null)} onNavigate={(path) => { setSelectedRow(null); navigateTo(path); }} />}
   </Page>;
 }
@@ -1025,12 +1025,28 @@ type UnitAnalysisDetail = {
 };
 
 const strategyActionRoutes: Partial<Record<keyof typeof strategyActionLabels, string>> = {
-  COMPLETE_DATA: '/data-management/operations?returnTo=/asset-strategy/analysis',
   GO_BENCHMARK: '/energy-analysis/benchmarking',
   GO_OPERATION_DATA: '/data-management/operations',
   GO_ENERGY_DATA: '/data-management/energy-data',
   GO_INTENSITY: '/energy-analysis/intensity',
 };
+
+function incompleteDataAction(row: StrategyAnalysisRow) {
+  const reason = (row.efficiency?.dataIssues ?? [row.efficiency?.dataIssue ?? '']).join('、');
+  if (/能源消费记录|能源数据|能源分子/.test(reason)) {
+    return { label: '补充能源数据', path: strategyActionRoutes.GO_ENERGY_DATA! };
+  }
+  if (/运营分母|产量|产值|面积|吞吐量|供气量|蒸汽产量/.test(reason)) {
+    return { label: '补充运营数据', path: strategyActionRoutes.GO_OPERATION_DATA! };
+  }
+  if (/指标配置|适用性|计算口径/.test(reason)) {
+    return { label: '检查指标配置', path: strategyActionRoutes.GO_INTENSITY! };
+  }
+  if (/单位产品|单位建筑面积|单位物流作业量|单位供气|单位蒸汽|单位供能量|单位运行能耗/.test(row.efficiency?.metricName ?? '')) {
+    return { label: '补充运营数据', path: strategyActionRoutes.GO_OPERATION_DATA! };
+  }
+  return { label: '查看缺失数据', path: undefined };
+}
 
 function buildUnitAnalysisDetail(row: StrategyAnalysisRow): UnitAnalysisDetail {
   const isIncomplete = row.efficiencyStatus === '数据待完善';
@@ -1038,7 +1054,13 @@ function buildUnitAnalysisDetail(row: StrategyAnalysisRow): UnitAnalysisDetail {
   const status: UnitAnalysisStatus = isIncomplete ? 'incomplete' : isAttention ? 'attention' : 'normal';
   const statusLabel = status === 'incomplete' ? '数据待完善' : status === 'attention' ? '存在关注项' : '暂无明显偏差';
   const actionCode = (isIncomplete
-    ? 'COMPLETE_DATA'
+    ? row.efficiency?.dataIssues?.some((issue) => /能源消费记录|能源数据|能源分子/.test(issue))
+      ? 'GO_ENERGY_DATA'
+      : row.efficiency?.dataIssues?.some((issue) => /运营分母|产量|产值|面积|吞吐量|供气量|蒸汽产量/.test(issue))
+        ? 'GO_OPERATION_DATA'
+        : /单位产品|单位建筑面积|单位物流作业量|单位供气|单位蒸汽|单位供能量|单位运行能耗/.test(row.efficiency?.metricName ?? '')
+          ? 'GO_OPERATION_DATA'
+        : 'GO_INTENSITY'
     : row.actionCode && row.actionCode in strategyActionLabels ? row.actionCode : 'VIEW_DETAIL') as keyof typeof strategyActionLabels;
   const metricValue = row.efficiency?.value === null || row.efficiency?.value === undefined
     ? '—'
@@ -1062,7 +1084,7 @@ function buildUnitAnalysisDetail(row: StrategyAnalysisRow): UnitAnalysisDetail {
   const judgement = isIncomplete
     ? '能效指标数据待完善'
     : row.efficiency?.evidence ?? (row.issueCode === 'ENERGY_CHANGE'
-      ? `能耗量同比 ${row.change >= 0 ? '+' : ''}${row.change.toFixed(1)}%`
+      ? `能耗量同比变化 ${row.change >= 0 ? '+' : ''}${row.change.toFixed(1)}%`
       : '当前没有命中异常规则。');
   const checks = isIncomplete
     ? ['当前期间能源数据是否已录入', '产量、产值等运营分母是否已维护', '指标适用性和计算口径是否正确']
@@ -1089,8 +1111,8 @@ function buildUnitAnalysisDetail(row: StrategyAnalysisRow): UnitAnalysisDetail {
     metrics: [
       ['能耗量', `${format(row.consumption, 1)} tce`, '能源数据'],
       ['能耗占比', `${row.share.toFixed(1)}%`, '当前分析范围'],
-      ['能耗量环比', row.monthChange === null ? '年度分析不适用' : `${row.monthChange >= 0 ? '+' : ''}${row.monthChange.toFixed(1)}%`, '能源数据'],
-      ['能耗量同比', `${row.change >= 0 ? '+' : ''}${row.change.toFixed(1)}%`, '同期对比'],
+      ['能耗量环比变化', row.monthChange === null ? '年度分析不适用' : `${row.monthChange >= 0 ? '+' : ''}${row.monthChange.toFixed(1)}%`, '能源数据'],
+      ['能耗量同比变化', `${row.change >= 0 ? '+' : ''}${row.change.toFixed(1)}%`, '同期对比'],
       ['单位产品综合能耗', metricValue, row.efficiency?.metricName ?? '能耗指标'],
       ['单位用能成本（参考）', row.unitCost === null ? '—' : `${format(row.unitCost, 2)} 元/tce`, '企业级成本按用量折算'],
     ],
@@ -1149,7 +1171,6 @@ function BudgetPage() {
   const [appliedScope, setAppliedScope] = useState('全企业');
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [version, setVersion] = useState(0);
-  const [aiVersion, setAiVersion] = useState(0);
   const [forecastReady, setForecastReady] = useState(true);
   const [trendScope, setTrendScope] = useState('全企业');
   const targetRecord = getBudgetTarget(budgetType);
@@ -1171,15 +1192,14 @@ function BudgetPage() {
   const trendTarget = baseRows.find((row) => row[0] === activeTrendScope)?.[1] ?? (activeTrendScope === '全企业' ? target : null);
   void version;
   return <Page toast={toast}>
-    <CommonFilters cycle showScope={false} scope={scope} setScope={setScope} onQuery={() => { setAppliedScope(scope); setForecastReady(true); setAiVersion((current) => current + 1); notify('查询条件已更新，预测结果已同步展示'); }} onReset={() => { setScope('全企业'); setAppliedScope('全企业'); setForecastReady(true); setAiVersion((current) => current + 1); notify('已重置查询条件，预测结果已同步展示'); }} />
+    <CommonFilters cycle showScope={false} scope={scope} setScope={setScope} onQuery={() => { setAppliedScope(scope); setForecastReady(true); notify('查询条件已更新，预测结果已同步展示'); }} onReset={() => { setScope('全企业'); setAppliedScope('全企业'); setForecastReady(true); notify('已重置查询条件，预测结果已同步展示'); }} />
     <section className={`${styles.card} ${styles.budgetCard}`}>
       <div className={styles.budgetTabs}><button type="button" className={budgetType === 'energy' ? styles.activeBudget : ''} onClick={() => { setBudgetType('energy'); setForecastReady(true); }}>能源预算管理</button><button type="button" className={budgetType === 'carbon' ? styles.activeBudget : ''} onClick={() => { setBudgetType('carbon'); setForecastReady(true); }}>碳排放预算管理</button></div>
       <div className={styles.budgetSummary}><div className={styles.targetSummary}><div className={styles.summaryLabel}><span>年度目标</span><button type="button" className={styles.summaryAction} onClick={() => setOverlay({ kind: 'budget', type: budgetType, energyUnitId: null, scopeName: '全企业' })}>{targetConfigured ? '调整目标' : '配置目标'}<span className={styles.srOnly}>目标预算配置</span></button></div><strong>{displayTarget !== null ? <>{format(displayTarget)} {unit}</> : '未配置'}</strong></div><div><span>当前累计</span><strong>{format(current)} {unit}</strong></div><div><span>预计全年</span><strong>{forecastReady ? `${format(forecast)} ${unit}` : '待预测'}</strong></div><div><span>预测偏差</span><strong className={forecastReady && displayTarget !== null ? styles.up : ''}>{forecastReady && displayTarget !== null ? <>{forecast - displayTarget >= 0 ? '+' : ''}{format(forecast - displayTarget)} {unit}<small>（{displayTarget ? ((forecast - displayTarget) / displayTarget * 100).toFixed(1) : '—'}%）</small></> : '—'}</strong></div><div><span>预算执行状态</span><strong>{forecastReady && displayTarget !== null ? <Tag tone="red">超预算风险</Tag> : <Tag tone="gray">未配置目标</Tag>}</strong><small>{forecastReady && displayTarget !== null ? '消耗进度高于时间进度' : '请先配置年度目标'}</small></div></div>
       <div className={styles.linePanel}><div className={styles.chartHead}><div><h2>{activeTrendScope === '全企业' ? '企业级年度预算累计趋势' : `${activeTrendScope}｜年度预算累计趋势`} <small>（单位：{unit}）</small></h2><p className={styles.chartContext}>趋势对象</p></div><div className={styles.chartActions}><select aria-label="趋势对象" className={styles.trendScopeSelect} value={activeTrendScope} onChange={(event) => setTrendScope(event.target.value)}>{baseRows.map((row) => <option key={row[0]} value={row[0]}>{row[0]}</option>)}</select><Button primary onClick={() => { setForecastReady(true); notify('已根据最新数据完成预测'); }}>{forecastReady ? '↻ 重新预测' : '开始预测'}</Button></div></div><BudgetLine trends={budgetDataset.trends} scope={activeTrendScope} target={trendTarget} forecastReady={forecastReady} /></div>
       <div className={styles.execution}><div className={styles.executionHead}><div><h2>用能单元预算分解</h2><p>表格用于展示预算执行情况；目标可针对企业或一级用能单元独立配置</p></div><span className={styles.executionScope}>当前范围：{appliedScope}</span></div><div className={styles.tableWrap}><table><thead><tr><th>管理对象</th><th>年度目标（{unit}）</th><th>操作</th><th>当前累计（{unit}）</th><th>预计全年（{unit}）</th><th>偏差（{unit}）</th><th>偏差（%）</th><th>状态</th></tr></thead><tbody>{rows.map((row) => { const rowTarget = row[1]; const diff = rowTarget === null ? null : row[3] - rowTarget; const rate = diff === null || rowTarget === null ? null : diff / rowTarget * 100; const state = rowTarget === null ? '未配置目标' : !forecastReady ? '待预测' : diff !== null && diff <= 0 ? '正常' : row[0] === '全企业' ? '超预算风险' : '关注'; const configured = rowTarget !== null; return <tr key={row[0]}><td>{row[0]}</td><td>{rowTarget === null ? '未配置' : format(rowTarget)}</td><td><button type="button" className={styles.targetConfigButton} onClick={() => setOverlay({ kind: 'budget', type: budgetType, energyUnitId: row[4] ?? null, scopeName: row[0] })}>{configured ? '调整目标' : '配置目标'}</button></td><td>{format(row[2])}</td><td>{forecastReady ? format(row[3]) : '—'}</td><td className={forecastReady && diff !== null ? (diff > 0 ? styles.up : styles.down) : ''}>{forecastReady && diff !== null ? `${diff > 0 ? '+' : ''}${format(diff)}` : '—'}</td><td className={forecastReady && rate !== null ? (rate > 0 ? styles.up : styles.down) : ''}>{forecastReady && rate !== null ? `${rate > 0 ? '+' : ''}${rate.toFixed(1)}%` : '—'}</td><td><Status value={state} /></td></tr>; })}</tbody></table></div></div>
-      <AssetAiAnalysis analysisKey={budgetType === 'energy' ? 'budgetEnergy' : 'budgetCarbon'} invalidationVersion={aiVersion} notify={notify} />
     </section>
-    {overlay?.kind === 'budget' && <BudgetDialog type={overlay.type} energyUnitId={overlay.energyUnitId} scopeName={overlay.scopeName} onClose={() => setOverlay(null)} onSaved={() => { setOverlay(null); setForecastReady(true); setVersion((value) => value + 1); setAiVersion((current) => current + 1); notify('目标预算配置已保存，预测结果已同步展示'); }} />}
+    {overlay?.kind === 'budget' && <BudgetDialog type={overlay.type} energyUnitId={overlay.energyUnitId} scopeName={overlay.scopeName} onClose={() => setOverlay(null)} onSaved={() => { setOverlay(null); setForecastReady(true); setVersion((value) => value + 1); notify('目标预算配置已保存，预测结果已同步展示'); }} />}
     {overlay?.kind === 'budgetDetail' && <BudgetDetailDrawer row={overlay.row} type={overlay.type} forecastReady={overlay.forecastReady} onClose={() => setOverlay(null)} onAdjust={() => setOverlay({ kind: 'budget', type: overlay.type, energyUnitId: null, scopeName: '全企业' })} />}
   </Page>;
 }
@@ -1260,7 +1280,6 @@ function CarbonAssetsPage() {
   const [cycle, setCycle] = useState('2026年度');
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [version, setVersion] = useState(0);
-  const [aiVersion, setAiVersion] = useState(0);
   const assets = listCarbonAssets(cycle);
   const snapshot = latestCarbonSnapshot(Number(cycle.slice(0, 4)));
   const quota = assets.find((asset) => asset.assetType === '碳配额');
@@ -1300,8 +1319,15 @@ function CarbonAssetsPage() {
   const nextCoverageRate = nextEmission > 0 ? (expectedQuota + nextCarryover) / nextEmission : 1;
   const nextRiskStatus = nextCoverageRate >= 1 ? '风险：较低' : '风险：需关注';
   const ruleTitle = industryAllocationRule
-    ? `测算规则：${industryAllocationRule.applicableIndustry} · 参考${industryAllocationRule.referenceYear}年度规则（${industryAllocationRule.status}）`
+    ? industryAllocationRule.ruleType === 'formal'
+      ? `测算规则：${industryAllocationRule.applicableIndustry} · ${industryAllocationRule.ruleVersion}`
+      : `测算规则：${industryAllocationRule.allocationMethod} · ${industryAllocationRule.status}`
     : '通用工业企业（规则待匹配） · 参考上一年度规则 · 情景估算';
+  const quotaLabel = industryAllocationRule.ruleType === 'formal' ? '预计配额' : '情景配额需求';
+  const adjustmentLabel = industryAllocationRule.ruleType === 'formal' ? '配额调整系数' : '情景调整系数';
+  const forecastNote = industryAllocationRule.ruleType === 'formal'
+    ? '测算结果基于适用行业规则及情景假设，仅用于履约准备分析，不代表主管部门最终核定配额。'
+    : '当前企业未匹配有效行业配额规则，结果基于通用工业强度情景模型，仅用于内部履约准备，不代表主管部门最终核定配额。';
   const pendingForReview = assets.filter((asset) => asset.assetState === '待核验').reduce((sum, asset) => sum + asset.totalAmount, 0);
   const assetTypeAttribute = (type: CarbonAssetType) => type === '碳配额' ? '可履约' : type === 'CCER' ? '可抵销' : '暂不可用';
   const [assetTypeFilter, setAssetTypeFilter] = useState<'全部' | CarbonAssetType>('全部');
@@ -1315,20 +1341,19 @@ function CarbonAssetsPage() {
   const gapWidth = Math.min(100, Math.max(0, currentNeed - availableForFulfilment) / coverageScale * 100);
   const gapPosition = Math.min(100, availableForFulfilment / coverageScale * 100 + gapWidth / 2);
   const nextRiskText = nextBalance < 0
-    ? `预计配额及可用于下一周期的履约资产不足以覆盖预计排放，预计履约缺口为 ${format(nextGap)} tCO₂，建议提前准备履约资产。`
+    ? `${quotaLabel}及可用于下一周期的履约资产不足以覆盖预计排放，预计履约缺口为 ${format(nextGap)} tCO₂，建议提前准备履约资产。`
     : expectedQuota >= nextEmission
-      ? `预计配额已可覆盖下一履约周期预计排放；叠加可结转资产后，预计履约余量为 ${format(nextSurplus)} tCO₂。`
-      : `预计配额尚不足以覆盖下一履约周期预计排放；叠加可结转资产后，预计履约余量为 ${format(nextSurplus)} tCO₂。`;
+      ? `${quotaLabel}已可覆盖下一履约周期预计排放；叠加可结转资产后，预计履约余量为 ${format(nextSurplus)} tCO₂。`
+      : `${quotaLabel}尚不足以覆盖下一履约周期预计排放；叠加可结转资产后，预计履约余量为 ${format(nextSurplus)} tCO₂。`;
   void version;
   return <Page toast={toast}>
-    <section className={`${styles.card} ${styles.filters}`}><Field label="履约周期"><select value={cycle} onChange={(event) => { setCycle(event.target.value); setAssetTypeFilter('全部'); setAiVersion((current) => current + 1); }}><option>2026年度</option><option>2025年度</option></select></Field><div className={styles.filterSpacer} /><Button primary onClick={() => notify(`已刷新 ${cycle} 履约视图`)}>查询</Button><Button onClick={() => { setCycle('2026年度'); setAssetTypeFilter('全部'); notify('已重置履约视图'); }}>重置</Button></section>
+    <section className={`${styles.card} ${styles.filters}`}><Field label="履约周期"><select value={cycle} onChange={(event) => { setCycle(event.target.value); setAssetTypeFilter('全部'); }}><option>2026年度</option><option>2025年度</option></select></Field><div className={styles.filterSpacer} /><Button primary onClick={() => notify(`已刷新 ${cycle} 履约视图`)}>查询</Button><Button onClick={() => { setCycle('2026年度'); setAssetTypeFilter('全部'); notify('已重置履约视图'); }}>重置</Button></section>
     <section className={styles.referenceTwoCol}><section className={`${styles.card} ${styles.referenceSection}`}><div className={styles.referenceSectionHead}><h2>当前年度履约覆盖情况</h2><span className={`${styles.coverageStatus} ${currentSurplus >= 0 ? styles.coverageStatusOk : styles.coverageStatusAttention}`}>{cycle} · {currentSurplus >= 0 ? '履约状态：充足' : '履约状态：需关注'}</span></div><div className={styles.coverageMetrics}><div><small>预计履约需求</small><strong className={styles.blueText}>{format(currentNeed)} <em>tCO₂</em></strong></div><div><small>已确认可用资产</small><strong>{format(availableForFulfilment)} <em>tCO₂</em></strong></div><div><small>履约覆盖率</small><strong className={currentSurplus >= 0 ? styles.greenText : styles.redText}>{currentCoverageRate.toFixed(1)}%</strong></div><div><small>{currentSurplus >= 0 ? '预计结余' : '预计缺口'}</small><strong className={currentSurplus >= 0 ? styles.greenText : styles.redText}>{format(Math.abs(currentSurplus))} <em>tCO₂</em></strong></div></div><div className={styles.referenceCoverageFigure}><div className={styles.referenceCoverageBar}><i className={styles.coverageQuota} style={{ width: `${Math.min(100, quotaAvailable / coverageScale * 100)}%` }} /><i className={styles.coverageCcer} style={{ width: `${Math.min(100, ccerAvailable / coverageScale * 100)}%` }} />{gapWidth > 0 && <span className={styles.coverageGapLabel} style={{ left: `${gapPosition}%` }}>待补足 {format(Math.abs(currentSurplus))} tCO₂</span>}{gapWidth > 0 && <i className={styles.coverageGap} style={{ width: `${gapWidth}%` }} />}<i className={styles.coverageDemandMarker} style={{ left: `${demandPosition}%` }} /></div><div className={styles.referenceBarScale}><span>0</span><span className={styles.coverageDemandLabel} style={{ left: `${demandPosition}%` }}><strong>{format(currentNeed)} <em>tCO₂</em></strong></span></div></div><div className={styles.referenceLegend}><span><i className={styles.coverageQuota} />碳配额覆盖 {format(quotaAvailable)} tCO₂</span><span><i className={styles.coverageCcer} />CCER等抵销 {format(ccerAvailable)} tCO₂</span><span><i className={styles.coverageGap} />待补足 {format(Math.max(0, currentNeed - availableForFulfilment))} tCO₂</span></div></section><section className={`${styles.card} ${styles.referenceSection}`}><div className={styles.referenceSectionHead}><h2>履约状态提示</h2><button type="button" className={styles.link} onClick={() => setOverlay({ kind: 'rules' })}>查看规则说明</button></div><p className={styles.ruleSummaryText}>{currentSurplus >= 0 ? '根据当前履约需求与已确认可用资产判断，当前周期履约覆盖充足。' : '根据当前履约需求与已确认可用资产判断，当前周期存在履约缺口。'}</p><div className={styles.ruleList}><div className={styles.ruleItem}><span className={styles.ruleBadgeOk}>✓</span><span>当前周期{currentSurplus >= 0 ? `覆盖充足，预计结余 ${format(currentSurplus)} tCO₂` : `预计缺口 ${format(Math.abs(currentSurplus))} tCO₂`}</span></div>{pendingForReview > 0 && <div className={styles.ruleItem}><span className={styles.ruleBadgeWarn}>◷</span><span>存在 <strong>{format(pendingForReview)} tCO₂</strong> 待核验资产，不计入当前履约覆盖</span></div>}<div className={styles.ruleItem}><span className={nextBalance < 0 ? styles.ruleBadgeDanger : styles.ruleBadgeOk}>{nextBalance < 0 ? '!' : '✓'}</span><span>{Number(cycle.slice(0, 4)) + 1}年度情景测算{nextBalance < 0 ? `预计履约缺口 ${format(nextGap)} tCO₂，建议提前准备` : expectedQuota >= nextEmission ? `预计配额已覆盖排放，叠加可结转资产后余量 ${format(nextSurplus)} tCO₂` : `预计配额不足，但叠加可结转资产后余量 ${format(nextSurplus)} tCO₂`}</span></div></div></section></section>
     <section className={`${styles.card} ${styles.referenceSection} ${styles.referenceAssets}`}><div className={styles.referenceSectionHead}><h2>履约资产构成</h2><span>点击资产类型查看台账明细</span></div><div className={styles.referenceAssetGrid}>{assetTypeStats.map((row) => <button type="button" key={row.type} className={styles.referenceAssetCard} onClick={() => { setAssetTypeFilter(row.type); document.querySelector(`.${styles.assetLedger}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}><div className={styles.referenceAssetTop}><div><b>{row.type}</b><strong>{format(row.total)} <em>tCO₂</em></strong></div></div><div className={styles.referenceAssetMeta}><span>已使用 <b>{format(row.used)}</b></span><span>当前可用 <b>{format(row.available)}</b></span><span>{row.type === '绿证折算减排量' ? '计入履约' : '可结转/可用'} <b>{format(row.available)}</b></span></div></button>)}</div></section>
-    <section className={`${styles.card} ${styles.referenceForecast}`}><div className={styles.referenceSectionHead}><h2>下一履约周期预测 <span className={styles.planTag}>{Number(cycle.slice(0, 4)) + 1}年度</span></h2><span>{ruleTitle}　<button type="button" className={styles.link} onClick={() => setOverlay({ kind: 'quotaRules' })}>调整参考值</button></span></div><div className={styles.referenceForecastGrid}><div className={styles.referenceScenario}><h3>情景假设</h3><div className={styles.referenceScenarioControls}><Field label="预计产量变化"><select value={businessChange} onChange={(event) => setBusinessChange(Number(event.target.value))}><option value={-0.1}>-10%</option><option value={0}>0%</option><option value={0.05}>+5%</option><option value={0.1}>+10%</option><option value={0.15}>+15%</option></select></Field><Field label="单位产品排放强度变化"><select value={intensityChange} onChange={(event) => setIntensityChange(Number(event.target.value))}><option value={-0.1}>-10%</option><option value={-0.05}>-5%</option><option value={-0.02}>-2%</option><option value={0}>0%</option><option value={0.05}>+5%</option></select></Field><Field label="行业平衡值变化"><select value={industryBalanceChange} onChange={(event) => setIndustryBalanceChange(Number(event.target.value))}><option value={-0.1}>-10%</option><option value={-0.05}>-5%</option><option value={0}>0%</option><option value={0.05}>+5%</option><option value={0.1}>+10%</option></select></Field></div><div className={styles.forecastFormulaBlock}><p>排放测算逻辑：预计产量 × 预计单位产品排放强度 = {format(expectedProduction)} t × {format(expectedUnitProductIntensity, 4)} tCO₂/t</p>{industryAllocationRule ? <><p>强度偏离度 X =（BP − I）÷ BP =（{format(expectedIndustryBalance, 4)} − {format(expectedUnitProductIntensity, 4)}）÷ {format(expectedIndustryBalance, 4)} = {format(intensityDeviation! * 100, 2)}%</p><p>配额调整系数 α = 0.15 × X = 0.15 × {format(intensityDeviation! * 100, 2)}% = {format(quotaAdjustmentCoefficient! * 100, 2)}%（当前规则：−20% &lt; X &lt; 20%）</p><p>预计配额 A：预计排放 ×（1 + α）= {format(expectedQuota)} tCO₂</p></> : <p>配额测算逻辑：未加载正式行业规则，使用人工配置的情景配额值或简化估算值 {format(expectedQuota)} tCO₂</p>}</div><p className={styles.forecastModelNote}>{industryAllocationRule ? '测算结果基于当前行业配额规则及情景假设，仅用于履约准备分析，不代表主管部门最终核定配额。' : '当前采用通用情景估算，未加载正式行业配额规则；预计配额为非正式行业配额测算结果。'}</p><Button primary onClick={() => { setAppliedScenario({ productionChange: businessChange, productIntensityChange: intensityChange, industryBalanceChange }); setAiVersion((current) => current + 1); notify('情景测算已更新'); }}>重新测算</Button></div><div className={styles.referenceForecastResult}><div className={styles.referenceForecastHead}><h3>预测结果</h3><Status value={nextRiskStatus} /></div><p className={styles.forecastRiskHint}>{nextRiskText}</p><div className={styles.referenceForecastMetrics}><div><span>预计排放</span><strong>{format(nextEmission)} <em>tCO₂</em></strong></div><div><span>预计配额</span><strong className={styles.blueText}>{format(expectedQuota)} <em>tCO₂</em></strong></div><div><span>预计可结转资产</span><strong className={styles.greenText}>{format(nextCarryover)} <em>tCO₂</em></strong><button type="button" className={styles.link} onClick={() => setOverlay({ kind: 'carryoverDetail', assets: nextCycleCarryoverAssets })}>查看构成</button></div><div><span>{nextBalance >= 0 ? '预计履约余量' : '预计履约缺口'}</span><strong className={nextBalance >= 0 ? styles.greenText : styles.redText}>{format(Math.abs(nextBalance))} <em>tCO₂</em></strong></div></div></div></div></section>
+    <section className={`${styles.card} ${styles.referenceForecast}`}><div className={styles.referenceSectionHead}><h2>下一履约周期预测 <span className={styles.planTag}>{Number(cycle.slice(0, 4)) + 1}年度</span></h2><span>{ruleTitle}　<button type="button" className={styles.link} onClick={() => setOverlay({ kind: 'quotaRules' })}>调整参考值</button></span></div><div className={styles.referenceForecastGrid}><div className={styles.referenceScenario}><h3>情景假设</h3><div className={styles.referenceScenarioControls}><Field label="预计产量变化"><select value={businessChange} onChange={(event) => setBusinessChange(Number(event.target.value))}><option value={-0.1}>-10%</option><option value={0}>0%</option><option value={0.05}>+5%</option><option value={0.1}>+10%</option><option value={0.15}>+15%</option></select></Field><Field label="单位产品排放强度变化"><select value={intensityChange} onChange={(event) => setIntensityChange(Number(event.target.value))}><option value={-0.1}>-10%</option><option value={-0.05}>-5%</option><option value={-0.02}>-2%</option><option value={0}>0%</option><option value={0.05}>+5%</option></select></Field><Field label="行业平衡值变化"><select value={industryBalanceChange} onChange={(event) => setIndustryBalanceChange(Number(event.target.value))}><option value={-0.1}>-10%</option><option value={-0.05}>-5%</option><option value={0}>0%</option><option value={0.05}>+5%</option><option value={0.1}>+10%</option></select></Field></div><div className={styles.forecastFormulaBlock}><p>排放测算逻辑：预计产量 × 预计单位产品排放强度 = {format(expectedProduction)} t × {format(expectedUnitProductIntensity, 4)} tCO₂/t</p>{industryAllocationRule ? <><p>强度偏离度 X =（BP − I）÷ BP =（{format(expectedIndustryBalance, 4)} − {format(expectedUnitProductIntensity, 4)}）÷ {format(expectedIndustryBalance, 4)} = {format(intensityDeviation! * 100, 2)}%</p><p>{adjustmentLabel} α = 0.15 × X = 0.15 × {format(intensityDeviation! * 100, 2)}% = {format(quotaAdjustmentCoefficient! * 100, 2)}%（当前规则：−20% &lt; X &lt; 20%）</p><p>{quotaLabel} A：预计排放 ×（1 + α）= {format(expectedQuota)} tCO₂</p></> : <p>配额测算逻辑：未加载正式行业规则，使用人工配置的情景配额值或简化估算值 {format(expectedQuota)} tCO₂</p>}</div><p className={styles.forecastModelNote}>{forecastNote}</p><Button primary onClick={() => { setAppliedScenario({ productionChange: businessChange, productIntensityChange: intensityChange, industryBalanceChange }); notify('情景测算已更新'); }}>重新测算</Button></div><div className={styles.referenceForecastResult}><div className={styles.referenceForecastHead}><h3>预测结果</h3><Status value={nextRiskStatus} /></div><p className={styles.forecastRiskHint}>{nextRiskText}</p><div className={styles.referenceForecastMetrics}><div><span>预计排放</span><strong>{format(nextEmission)} <em>tCO₂</em></strong></div><div><span>{quotaLabel}</span><strong className={styles.blueText}>{format(expectedQuota)} <em>tCO₂</em></strong></div><div><span>预计可结转资产</span><strong className={styles.greenText}>{format(nextCarryover)} <em>tCO₂</em></strong><button type="button" className={styles.link} onClick={() => setOverlay({ kind: 'carryoverDetail', assets: nextCycleCarryoverAssets })}>查看构成</button></div><div><span>{nextBalance >= 0 ? '预计履约余量' : '预计履约缺口'}</span><strong className={nextBalance >= 0 ? styles.greenText : styles.redText}>{format(Math.abs(nextBalance))} <em>tCO₂</em></strong></div></div></div></div></section>
     <section className={`${styles.card} ${styles.tableCard} ${styles.assetLedger}`}><div className={styles.panelHead}><div><h2>碳资产台账</h2><p className={styles.panelHint}>{assetTypeFilter === '全部' ? `2026年度资产明细：履约属性反映资产可用范围。` : `当前筛选：${assetTypeFilter}`}</p></div><Button primary onClick={() => setOverlay({ kind: 'asset' })}>录入碳资产</Button></div><div className={styles.tableWrap}><table className={styles.assetTable}><thead><tr><th>资产类型</th><th>履约周期</th><th>来源</th><th>取得量(tCO₂)</th><th>已使用</th><th>当前可用</th><th>履约属性</th><th>操作</th></tr></thead><tbody>{visibleAssets.map((asset) => <tr key={asset.carbonAssetId}><td>{asset.assetType}</td><td>{asset.complianceCycle}</td><td>{asset.assetSource}</td><td>{format(asset.totalAmount)}</td><td>{format(asset.usedAmount)}</td><td>{format(asset.eligibleAmount)}</td><td><Status value={assetTypeAttribute(asset.assetType)} /></td><td><div className={styles.assetActions}><button type="button" className={styles.link} onClick={() => asset.voucherNumber ? setOverlay({ kind: 'assetDetail', asset }) : setOverlay({ kind: 'asset', asset })}>{asset.voucherNumber ? '查看凭证' : '上传凭证'}</button><button type="button" className={styles.link} onClick={() => setOverlay({ kind: 'asset', asset })}>编辑</button></div></td></tr>)}</tbody></table></div></section>
     <NextCycleForecastModule cycle={cycle} baseProduction={baseProduction} baseIntensity={baseUnitProductIntensity} baseBalance={effectiveIndustryBalance} carryover={expectedCarryover} rule={industryAllocationRule} onAdjustIndustryBalance={() => setOverlay({ kind: 'quotaRules' })} />
-    <AssetAiAnalysis analysisKey="asset" invalidationVersion={aiVersion} notify={notify} />
-    {overlay?.kind === 'asset' && <AssetDialog asset={overlay.asset} onClose={() => setOverlay(null)} onSaved={() => { setOverlay(null); setVersion((value) => value + 1); setAiVersion((current) => current + 1); notify('碳资产已保存，AI结果需重新生成'); }} />}
+    {overlay?.kind === 'asset' && <AssetDialog asset={overlay.asset} onClose={() => setOverlay(null)} onSaved={() => { setOverlay(null); setVersion((value) => value + 1); notify('碳资产已保存'); }} />}
     {overlay?.kind === 'assetDetail' && <AssetDrawer asset={overlay.asset} onClose={() => setOverlay(null)} onReplace={() => setOverlay({ kind: 'asset', asset: overlay.asset })} />}
     {overlay?.kind === 'quotaRules' && <CarbonQuotaParametersDialog baseIndustryBalance={effectiveIndustryBalance} onClose={() => setOverlay(null)} onSave={(value) => { setManualIndustryBalance(value); setOverlay(null); notify('行业参考基准已应用于本次测算'); }} />}
     {overlay?.kind === 'carryoverDetail' && <Modal title="下一周期可用履约资产构成" width={620} onClose={() => setOverlay(null)} footer={<Button primary onClick={() => setOverlay(null)}>关闭</Button>}><div className={styles.tableWrap}><table className={styles.assetTable}><thead><tr><th>资产类型</th><th>来源</th><th>履约状态</th><th>可结转量(tCO₂)</th></tr></thead><tbody>{overlay.assets.length ? overlay.assets.map((asset) => <tr key={asset.carbonAssetId}><td>{asset.assetType}</td><td>{asset.assetSource}</td><td>{asset.assetState}</td><td>{format(asset.carryoverEligibleAmount ?? 0)}</td></tr>) : <tr><td colSpan={4}>暂无符合条件的下一周期可结转资产</td></tr>}</tbody></table></div></Modal>}
@@ -1353,15 +1378,20 @@ function ForecastBasisDialog({
   rule: IndustryAllocationRule;
   onClose: () => void;
 }) {
+  const isFormalRule = rule.ruleType === 'formal';
+  const adjustmentLabel = isFormalRule ? '配额调整系数' : '情景调整系数';
+  const modelNote = isFormalRule
+    ? '本模块用于下一履约周期准备分析。测算结果基于适用行业规则及情景假设，不代表主管部门最终核定配额。'
+    : '当前企业未匹配有效行业配额规则，本结果基于通用工业强度情景模型，仅用于内部履约准备，不代表主管部门最终核定配额。';
   return <Modal title="下一周期测算依据" width={720} onClose={onClose} footer={<Button primary onClick={onClose}>知道了</Button>}>
     <div className={`${styles.referenceRuleModal} ${styles.forecastBasisDialog}`}>
       <p><strong>企业基础数据</strong></p>
       <div className={styles.sourceCard}><span>基期产量</span><strong>{format(baseProduction)} t</strong><span>来源</span><span>运营数据 · {cycle}主产品产量</span><span>基期单位产品排放强度</span><strong>{format(baseIntensity, 4)} tCO₂/t</strong><span>来源</span><span>碳排放核算结果 ÷ 基期产品产量</span></div>
       <p><strong>政策规则参数</strong></p>
-      <div className={styles.sourceCard}><span>适用范围</span><span>{rule.applicableIndustry}</span><span>配额规则</span><span>{rule.ruleVersion} · 情景估算</span><span>行业参考基准强度</span><strong>{format(baseBalance, 4)} tCO₂/t</strong><span>参数状态</span><span>情景参考值 · 非正式核定</span><span>X计算公式</span><span>{rule.deviationRule}</span><span>α计算规则</span><span>{rule.coefficientRule}</span></div>
+      <div className={styles.sourceCard}><span>适用范围</span><span>{rule.applicableIndustry}</span><span>配额规则</span><span>{rule.ruleVersion} · {isFormalRule ? '正式规则' : '管理估算'}</span><span>行业参考基准强度</span><strong>{format(baseBalance, 4)} tCO₂/t</strong><span>参数状态</span><span>{isFormalRule ? '行业规则参数' : '情景参考值 · 非正式核定'}</span><span>X计算公式</span><span>{rule.deviationRule}</span><span>{adjustmentLabel}计算规则</span><span>{rule.coefficientRule}</span></div>
       <p><strong>碳资产数据</strong></p>
       <div className={styles.sourceCard}><span>预计可结转资产</span><strong>{format(carryover)} tCO₂</strong><span>来源</span><span>碳资产台账 · 按有效、已核验、可结转规则汇总</span><span>用户可调整项</span><span>预计产量变化、单位产品排放强度变化</span></div>
-      <p className={styles.ruleModalNote}>本模块用于下一履约周期准备分析。未来年度政策参数尚未正式发布时，行业参考基准仅作为情景参考值，测算结果不代表主管部门最终核定配额。</p>
+      <p className={styles.ruleModalNote}>{modelNote}</p>
     </div>
   </Modal>;
 }
@@ -1383,6 +1413,10 @@ function NextCycleForecastModule({
   rule: IndustryAllocationRule;
   onAdjustIndustryBalance: () => void;
 }) {
+  const isFormalRule = rule.ruleType === 'formal';
+  const quotaLabel = isFormalRule ? '预计配额' : '情景配额需求';
+  const adjustmentLabel = isFormalRule ? '配额调整系数' : '情景调整系数';
+  const ruleBasisLabel = isFormalRule ? rule.ruleVersion : `${rule.allocationMethod} · 管理估算`;
   const [productionChange, setProductionChange] = useState(0.1);
   const [intensityChange, setIntensityChange] = useState(-0.02);
   const [draftProductionChange, setDraftProductionChange] = useState(0.1);
@@ -1396,14 +1430,21 @@ function NextCycleForecastModule({
   const isShortfall = result.balance < 0;
   const isLowMargin = !isShortfall && marginRate < 0.03;
   const risk = isShortfall ? '需关注' : isLowMargin ? '低余量' : '余量正常';
+  const coefficientBasis = result.intensityDeviation === null
+    ? '无法计算'
+    : result.intensityDeviation >= 0.2
+      ? 'X≥20%时取+3%'
+      : result.intensityDeviation <= -0.2
+        ? 'X≤−20%时取−3%'
+        : 'α取X的15%';
   const summary = isShortfall
     ? `当前情景下预计存在履约缺口，建议提前准备补充履约资产。`
     : isLowMargin
       ? `预计不会形成履约缺口，但安全余量较低。若实际排放较当前预测增加约${(marginRate * 100).toFixed(1)}%以上，可能出现履约缺口。`
-      : '预计配额与可结转资产可以覆盖下一履约周期预计排放，当前情景下履约保障度较好。';
+    : `${quotaLabel}与可结转资产可以覆盖下一履约周期预计排放，当前情景下履约保障度较好。`;
   return <section className={styles.forecastV2}>
     <div className={styles.forecastV2Head}><div><h2>下一履约周期情景测算 <span className={styles.planTag}>{Number(cycle.slice(0, 4)) + 1}年度</span></h2></div></div>
-    <div className={styles.forecastBasis}><div><span>基期</span><strong>{cycle}实际数据</strong></div><div><span>适用范围</span><strong>通用工业企业（规则待匹配）</strong></div><div><span>配额规则</span><strong>参考{rule.referenceYear}年度规则 · 情景估算</strong></div><div><span>行业基准参数</span><span><strong className={styles.warningText}>{format(baseBalance, 4)} tCO₂/t · 情景参考值</strong> <button type="button" className={styles.link} onClick={onAdjustIndustryBalance}>调整参考值</button></span></div></div>
+    <div className={styles.forecastBasis}><div><span>基期</span><strong>{cycle}实际数据</strong></div><div><span>适用范围</span><strong>{rule.applicableIndustry}</strong></div><div><span>配额规则</span><strong>{ruleBasisLabel}</strong></div><div><span>行业基准参数</span><span><strong className={styles.warningText}>{format(baseBalance, 4)} tCO₂/t · 情景参考值</strong> <button type="button" className={styles.link} onClick={onAdjustIndustryBalance}>调整参考值</button></span></div></div>
     <div className={styles.forecastV2Grid}>
       <div className={styles.scenarioV2}>
         <h3>情景设置</h3>
@@ -1431,9 +1472,9 @@ function NextCycleForecastModule({
           <button type="button" className={styles.outlineButton} onClick={() => { setDraftProductionChange(0.1); setDraftIntensityChange(-0.02); setProductionChange(0.1); setIntensityChange(-0.02); setProductionCustom(false); setIntensityCustom(false); }}>恢复默认情景</button>
         </div>
       </div>
-      <div className={`${styles.forecastResultV2} ${isShortfall ? styles.resultNegative : ''}`}><div className={styles.resultV2Top}><div><span>预计履约{isShortfall ? '缺口' : '余量'}</span><strong>{isShortfall ? format(Math.abs(result.balance)) : `+${format(result.balance)}`} <em>tCO₂</em></strong><small>余量率 {marginRatePercent.toFixed(2)}%{isLowMargin ? ' · 低于3%，安全余量偏低' : ''}</small></div><span className={`${styles.riskChipV2} ${isShortfall ? styles.riskWarnV2 : isLowMargin ? styles.riskLowV2 : styles.riskOkV2}`}>{risk}</span></div><div className={styles.balanceEquationV2}><div><span>预计获得配额</span><strong>{format(result.expectedQuota)}</strong></div><i>＋</i><div><span>预计可结转资产</span><strong>{format(result.expectedCarryover)}</strong></div><i>−</i><div><span>预计排放</span><strong>{format(result.expectedEmission)}</strong></div><i>＝</i><div className={styles.equationResultV2}><span>预计{isShortfall ? '缺口' : '余量'}</span><strong>{format(Math.abs(result.balance))}</strong></div></div><div className={styles.resultSummaryV2}><strong>当前判断：</strong>{summary}</div><div className={styles.actionTipV2}>建议持续关注产量及排放强度变化；若经营计划上调，提前准备补充履约资产。</div><div className={styles.resultLinksV2}><button type="button" className={styles.textActionV2} onClick={() => setShowProcess((value) => !value)}>{showProcess ? '收起测算过程' : '查看测算过程'}</button></div></div>
+      <div className={`${styles.forecastResultV2} ${isShortfall ? styles.resultNegative : ''}`}><div className={styles.resultV2Top}><div><span>预计履约{isShortfall ? '缺口' : '余量'}</span><strong>{isShortfall ? format(Math.abs(result.balance)) : `+${format(result.balance)}`} <em>tCO₂</em></strong><small>余量率 {marginRatePercent.toFixed(2)}%{isLowMargin ? ' · 低于3%，安全余量偏低' : ''}</small></div><span className={`${styles.riskChipV2} ${isShortfall ? styles.riskWarnV2 : isLowMargin ? styles.riskLowV2 : styles.riskOkV2}`}>{risk}</span></div><div className={styles.balanceEquationV2}><div><span>{quotaLabel}</span><strong>{format(result.expectedQuota)}</strong></div><i>＋</i><div><span>预计可结转资产</span><strong>{format(result.expectedCarryover)}</strong></div><i>−</i><div><span>预计排放</span><strong>{format(result.expectedEmission)}</strong></div><i>＝</i><div className={styles.equationResultV2}><span>预计{isShortfall ? '缺口' : '余量'}</span><strong>{format(Math.abs(result.balance))}</strong></div></div><div className={styles.resultSummaryV2}><strong>当前判断：</strong>{summary}</div><div className={styles.actionTipV2}>建议持续关注产量及排放强度变化；若经营计划上调，提前准备补充履约资产。</div><div className={styles.resultLinksV2}><button type="button" className={styles.textActionV2} onClick={() => setShowProcess((value) => !value)}>{showProcess ? '收起测算过程' : '查看测算过程'}</button></div></div>
     </div>
-    {showProcess && <div className={styles.calcDetailsV2}><p>① 预计排放：{format(result.expectedProduction)} t × {format(result.expectedUnitProductIntensity, 4)} tCO₂/t = {format(result.expectedEmission)} tCO₂</p><p>② 行业规则判断：企业预计强度 {format(result.expectedUnitProductIntensity, 4)} vs 行业参考基准 {format(result.expectedIndustryBalance, 4)} → X = {result.intensityDeviation !== null ? `${result.intensityDeviation >= 0 ? '+' : ''}${(result.intensityDeviation * 100).toFixed(2)}%` : '—'}</p><p>③ 配额调整：α = {result.quotaAdjustmentCoefficient !== null ? `${result.quotaAdjustmentCoefficient >= 0 ? '+' : ''}${(result.quotaAdjustmentCoefficient * 100).toFixed(2)}%` : '—'}（参考规则自动计算）</p><p>④ 预计配额：{format(result.expectedEmission)} ×（1 + α）= {format(result.expectedQuota)} tCO₂</p></div>}
+    {showProcess && <div className={styles.calcDetailsV2}><p>① 预计排放：{format(result.expectedProduction)} t × {format(result.expectedUnitProductIntensity, 4)} tCO₂/t = {format(result.expectedEmission)} tCO₂</p><p>② {isFormalRule ? '行业规则' : '通用情景模型'}判断：企业预计强度 {format(result.expectedUnitProductIntensity, 4)} vs 行业参考基准 {format(result.expectedIndustryBalance, 4)} → X = {result.intensityDeviation !== null ? `${result.intensityDeviation >= 0 ? '+' : ''}${(result.intensityDeviation * 100).toFixed(2)}%` : '—'}</p><p>③ {adjustmentLabel}：α = {result.quotaAdjustmentCoefficient !== null ? `${result.quotaAdjustmentCoefficient >= 0 ? '+' : ''}${(result.quotaAdjustmentCoefficient * 100).toFixed(2)}%` : '—'}（{coefficientBasis}）</p><p>④ {quotaLabel} A：预计排放 ×（1 + α）= {format(result.expectedQuota)} tCO₂</p></div>}
   </section>;
 }
 
@@ -1505,9 +1546,3 @@ function formatSignedPercent(value: number) {
   const rounded = value.toFixed(2);
   return `${value > 0 ? '+' : ''}${rounded}%`;
 }
-
-
-
-
-
-

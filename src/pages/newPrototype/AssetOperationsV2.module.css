@@ -335,27 +335,6 @@
   font-size: 12px;
 }
 
-.energyDiagnosisMore {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 11px;
-  color: #7a8792;
-  background: #fbfcfe;
-  border: 0;
-  border-top: 1px solid #edf1f4;
-  font-size: 11px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.energyDiagnosisMore span {
-  color: #1677ff;
-  font-weight: 600;
-}
-
-
 .panel,
 .tableCard,
 .aiCard,

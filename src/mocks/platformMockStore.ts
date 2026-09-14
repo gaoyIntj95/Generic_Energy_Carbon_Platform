@@ -95,8 +95,8 @@ const seedEnergyCosts: EnergyCostRecord[] = [
 let energyCosts = seedEnergyCosts.map((item) => ({ ...item, monthlyCosts: [...item.monthlyCosts] }));
 
 const seedOperationMetrics: OperationMetric[] = [
-  { operationMetricId: 'om-product-a', energyUnitId: 'eu-clinker-line-1', year: 2026, metricCategory: '产量', entryMode: 'monthly', metricName: '产品A产量', metricUnit: 't', annualValue: 1_365_000 },
-  { operationMetricId: 'om-product-b', energyUnitId: 'eu-cement-grinding-line', year: 2026, metricCategory: '产量', entryMode: 'monthly', metricName: '产品B产量', metricUnit: 't', annualValue: 1_920_000 },
+  { operationMetricId: 'om-product-a', energyUnitId: 'eu-clinker-line-1', year: 2026, metricCategory: '产量指标', entryMode: 'monthly', metricName: '产品A产量', metricUnit: 't', annualValue: 1_365_000 },
+  { operationMetricId: 'om-product-b', energyUnitId: 'eu-cement-grinding-line', year: 2026, metricCategory: '产量指标', entryMode: 'monthly', metricName: '产品B产量', metricUnit: 't', annualValue: 1_920_000 },
   { operationMetricId: 'om-added-value', energyUnitId: null, year: 2026, metricCategory: '经济指标', entryMode: 'annual', metricName: '工业增加值', metricUnit: '万元', annualValue: 31_680 },
 ];
 let operationMetrics = seedOperationMetrics.map((item) => ({ ...item }));

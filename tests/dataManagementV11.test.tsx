@@ -72,7 +72,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
   it('renders the V11 energy type columns without prototype-external state fields', async () => {
     await render('/data-management/energy-types');
     const headers = [...container.querySelectorAll('th')].map((item) => item.textContent);
-    expect(headers).toEqual(['能源分析类别', '能源品种', '计量单位', '折标系数', '折标单位', '操作']);
+    expect(headers).toEqual(['能源分析类别', '能源品种', '计量单位', '折标系数', '折标单位', '年份', '操作']);
     expect(container.textContent).toContain('压缩空气');
     expect(container.textContent).not.toContain('回收蒸汽');
     expect(container.textContent).not.toContain('余热');
@@ -148,6 +148,30 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     await click(button('下一页'));
     expect(container.textContent).toContain('2 / 3');
     expect(container.textContent).toContain('1#数控加工中心');
+  });
+
+  it('shows the current year as a read-only field in maintenance dialogs', async () => {
+    await render('/data-management/energy-types?year=2025');
+    await click(button('新增能源品种'));
+    let yearField = container.querySelector('input[aria-label="年度"]') as HTMLInputElement;
+    expect(yearField.value).toBe('2025年');
+    expect(yearField.readOnly).toBe(true);
+
+    await render('/data-management/operations?year=2025');
+    await click(button('全厂'));
+    await click(button('新增运营数据'));
+    yearField = container.querySelector('input[aria-label="年度"]') as HTMLInputElement;
+    expect(yearField.value).toBe('2025年');
+    expect(yearField.readOnly).toBe(true);
+  });
+
+  it('keeps the energy quantity overview actions read-only', async () => {
+    await render('/data-management/energy-data');
+    const actionLabels = [...container.querySelectorAll('tbody tr[class*="scopeRecordRow"]')]
+      .map((row) => [...row.querySelectorAll('td:last-child button')].map((item) => item.textContent));
+
+    expect(actionLabels.length).toBeGreaterThan(0);
+    expect(actionLabels.every((labels) => labels.length === 1 && labels[0] === '查看')).toBe(true);
   });
 
   it('locks new energy records to the active level tab and cascades second-level choices from the configured parent', async () => {
@@ -300,7 +324,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
 
   it('separates conversion and external records without analysis duplication', async () => {
     await render('/data-management/energy-data?tab=conversion');
-    expect([...container.querySelectorAll('section[aria-label="用能单元数据"] th')].map((el) => el.textContent)).toEqual(['用能单元（动力中心）', '能源关系', '产出能源', '年度能源投入', '年度产出', '年度损失', '操作']);
+    expect([...container.querySelectorAll('section[aria-label="用能单元数据"] th')].map((el) => el.textContent)).toEqual(['用能单元（动力中心）', '能源关系', '产出能源', '年份', '年度能源投入', '年度产出', '年度损失', '操作']);
     expect(container.querySelectorAll('[role="tab"]')).toHaveLength(0);
     expect(container.querySelectorAll('table')).toHaveLength(2);
     expect(container.querySelector('section[aria-label="对外供能台账"] h2')?.textContent).toBe('外供记录');
@@ -489,7 +513,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
 
     expect(products.map((product) => product.productName)).toEqual(['产品A', '产品B', '产品C']);
     expect(productOutputs.every((record) => record.metricName === '产品产量')).toBe(true);
-    expect(productOutputs.every((record) => record.metricCategory === '产量')).toBe(true);
+    expect(productOutputs.every((record) => record.metricCategory === '产量指标')).toBe(true);
     expect(productOutputs.every((record) => products.some((product) => product.productId === record.productId))).toBe(true);
     expect(productOutputs.filter((record) => record.productId === 'product-b')).toHaveLength(10);
     expect(productOutputs.some((record) => record.energyUnitId === null)).toBe(false);
@@ -502,13 +526,14 @@ describe('DataManagementV11 fidelity and data behavior', () => {
       '产品',
       '单位',
       '年度值',
+      '年份',
       '操作',
     ]);
     expect(container.textContent).toContain('产品A');
     expect(container.textContent).toContain('产品B');
     expect(container.textContent).toContain('产品C');
     expect(container.textContent).toContain('全厂');
-    expect(container.textContent).toContain('产量可在企业、一级或二级用能单元层级维护');
+    expect(container.textContent).toContain('产量指标可在企业、一级或二级用能单元层级维护');
     expect(container.textContent).not.toContain('产量与业务量');
     expect(container.textContent).not.toContain('熟料产量');
     expect(container.textContent).not.toContain('水泥产量');
@@ -531,7 +556,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
       year: 2026,
       scopeLevel: '企业',
       energyUnitId: null,
-      metricCategory: '产量',
+      metricCategory: '产量指标',
       aggregationMethod: '月度求和',
       metricCode: 'product_output',
       productId: 'product-b',
@@ -567,6 +592,15 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     await click(button('全厂'));
     await click(button('新增运营数据'));
     expect(container.querySelector('form')?.textContent).toContain('2025年度');
+  });
+
+  it('keeps the operation overview actions read-only', async () => {
+    await render('/data-management/operations');
+    const actionLabels = [...container.querySelectorAll('tbody tr[class*="scopeRecordRow"]')]
+      .map((row) => [...row.querySelectorAll('td:last-child button')].map((item) => item.textContent));
+
+    expect(actionLabels.length).toBeGreaterThan(0);
+    expect(actionLabels.every((labels) => labels.length === 1 && labels[0] === '查看')).toBe(true);
   });
 
   it('opens operation data at the requested scope without opening a new-record dialog', async () => {
@@ -620,15 +654,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
       .map((unit) => unit.energyUnitName);
 
     await render('/data-management/operations');
-    await click(button('二级用能单元（'));
-    await click(button('新增运营数据'));
-    const operationScopeLevel = container.querySelector('[aria-label="运营数据归属层级"]') as HTMLInputElement;
-    expect(operationScopeLevel.value).toBe('二级用能单元');
-    const operationParent = container.querySelector('[aria-label="运营数据所属一级用能单元"]') as HTMLSelectElement;
-    const operationChild = container.querySelector('[aria-label="运营数据归属范围"]') as HTMLSelectElement;
-    expect(operationChild.disabled).toBe(true);
-    await change(operationParent, parent.energyUnitId);
-    expect([...operationChild.options].slice(1).map((option) => option.textContent)).toEqual(expectedChildren);
+    expect([...container.querySelectorAll('button')].some((item) => item.textContent?.startsWith('二级用能单元（'))).toBe(false);
 
     await render('/data-management/devices');
     await click(button('新增重点设备'));

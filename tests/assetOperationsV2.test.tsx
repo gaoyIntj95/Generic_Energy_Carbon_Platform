@@ -77,6 +77,8 @@ describe('AssetOperationsV2 V2 prototype fidelity and interactions', () => {
     expect(container.textContent).toContain('同比');
     expect(container.textContent).toContain('环比');
     expect(container.textContent).toContain('异常问题清单');
+    expect(container.textContent).not.toContain('已汇总到下方清单');
+    expect(container.textContent).not.toContain('查看清单 ↓');
     expect(container.textContent).toContain('AI辅助分析');
     expect(container.textContent).toContain('下一步行动');
     expect(container.textContent).not.toContain('研发实现说明');
@@ -142,7 +144,7 @@ describe('AssetOperationsV2 V2 prototype fidelity and interactions', () => {
     await render('/asset-strategy/balance');
     const dataGroup = [...container.querySelectorAll('section[class*="energyDiagnosisGroup"]')]
       .find((section) => [...section.querySelectorAll('strong')].some((node) => node.textContent === '数据完整性问题'))!;
-    await click(button('补充数据', dataGroup));
+    await click(button('查看缺失项', dataGroup));
     expect(container.textContent).not.toContain('数据完整性｜办公区域');
     expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
@@ -311,8 +313,10 @@ describe('AssetOperationsV2 V2 prototype fidelity and interactions', () => {
     expect(container.textContent).toContain('能效');
     expect(container.textContent).not.toContain('来源：');
     expect([...container.querySelectorAll('button')].some((item) => item.textContent?.includes('查看分析'))).toBe(true);
-    const incompleteUnitRow = [...container.querySelectorAll('tr')].find((row) => row.textContent?.includes('办公区域'));
-    expect(incompleteUnitRow?.textContent).toContain('完善数据');
+    const officeUnitRow = [...container.querySelectorAll('tr')].find((row) => row.textContent?.includes('办公区域'));
+    const logisticsUnitRow = [...container.querySelectorAll('tr')].find((row) => row.textContent?.includes('仓储物流区域'));
+    expect(officeUnitRow?.textContent).toContain('查看缺失数据');
+    expect(logisticsUnitRow?.textContent).toContain('补充运营数据');
     expect(container.textContent).toContain('能耗占比');
     expect(container.textContent).toContain('成本占比');
     expect(container.textContent).toContain('单位用能成本');

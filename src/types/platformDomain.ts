@@ -78,7 +78,7 @@ export interface OperationMetric {
   operationMetricId: string;
   energyUnitId: string | null;
   year: number;
-  metricCategory: '产量' | '经济指标';
+  metricCategory: '产量指标' | '经济指标';
   entryMode: 'monthly' | 'annual';
   metricName: string;
   metricUnit: string;

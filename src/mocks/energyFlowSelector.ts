@@ -496,8 +496,8 @@ function recordTrace(
 
 function objectTypeLabel(unit: EnergyUnit) {
   if (unit.unitType === '生产单元') return '工序/环节';
-  if (unit.unitType === '公辅系统') return '公辅系统';
-  if (unit.unitType === '建筑/区域') return '建筑/区域';
+  if (unit.unitType === '能源转换系统' || unit.unitType === '能源转换子系统') return '能源转换系统';
+  if (unit.unitType === '建筑区域' || unit.unitType === '建筑子区域') return '建筑区域';
   return '其他';
 }
 

@@ -80,6 +80,18 @@ function lossAmount(row: V11ConversionOutput, index: number | null) {
 function outputIssue(row: V11ConversionOutput, index: number | null) {
   return outputAmount(row, index) == null ? '本期产出待填报' : '';
 }
+function missingPeriodMonths(row: V11ConversionOutput, amount: (row: V11ConversionOutput, index: number) => number | undefined) {
+  return Array.from({ length: 12 }, (_, index) => index + 1).filter((month) => amount(row, month - 1) == null);
+}
+function conversionStatus(row: V11ConversionOutput) {
+  const missingInputMonths = missingPeriodMonths(row, inputAmount);
+  const missingOutputMonths = missingPeriodMonths(row, outputAmount);
+  return {
+    incomplete: missingInputMonths.length > 0 || missingOutputMonths.length > 0,
+    missingInputMonths,
+    missingOutputMonths,
+  };
+}
 function inputAmount(row: V11ConversionOutput, index: number | null) {
   const source = inputRecord(row);
   if (!source) return undefined;
@@ -182,19 +194,21 @@ function AnnualFlowMaintenance() {
       <Button onClick={() => guard(() => { setEditingConversionId(''); setEditor(null); setKeywordInput(''); setKeyword(''); setExpandedConversionId(''); setExpandedExternalId(''); setMessage(''); })}>重置</Button>
       <Button primary type="submit">查询</Button>
     </form>
+    <div className={s.hint}><strong>当前年份：{year}年</strong></div>
     <section className={s.card} aria-label="用能单元数据">
       <div className={s.sectionHeader}><h2>转换与回收</h2></div>
-      <div className={s.tableWrap}><table className={s.conversionTable}><thead><tr><th>{unitColumnLabel}</th><th>能源关系</th><th>产出能源</th><th>年度能源投入</th><th>年度产出</th><th>年度损失</th><th>操作</th></tr></thead><tbody>
+      <div className={s.tableWrap}><table className={s.conversionTable}><thead><tr><th>{unitColumnLabel}</th><th>能源关系</th><th>产出能源</th><th>年度能源投入</th><th>年度产出</th><th>状态</th><th>年度损失</th><th>年份</th><th>操作</th></tr></thead><tbody>
         {filtered.flatMap((row) => {
           const detail = expandedConversionId === row.conversionOutputId;
-          const missingInputMonths = Array.from({ length: 12 }, (_, index) => index + 1).filter((month) => inputAmount(row, month - 1) == null);
+          const status = conversionStatus(row);
           return [<tr key={row.conversionOutputId} className={detail ? s.selected : ''}>
             <td><strong>{unitRowName(row.conversionEnergyUnitId)}</strong></td><td className={s.relation}>{inputName(row)} → {row.outputEnergyName}</td><td>{row.outputEnergyName}</td>
-            <td><strong className={inputAmount(row, null) == null ? s.missing : s.value}>{inputAmount(row, null) == null ? '待补充' : `${number(inputAmount(row, null))} ${inputUnit(row)}`}</strong>{missingInputMonths.length > 0 && <div className={s.inputMissing}><span>{missingInputMonths.length === 12 ? '全年月度投入待补充' : `缺 ${missingInputMonths.join('、')} 月投入`}</span><button className={s.link} onClick={() => guard(() => goConversionInput(row, missingInputMonths[0]))}>补充数据</button></div>}</td>
+            <td><strong className={inputAmount(row, null) == null ? s.missing : s.value}>{inputAmount(row, null) == null ? '待补充' : `${number(inputAmount(row, null))} ${inputUnit(row)}`}</strong></td>
             <td><strong className={outputIssue(row, null) ? s.missing : s.value}>{outputIssue(row, null) ? '待填报' : `${number(outputAmount(row, null))} ${row.outputUnit}`}</strong></td>
-            <td><span className={lossAmount(row, null) == null ? s.muted : s.value}>{lossAmount(row, null) == null ? '未填写' : `${number(lossAmount(row, null))} ${row.outputUnit}`}</span></td>
-            <td><div className={s.actions}><button className={s.link} onClick={() => guard(() => { setEditingConversionId(''); setEditor(null); setExpandedConversionId(detail ? '' : row.conversionOutputId); })} aria-expanded={detail}>{detail ? '收起' : '查看'}</button><button className={s.link} onClick={() => guard(() => { setEditor(null); setEditingConversionId(row.conversionOutputId); })}>编辑</button><button className={`${s.link} ${s.danger}`} disabled={outputAmount(row, null) == null && lossAmount(row, null) == null} onClick={() => guard(() => setDeleting({ kind: 'conversion', id: row.conversionOutputId, name: unitRowName(row.conversionEnergyUnitId) }))}>删除</button></div></td>
-          </tr>, detail && <tr key={`${row.conversionOutputId}-detail`} className={s.monthDetailRow}><td colSpan={7}>
+            <td><span className={status.incomplete ? s.statusIncomplete : s.statusComplete}>{status.incomplete ? '数据不完整' : '数据完整'}</span></td>
+            <td><span className={lossAmount(row, null) == null ? s.muted : s.value}>{lossAmount(row, null) == null ? '未填写' : `${number(lossAmount(row, null))} ${row.outputUnit}`}</span></td><td>{row.year}年</td>
+            <td><div className={s.actions}>{status.incomplete && <button className={s.link} onClick={() => guard(() => status.missingInputMonths.length ? goConversionInput(row, status.missingInputMonths[0]) : setEditingConversionId(row.conversionOutputId))}>补充</button>}<button className={s.link} onClick={() => guard(() => { setEditingConversionId(''); setEditor(null); setExpandedConversionId(detail ? '' : row.conversionOutputId); })} aria-expanded={detail}>{detail ? '收起' : '查看'}</button><button className={s.link} onClick={() => guard(() => { setEditor(null); setEditingConversionId(row.conversionOutputId); })}>编辑</button><button className={`${s.link} ${s.danger}`} disabled={outputAmount(row, null) == null && lossAmount(row, null) == null} onClick={() => guard(() => setDeleting({ kind: 'conversion', id: row.conversionOutputId, name: unitRowName(row.conversionEnergyUnitId) }))}>删除</button></div></td>
+          </tr>, detail && <tr key={`${row.conversionOutputId}-detail`} className={s.monthDetailRow}><td colSpan={9}>
             <>
               <MonthlyDataDetails title="能源投入月度明细" values={Array.from({ length: 12 }, (_, index) => inputAmount(row, index))} annualValue={inputAmount(row, null)} unit={inputUnit(row)} />
               <MonthlyDataDetails title="能源产出月度明细" values={Array.from({ length: 12 }, (_, index) => outputAmount(row, index))} annualValue={outputAmount(row, null)} unit={row.outputUnit ?? ''} />
@@ -202,22 +216,22 @@ function AnnualFlowMaintenance() {
             </>
           </td></tr>];
         })}
-        {visiblePendingUnits.map((unit) => <tr key={unit.energyUnitId}><td><strong>{unitRowName(unit.energyUnitId)}</strong></td><td>—</td><td>—</td><td>—</td><td>待填报</td><td>未填写</td><td><div className={s.actions}><button className={s.link} disabled>查看</button><button className={s.link} onClick={() => guard(() => { setEditingConversionId(''); setEditor(null); setEditor({ kind: 'conversion', unitId: unit.energyUnitId }); })}>编辑</button><button className={`${s.link} ${s.danger}`} disabled>删除</button></div></td></tr>)}
-        {!filtered.length && !visiblePendingUnits.length && <tr><td colSpan={7} className={s.empty}>{keyword.trim() ? '没有匹配的用能单元，请调整关键词。' : '暂无参与转换与回收的用能单元，请在用能单元管理中维护。'}</td></tr>}
+        {visiblePendingUnits.map((unit) => <tr key={unit.energyUnitId}><td><strong>{unitRowName(unit.energyUnitId)}</strong></td><td>—</td><td>—</td><td>—</td><td>待填报</td><td><span className={s.statusIncomplete}>数据不完整</span></td><td>未填写</td><td>{year}年</td><td><div className={s.actions}><button className={s.link} onClick={() => guard(() => setEditor({ kind: 'conversion', unitId: unit.energyUnitId }))}>补充</button><button className={s.link} disabled>查看</button><button className={s.link} onClick={() => guard(() => { setEditingConversionId(''); setEditor(null); setEditor({ kind: 'conversion', unitId: unit.energyUnitId }); })}>编辑</button><button className={`${s.link} ${s.danger}`} disabled>删除</button></div></td></tr>)}
+        {!filtered.length && !visiblePendingUnits.length && <tr><td colSpan={9} className={s.empty}>{keyword.trim() ? '没有匹配的用能单元，请调整关键词。' : '暂无参与转换与回收的用能单元，请在用能单元管理中维护。'}</td></tr>}
       </tbody></table></div>
     </section>
     <section className={s.card} aria-label="对外供能台账">
       <div className={s.sectionHeader}><h2>外供记录</h2><Button primary onClick={() => guard(() => { setEditingConversionId(''); setEditor(null); setEditor({ kind: 'external' }); })}>＋ 登记外供</Button></div>
-      <div id="external-records"><div className={s.tableWrap}><table className={s.externalTable}><thead><tr><th>外供能源</th><th>供能来源</th><th>接收方</th><th>年度数量</th><th>操作</th></tr></thead><tbody>
+      <div id="external-records"><div className={s.tableWrap}><table className={s.externalTable}><thead><tr><th>外供能源</th><th>供能来源</th><th>接收方</th><th>年度数量</th><th>年份</th><th>操作</th></tr></thead><tbody>
         {visibleExternal.flatMap((row) => {
           const energy = types.find((type) => type.energyTypeId === row.energyTypeId);
           const reported = externalAmount(row, null) != null;
           const issue = externalIssue(row, null);
           const detail = expandedExternalId === row.externalSupplyId;
-          return [<tr key={row.externalSupplyId}><td><strong>{energy?.energyTypeName ?? '能源'}</strong></td><td>{externalSourceLabel(row)}</td><td>{row.receiver || '接收方待完善'}</td><td><strong className={reported ? s.value : s.missing}>{reported ? `${number(externalAmount(row, null))} ${row.unit ?? ''}` : '待填报'}</strong>{reported && issue && <small className={s.externalIssue}>待核验：{issue}</small>}</td><td><div className={s.actions}><button className={s.link} onClick={() => guard(() => { setEditor(null); setEditingConversionId(''); setExpandedExternalId(detail ? '' : row.externalSupplyId); })} aria-expanded={detail}>{detail ? '收起' : '查看'}</button><button className={s.link} onClick={() => guard(() => { setEditingConversionId(''); setEditor({ kind: 'external', item: row }); })}>编辑</button><button className={`${s.link} ${s.danger}`} disabled={!reported} onClick={() => guard(() => setDeleting({ kind: 'external', id: row.externalSupplyId, name: `${energy?.energyTypeName ?? '能源'} · ${row.receiver || '未填写接收方'}` }))}>删除</button></div></td></tr>,
-            detail && <tr key={`${row.externalSupplyId}-detail`} className={s.monthDetailRow}><td colSpan={5}><MonthlyDataDetails onCollapse={collapseDetails} title="外供月度明细" values={Array.from({ length: 12 }, (_, index) => externalAmount(row, index))} annualValue={externalAmount(row, null)} unit={row.unit ?? ''} />{row.remark && <p className={s.hint}>备注：{row.remark}</p>}</td></tr>];
+          return [<tr key={row.externalSupplyId}><td><strong>{energy?.energyTypeName ?? '能源'}</strong></td><td>{externalSourceLabel(row)}</td><td>{row.receiver || '接收方待完善'}</td><td><strong className={reported ? s.value : s.missing}>{reported ? `${number(externalAmount(row, null))} ${row.unit ?? ''}` : '待填报'}</strong>{reported && issue && <small className={s.externalIssue}>待核验：{issue}</small>}</td><td>{row.year}年</td><td><div className={s.actions}><button className={s.link} onClick={() => guard(() => { setEditor(null); setEditingConversionId(''); setExpandedExternalId(detail ? '' : row.externalSupplyId); })} aria-expanded={detail}>{detail ? '收起' : '查看'}</button><button className={s.link} onClick={() => guard(() => { setEditingConversionId(''); setEditor({ kind: 'external', item: row }); })}>编辑</button><button className={`${s.link} ${s.danger}`} disabled={!reported} onClick={() => guard(() => setDeleting({ kind: 'external', id: row.externalSupplyId, name: `${energy?.energyTypeName ?? '能源'} · ${row.receiver || '未填写接收方'}` }))}>删除</button></div></td></tr>,
+            detail && <tr key={`${row.externalSupplyId}-detail`} className={s.monthDetailRow}><td colSpan={6}><MonthlyDataDetails onCollapse={collapseDetails} title="外供月度明细" values={Array.from({ length: 12 }, (_, index) => externalAmount(row, index))} annualValue={externalAmount(row, null)} unit={row.unit ?? ''} />{row.remark && <p className={s.hint}>备注：{row.remark}</p>}</td></tr>];
         })}
-        {!visibleExternal.length && <tr><td colSpan={5} className={s.empty}>{external.length ? '没有匹配的外供记录，请调整关键词。' : '本年度暂无外供记录。'}</td></tr>}
+        {!visibleExternal.length && <tr><td colSpan={6} className={s.empty}>{external.length ? '没有匹配的外供记录，请调整关键词。' : '本年度暂无外供记录。'}</td></tr>}
       </tbody></table></div></div>
     </section>
     {editingConversion && <ConversionDetails key={`${editingConversionId}:${version}`} row={editingConversion} initialMonth={editingMonth} onClose={() => setEditingConversionId('')} onSaved={(text) => { setEditingConversionId(''); refresh(text); }} onSource={(month) => guard(() => goConversionInput(editingConversion, month))} />}
@@ -253,6 +267,7 @@ function ConversionDetails({ row, initialMonth, onClose, onSaved, onSource }: { 
     onSaved('年度月度数据已保存');
   };
   return <FlowModal title={`${conversionUnitName(row.conversionEnergyUnitId, row.year)} · ${row.year}年度`} description="直接填写各月产出与已确认损失，空白表示未填报，实际为零请填 0。" width={960} onClose={onClose} onSubmit={save} footer={<><Button onClick={onClose}>取消</Button><Button primary type="submit" disabled={!changed}>保存</Button></>}>
+    <Field label="年度"><input aria-label="年度" value={`${row.year}年`} readOnly /></Field>
     {missingInput >= 0 && <p className={s.hint}>投入数据来自能源消费。<button type="button" className={s.link} onClick={() => onSource(missingInput + 1)}>补充数据</button></p>}
     <div className={s.monthEditorWrap}><table className={s.monthEditorTable}><thead><tr><th>月份</th><th>能源投入（{inputUnit(row)}）</th><th>产出（{row.outputUnit}）</th><th>已确认损失（{row.outputUnit}）</th></tr></thead><tbody>{outputs.map((value, index) => <tr key={index} data-month={index + 1}><td>{index + 1}月</td><td>{number(inputAmount(row, index))}</td><td><input autoFocus={initialMonth === index + 1} aria-label={`${index + 1}月产出量`} type="number" min="0" step="any" value={value} onChange={(event) => setOutputs((current) => current.map((item, i) => i === index ? event.target.value : item))} /></td><td><input aria-label={`${index + 1}月已确认损失`} type="number" min="0" step="any" value={losses[index]} onChange={(event) => setLosses((current) => current.map((item, i) => i === index ? event.target.value : item))} /></td></tr>)}</tbody></table></div>
     <div className={s.annualSummaryGrid}><Field label={`年度能源投入${inputUnit(row) ? `（${inputUnit(row)}）` : ''}`}><input aria-label="年度能源投入" readOnly value={annualInput} /></Field><Field label={`年度产出${row.outputUnit ? `（${row.outputUnit}）` : ''}`}><input aria-label="年度产出" readOnly value={annualOutput} /></Field><Field label={`年度已确认损失${row.outputUnit ? `（${row.outputUnit}）` : ''}`}><input aria-label="年度已确认损失" readOnly value={annualLoss} /></Field></div>
@@ -307,7 +322,8 @@ function FlowRecordDialog({ editor, year, index, onClose, onSaved }: { editor: E
     }
     onSaved();
   };
-  return <FlowModal title={kind === 'external' ? e ? '编辑外供数据' : '登记外供' : '补数据'} description={`${year}年度`} width={760} onClose={onClose} onSubmit={save} submitText="保存"><div className={s.form}>
+  return <FlowModal title={`${kind === 'external' ? e ? '编辑外供数据' : '登记外供' : '补数据'}（${year}年度）`} description="年度独立维护，保存仅影响当前年度数据。" width={760} onClose={onClose} onSubmit={save} submitText="保存"><div className={s.form}>
+    <div className={s.formGrid}><Field label="年度"><input aria-label="年度" value={`${year}年`} readOnly /></Field></div>
     <p className={s.hint}>{kind === 'external' ? '直接填写各月外供数量，空白表示未填报，实际为零请填 0。' : '选择已有投入记录和产出能源，填写已取得月份的产出。'}</p>
     {kind === 'external' ? <><div className={s.formGrid}><Field label="供能来源" required><select aria-label="供能来源" disabled={Boolean(e) && !sourceChanged && quantityChanged} value={externalSource} onChange={(event) => { const next = event.target.value; setExternalSource(next); setAmounts(initialAmounts.map((value, i) => next === (e?.conversionOutputId ?? e?.inputEnergyRecordId) || i !== sourceMonth ? value : '')); }}><option value="">请选择来源</option><optgroup label="用能单元转换与回收产出">{conversions.map((r) => <option key={r.conversionOutputId} value={r.conversionOutputId}>{v11ScopeName(r.conversionEnergyUnitId, year)} · {r.outputEnergyName}</option>)}</optgroup><optgroup label="外购能源直接外供">{records.filter((r) => v11RecordScopeType(r) === 'enterprise' && r.energyRole === '能源消费').map((r) => <option key={r.energyRecordId} value={r.energyRecordId}>{types.find((t) => t.energyTypeId === r.energyTypeId)?.energyTypeName} · {r.year}年企业能源消费</option>)}</optgroup></select></Field><Field label="外供能源"><input readOnly value={externalType ? `${externalType.energyTypeName} · ${externalConversion?.outputUnit ?? externalType.measurementUnit}` : '选择来源后带出'} /></Field><Field label="接收方" required><input aria-label="接收方" required value={receiver} onChange={(event) => setReceiver(event.target.value)} /></Field></div>{Boolean(e) && !sourceChanged && quantityChanged && <p className={s.hint}>保存数量修改后可调整供能来源。</p>}{sourceChanged && <><Field label="调整来源月份"><select aria-label="调整来源月份" value={sourceMonth} onChange={(event) => { const month = Number(event.target.value); setSourceMonth(month); setAmounts(initialAmounts.map((value, i) => i === month ? '' : value)); }}>{Array.from({ length: 12 }, (_, i) => <option key={i} value={i}>{i + 1}月</option>)}</select></Field><p className={s.hint}>仅将所选月份调整至新来源并重新填写数量，其余月份保留原来源。</p></>}
       <div className={s.monthInputGrid}>{amounts.map((value, i) => <Field key={i} label={`${i + 1}月`}><input aria-label={`${i + 1}月外供数量`} type="number" min="0" step="any" readOnly={sourceChanged && i !== sourceMonth} value={value} onChange={(event) => setAmounts((current) => current.map((item, j) => i === j ? event.target.value : item))} /></Field>)}</div><div className={s.annualSummary}><Field label={`年度外供汇总${externalConversion?.outputUnit ?? externalType?.measurementUnit ?? e?.unit ? `（${externalConversion?.outputUnit ?? externalType?.measurementUnit ?? e?.unit}）` : ''}`}><input aria-label="年度外供汇总" readOnly value={annualAmount} /></Field></div></> : <>

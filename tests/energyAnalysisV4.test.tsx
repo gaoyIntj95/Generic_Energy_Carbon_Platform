@@ -439,7 +439,7 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(location).toContain('/data-management/operations');
     expect(location).toContain('scopeLevel=一级用能单元');
     expect(location).toContain('productId=');
-    expect(location).toContain('category=产量');
+    expect(location).toContain('category=产量指标');
   });
 
   it('routes missing device output maintenance to the device-output page', async () => {
@@ -499,7 +499,7 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(location).toContain('scopeLevel=一级用能单元');
     expect(location).toContain('productId=');
     expect(location).toContain('keyword=产品C');
-    expect(location).toContain('category=产量');
+    expect(location).toContain('category=产量指标');
   });
 
   it('calculates waste heat generator unit electricity consumption from conversion output records', () => {
