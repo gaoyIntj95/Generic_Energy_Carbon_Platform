@@ -92,7 +92,7 @@
   align-items: center;
   gap: 11px;
   padding: 0 11px;
-  color: #24313f;
+  color: #008f60;
   background: transparent;
   border: 0;
   border-radius: 8px;
@@ -117,7 +117,7 @@
   height: 28px;
   flex: 0 0 28px;
   place-items: center;
-  color: #526476;
+  color: #00a36d;
 }
 
 .groupIcon svg,
@@ -293,13 +293,25 @@
 
 .inlineSectionButton {
   width: 100%;
+  color: #24313f;
   cursor: pointer;
   font: inherit;
+  font-weight: 700;
   text-align: left;
+}
+
+.inlineSectionButton.active {
+  color: #24313f;
 }
 
 .topLevelSectionButton {
   padding-left: 38px;
+  color: #24313f;
+  font-weight: 700;
+}
+
+.topLevelSectionButton.sectionActive {
+  color: #24313f;
 }
 
 .topLevelSectionButton .sectionIcon {

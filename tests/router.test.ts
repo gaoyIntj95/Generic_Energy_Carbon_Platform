@@ -3,8 +3,8 @@ import { allNavItems, navigation, navItemMatches, type NavItem } from '../src/ap
 
 describe('navigation manifest', () => {
   it('contains every confirmed page as a unique route', () => {
-    expect(allNavItems).toHaveLength(19);
-    expect(new Set(allNavItems.map((item) => item.path)).size).toBe(19);
+    expect(allNavItems).toHaveLength(26);
+    expect(new Set(allNavItems.map((item) => item.path)).size).toBe(26);
     expect(navigation.map((group) => group.label)).toEqual([
       '能源监测与分析',
       '碳排放核算与合规',
@@ -13,7 +13,7 @@ describe('navigation manifest', () => {
     ]);
     expect(allNavItems.map((item) => item.label)).toEqual(expect.arrayContaining([
       '能耗指标',
-      '碳因子参数',
+      '碳排放因子库',
       '用能与碳排放预算管理',
       '用能单元',
       '能源数据',
@@ -38,22 +38,24 @@ describe('navigation manifest', () => {
       '碳核算清单',
       '碳核查支撑',
       '碳排放报告',
+      '碳排放因子库',
     ]);
     expect(carbonDisplay?.map((entry) => entry.label)).toEqual([
       '碳排放核算',
-      '碳因子参数',
       '供应链碳管理',
-      '碳足迹核算',
+      '产品碳足迹',
     ]);
-    expect(carbonDisplay?.filter((entry) => 'planned' in entry)).toEqual([
-      expect.objectContaining({ label: '供应链碳管理', planned: true, badge: '规划中' }),
-      expect.objectContaining({ label: '碳足迹核算', planned: true, badge: '规划中' }),
+    expect(carbonDisplay?.some((entry) => entry.label === '碳排放因子库')).toBe(false);
+    const supplyChain = carbonDisplay?.find((entry) => entry.key === 'supply-chain-carbon');
+    expect(supplyChain && 'items' in supplyChain ? supplyChain.items.map((item) => item.label) : []).toEqual([
+      '上游供应商碳数据',
+      '下游产品碳足迹交付',
     ]);
-    expect(carbonDisplay?.find((entry) => entry.label === '碳因子参数')).toEqual(
-      expect.objectContaining({ label: '碳因子参数', disabled: true }),
-    );
-    expect(allNavItems.some((item) => item.label === '供应链碳管理')).toBe(false);
-    expect(allNavItems.some((item) => item.label === '碳足迹核算')).toBe(false);
+    expect(carbonDisplay?.filter((entry) => 'items' in entry).map((entry) => entry.key)).toEqual([
+      'carbon-calculation',
+      'supply-chain-carbon',
+      'product-carbon-footprint',
+    ]);
   });
 
   it('distinguishes energy data submenu entries by query string', () => {

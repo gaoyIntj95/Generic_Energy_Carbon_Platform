@@ -26,6 +26,8 @@ const iconNames: Record<string, string> = {
   碳排放核算: 'calculation',
   碳排放因子库: 'factor',
   供应链碳管理: 'supply',
+  上游供应商碳数据: 'supply',
+  下游产品碳足迹交付: 'footprint',
   产品碳足迹: 'footprint',
   核算清单: 'inventory',
   项目管理: 'calculation',
@@ -184,7 +186,9 @@ export function Sidebar() {
                     const sectionClosed = sectionCollapsed[entry.key] ?? false;
                     const sectionActive = entry.items.some((item) => !isPlaceholder(item) && navItemMatches(item, location.pathname, location.search));
                     const isInlineSection = entry.key === 'energy-data-submenu';
-                    const isTopLevelSection = entry.key === 'carbon-calculation';
+                    const isTopLevelSection = entry.key === 'carbon-calculation'
+                      || entry.key === 'supply-chain-carbon'
+                      || entry.key === 'product-carbon-footprint';
                     return (
                       <div className={isInlineSection ? styles.inlineSection : `${styles.section} ${sectionClosed ? '' : styles.sectionOpen}`} key={entry.key}>
                         <button

@@ -54,12 +54,10 @@ const productCarbonFootprintItems: NavItem[] = [
   { label: '碳足迹因子库', path: '/product-carbon-footprint/factors', description: '维护产品碳足迹核算所用的排放因子与数据来源。' },
 ];
 
-const supplyChainCarbonItem: NavItem = {
-  label: '供应链碳管理',
-  pageTitle: '供应链碳管理',
-  path: '/supply-chain-carbon/suppliers',
-  description: '集中维护供应商提供的材料/产品碳足迹数据、必要的供应业务数据及证明材料，为产品碳足迹核算和供应链碳分析提供数据基础。',
-};
+const supplyChainCarbonItems: NavItem[] = [
+  { label: '上游供应商碳数据', pageTitle: '供应链碳管理', path: '/supply-chain-carbon/suppliers', description: '维护供应商提供的材料/产品碳数据、业务数据及证明材料。' },
+  { label: '下游产品碳足迹交付', pageTitle: '供应链碳管理', path: '/supply-chain-carbon/delivery', description: '登记产品碳足迹报告向下游客户的交付情况。' },
+];
 
 const assetStrategyItems: NavItem[] = [
   { label: '能效平衡与优化', path: '/asset-strategy/balance', description: '基于能源流向、能效指标和异常诊断结果，识别能源管理问题并辅助发现优化机会。' },
@@ -73,7 +71,7 @@ export const navigation: NavGroup[] = [
   {
     key: 'carbon-accounting',
     label: '碳排放核算与合规',
-    items: [...carbonAccountingItems, ...productCarbonFootprintItems, supplyChainCarbonItem],
+    items: [...carbonAccountingItems, ...productCarbonFootprintItems, ...supplyChainCarbonItems],
     display: [
       {
         key: 'carbon-calculation',
@@ -83,10 +81,10 @@ export const navigation: NavGroup[] = [
           carbonAccountingItems[1],
           carbonAccountingItems[2],
           carbonAccountingItems[3],
+          carbonAccountingItems[4],
         ],
       },
-      carbonAccountingItems[4],
-      supplyChainCarbonItem,
+      { key: 'supply-chain-carbon', label: '供应链碳管理', items: supplyChainCarbonItems },
       { key: 'product-carbon-footprint', label: '产品碳足迹', items: productCarbonFootprintItems },
     ],
   },
