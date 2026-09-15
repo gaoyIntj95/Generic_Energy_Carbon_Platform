@@ -93,5 +93,8 @@ describe('产品碳足迹运输活动', () => {
     await act(async () => root.render(<MemoryRouter><ProductCarbonFootprint pathname="/product-carbon-footprint/reports" /></MemoryRouter>));
     expect(container.textContent).toContain('数据依据已确认核算清单快照');
     expect(container.textContent).toContain('98.88');
+    expect(container.textContent).toContain('01 报告摘要');
+    expect(container.textContent).toContain('03 数据收集与核算方法');
+    expect(container.textContent).toContain('06 排放热点与减排建议');
   });
 });

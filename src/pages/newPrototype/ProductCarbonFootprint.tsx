@@ -506,12 +506,39 @@ function LinkedResultsPage({ projects, activeProjectId, confirmedRows, onProject
 }
 function downloadProductCarbonReport(project: Project, rows: ActivityDataRow[]) {
   const total = inventoryTotal(rows);
+  const stageRows = ['原材料获取', '生产制造', '分销与运输'].map((stage) => ({ label: stage, value: rows.filter((row) => stageLabel(row.stage) === stage).reduce((sum, row) => sum + emissionOf(row), 0) }));
   const detailRows = rows.filter((row) => emissionOf(row) > 0).map((row) => `<tr><td>${stageLabel(row.stage)}</td><td>${row.name}</td><td>${row.amount} ${row.unit}</td><td>${emissionOf(row).toFixed(2)}</td></tr>`).join('');
   downloadHtmlReport({
     filename: `${project.name}-产品碳足迹报告.html`,
     title: `${project.name} 产品碳足迹报告`,
-    content: `<p>报告编号：CFP-${project.year.slice(0, 4)}-${project.id}-001</p><h2>产品与核算信息</h2><table><tbody><tr><th>功能单位</th><td>${project.unit}</td></tr><tr><th>系统边界</th><td>${project.boundary}</td></tr><tr><th>核算期间</th><td>${project.period}</td></tr><tr><th>数据依据</th><td>已确认核算清单快照</td></tr></tbody></table><h2>产品碳足迹结果</h2><p><strong>${total.toFixed(2)} kgCO₂e/${project.unit}</strong></p><h2>排放活动明细</h2><table><thead><tr><th>生命周期阶段</th><th>排放活动</th><th>活动数据</th><th>排放量（kgCO₂e）</th></tr></thead><tbody>${detailRows}</tbody></table>`,
+    content: `<p>报告编号：CFP-${project.year.slice(0, 4)}-${project.id}-001</p><h2>01 报告摘要</h2><p><strong>单位产品碳足迹：${total.toFixed(2)} kgCO₂e/${project.unit}</strong></p><table><tbody><tr><th>产品名称</th><td>${project.name}</td></tr><tr><th>功能单位</th><td>${project.unit}</td></tr><tr><th>系统边界</th><td>${project.boundary}</td></tr><tr><th>核算期间</th><td>${project.period}</td></tr><tr><th>核算依据</th><td>ISO 14067:2018</td></tr></tbody></table><h2>生命周期阶段贡献</h2><table><thead><tr><th>生命周期阶段</th><th>排放量（kgCO₂e）</th><th>占比</th></tr></thead><tbody>${stageRows.map((row) => `<tr><td>${row.label}</td><td>${row.value.toFixed(2)}</td><td>${total ? (row.value / total * 100).toFixed(2) : '0.00'}%</td></tr>`).join('')}<tr><th>合计</th><th>${total.toFixed(2)}</th><th>100.00%</th></tr></tbody></table><h2>02 目标与范围定义</h2><p>本报告以${project.unit}为功能单位，依据已确认核算清单，对${project.boundary}边界内的温室气体排放进行量化。</p><h2>03 数据收集与核算方法</h2><p>各排放活动按“活动数据 × 排放因子”计算，并汇总为二氧化碳当量。</p><h2>04 产品碳足迹核算结果</h2><table><thead><tr><th>生命周期阶段</th><th>排放活动</th><th>活动数据</th><th>排放量（kgCO₂e）</th></tr></thead><tbody>${detailRows}</tbody></table><h2>05 数据质量与不确定性</h2><p>报告数据来自已确认核算清单快照；未取得供应商特定数据的活动使用适配因子并应持续完善。</p><h2>06 排放热点与减排建议</h2><p>优先针对高贡献排放活动推进低碳材料替代、供应商碳数据协同及制造环节节能优化。</p>`,
   });
+}
+
+function ProductCarbonReportPreview({ project, rows }: { project: Project; rows: ActivityDataRow[] }) {
+  const total = inventoryTotal(rows);
+  const reportNo = `CFP-${project.year.slice(0, 4)}-${project.id}-001`;
+  const stageRows = ['原材料获取', '生产制造', '分销与运输'].map((stage) => ({ label: stage, value: rows.filter((row) => stageLabel(row.stage) === stage).reduce((sum, row) => sum + emissionOf(row), 0) }));
+  const topRows = rows.filter((row) => emissionOf(row) > 0).sort((left, right) => emissionOf(right) - emissionOf(left)).slice(0, 3);
+  const evidenceRate = rows.length ? Math.round(rows.filter((row) => row.evidence > 0).length / rows.length * 100) : 0;
+  return <article className={styles.productReportPaper}>
+    <section className={styles.reportCover}>
+      <div className={styles.reportCoverHead}><div><b>工业企业能碳管理平台</b><span>PRODUCT CARBON FOOTPRINT</span></div><div>ISO 14067:2018<br />产品碳足迹核算报告</div></div>
+      <div className={styles.reportCoverTitle}><span>PRODUCT CARBON FOOTPRINT REPORT</span><h2>产品碳足迹核算报告</h2><strong>{project.name}</strong></div>
+      <div className={styles.reportMeta}><span>报告编号</span><b>{reportNo}</b><span>功能单位</span><b>{project.unit}</b><span>系统边界</span><b>{project.boundary}</b><span>核算周期</span><b>{project.period}</b><span>数据依据</span><b>已确认核算清单快照</b><span>报告版本</span><b>V1.0</b></div>
+      <p>本报告基于已确认核算清单快照生成，用于产品碳足迹量化、热点识别与减排管理。</p>
+    </section>
+    <section className={styles.reportPageSection}>
+      <div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>{reportNo}</span></div><h2>01 报告摘要</h2><p>本报告基于既定系统边界与功能单位，对目标产品相关生命周期阶段的温室气体排放进行量化。</p>
+      <div className={styles.reportSummaryGrid}><div className={styles.reportResultCard}><span>单位产品碳足迹</span><strong>{total.toFixed(2)}</strong><b>kgCO₂e / {project.unit}</b></div><div className={styles.reportInfoCard}>{[['目标产品', project.name], ['功能单位', project.unit], ['系统边界', project.boundary], ['核算依据', 'ISO 14067:2018'], ['数据质量等级', evidenceRate >= 90 ? '良好' : '待完善']].map(([label, value]) => <div key={label}><span>{label}</span><b>{value}</b></div>)}</div></div>
+      <h3>生命周期阶段贡献</h3><table><thead><tr><th>生命周期阶段</th><th>排放量（kgCO₂e）</th><th>占比</th></tr></thead><tbody>{stageRows.map((row) => <tr key={row.label}><td>{row.label}</td><td>{row.value.toFixed(2)}</td><td>{total ? (row.value / total * 100).toFixed(2) : '0.00'}%</td></tr>)}<tr className={styles.reportTotalRow}><td>合计</td><td>{total.toFixed(2)}</td><td>100.00%</td></tr></tbody></table>
+    </section>
+    <section className={styles.reportPageSection}><div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>目标与范围</span></div><h2>02 目标与范围定义</h2><h3>核算目标</h3><p>量化目标产品在既定系统边界内的温室气体排放，识别主要排放贡献环节，为低碳设计、供应链协同和减排管理提供依据。</p><h3>产品与功能单位</h3><table><tbody><tr><th>产品名称</th><td>{project.name}</td></tr><tr><th>产品规格</th><td>{project.spec}</td></tr><tr><th>功能单位</th><td>{project.unit}</td></tr><tr><th>核算周期</th><td>{project.period}</td></tr></tbody></table><h3>系统边界</h3><div className={styles.reportScopeFlow}>{stageRows.map((row) => <span key={row.label}>{row.label}</span>)}</div><p className={styles.reportCallout}>纳入核算的阶段依据已确认核算清单确定；未纳入的生命周期阶段不计入本次结果。</p></section>
+    <section className={styles.reportPageSection}><div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>数据收集与方法</span></div><h2>03 数据收集与核算方法</h2><h3>数据来源</h3><table><thead><tr><th>数据对象</th><th>活动数据</th><th>数据来源</th><th>因子来源</th></tr></thead><tbody>{rows.filter((row) => emissionOf(row) > 0).map((row) => <tr key={row.id}><td>{row.name}</td><td>{row.amount} {row.unit}</td><td>{row.source}</td><td>{row.factor}</td></tr>)}</tbody></table><h3>计算方法</h3><p>各排放活动按照“活动数据 × 对应排放因子”计算，并按功能单位归集为二氧化碳当量。</p><p className={styles.reportCallout}>产品碳足迹 = Σ（活动数据 × 排放因子 × 必要的换算或分配系数）</p></section>
+    <section className={styles.reportPageSection}><div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>核算结果</span></div><h2>04 产品碳足迹核算结果</h2><table><thead><tr><th>阶段</th><th>排放活动</th><th>活动数据</th><th>因子来源</th><th>排放量（kgCO₂e）</th><th>占比</th></tr></thead><tbody>{rows.filter((row) => emissionOf(row) > 0).map((row) => <tr key={row.id}><td>{stageLabel(row.stage)}</td><td>{row.name}</td><td>{row.amount} {row.unit}</td><td>{row.source}</td><td>{emissionOf(row).toFixed(2)}</td><td>{total ? (emissionOf(row) / total * 100).toFixed(2) : '0.00'}%</td></tr>)}<tr className={styles.reportTotalRow}><td colSpan={4}>合计</td><td>{total.toFixed(2)}</td><td>100.00%</td></tr></tbody></table><p>单位产品碳足迹为 <b>{total.toFixed(2)} kgCO₂e/{project.unit}</b>，应优先关注高贡献排放活动。</p></section>
+    <section className={styles.reportPageSection}><div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>数据质量与不确定性</span></div><h2>05 数据质量与不确定性</h2><div className={styles.reportQualityGrid}><div><span>数据完整性</span><b>{evidenceRate}%</b></div><div><span>初级数据覆盖</span><b>{evidenceRate}%</b></div><div><span>因子适配度</span><b>良好</b></div><div><span>综合质量等级</span><b>{evidenceRate >= 90 ? 'B' : '待完善'}</b></div></div><p className={styles.reportCallout}>结果基于已确认清单快照。采用行业或通用因子的活动，建议后续以供应商特定数据持续替换和完善。</p></section>
+    <section className={styles.reportPageSection}><div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>热点分析与减排建议</span></div><h2>06 排放热点与减排建议</h2><div className={styles.reportHotspots}>{topRows.map((row, index) => <div key={row.id}><b>{index + 1}</b><strong>{row.name}</strong><p>贡献 {total ? (emissionOf(row) / total * 100).toFixed(2) : '0.00'}%，建议优先结合工艺、供应链或能源管理措施降低该环节影响。</p></div>)}</div><div className={styles.reportRecommendations}><div><b>推进高贡献活动减排</b><p>优先开展低碳材料替代、设备节能和低碳能源采购。</p></div><div><b>完善供应商碳数据协同</b><p>逐步以供应商特定数据替换行业平均排放因子。</p></div><div><b>提升产品级数据颗粒度</b><p>持续完善 BOM、计量、运输和废弃物台账，为年度复算提供依据。</p></div></div></section>
+  </article>;
 }
 
 function LinkedReportsPage({ projects, activeProjectId, confirmedRows, generatedReportIds, onProjectChange, onGenerate }: { projects: Project[]; activeProjectId: number; confirmedRows?: ActivityDataRow[]; generatedReportIds: number[]; onProjectChange: (projectId: number) => void; onGenerate: () => void }) {
@@ -526,9 +553,9 @@ function LinkedReportsPage({ projects, activeProjectId, confirmedRows, generated
         return item ? <button className={`${styles.reportItem} ${id === project.id ? styles.selected : ''}`} key={id} onClick={() => onProjectChange(id)}><b>{item.name} 产品碳足迹报告</b><span>基于已确认清单快照</span></button> : null;
       })}
     </section>
-    <section className={styles.card}>
+    <section className={`${styles.card} ${styles.reportPreviewCard}`}>
       <div className={styles.cardHead}><b>报告预览</b><div><button className={styles.button} disabled={!confirmedRows} onClick={onGenerate}>重新生成</button> <button className={styles.primary} disabled={!generated} onClick={() => downloadProductCarbonReport(project, confirmedRows ?? [])}>⇩ 下载报告</button></div></div>
-      {!confirmedRows ? <div className={styles.empty}><div><strong>暂无可生成报告的正式结果</strong><p>报告仅能读取已确认的核算清单快照。</p></div></div> : !generated ? <div className={styles.empty}><div><strong>结果已确认，可生成报告</strong><p>点击“生成报告”后创建该项目的报告版本。</p></div></div> : <article className={styles.paper}><div>ISO 14067 / 适用 PCR</div><h2>产品碳足迹报告</h2><p>报告编号：CFP-{project.year.slice(0, 4)}-{project.id}-001</p><dl><dt>产品名称</dt><dd>{project.name}</dd><dt>功能单位</dt><dd>{project.unit}</dd><dt>系统边界</dt><dd>{project.boundary}</dd><dt>核算期间</dt><dd>{project.period}</dd><dt>数据依据</dt><dd>已确认核算清单快照</dd></dl><strong>{total.toFixed(2)} <small>kgCO₂e/{project.unit}</small></strong></article>}
+      <div className={styles.reportPreviewViewport}>{!confirmedRows ? <div className={styles.empty}><div><strong>暂无可生成报告的正式结果</strong><p>报告仅能读取已确认的核算清单快照。</p></div></div> : !generated ? <div className={styles.empty}><div><strong>结果已确认，可生成报告</strong><p>点击“生成报告”后创建该项目的报告版本。</p></div></div> : <ProductCarbonReportPreview project={project} rows={confirmedRows} />}</div>
     </section>
   </div>;
 }
