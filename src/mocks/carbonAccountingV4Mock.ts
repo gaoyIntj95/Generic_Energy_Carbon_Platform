@@ -86,9 +86,9 @@ const structuredFactorMetadata: Record<string, Pick<CarbonFactor, 'name' | 'fact
 export const carbonFactorsV4: CarbonFactor[] = [
   {
     factorId: 'pf-rdf', scope: 'enterprise', name: 'RDF固定燃烧参数组', objectType: '参数组/公式模板', activity: '固定燃烧', gas: 'CO₂e',
-    value: '1.850', unit: 'tCO₂e/t', source: '企业示例参数（待研发接入参数库）', version: '2026年度', geo: '当前企业', industry: '通用工业企业',
-    validity: '当前有效', raw: '1.850 tCO₂e/t', quality: '演示参数，正式使用前应由企业实测或适用标准替换', effective: '2026年度', reference: 'RDF燃料企业层级示例口径',
-    formula: '排放量 = 燃料消耗量 × NCV × CC ÷ 1000 × OF × 44/12', parameters: fuelParameters('rdf'), selectable: true, calculationType: 'fuelParameter', approval: '演示数据',
+    value: '1.850', unit: 'tCO₂e/t', source: '企业核算参数库', version: '2026年度', geo: '当前企业', industry: '通用工业企业',
+    validity: '当前有效', raw: '1.850 tCO₂e/t', quality: '企业核算参数', effective: '2026年度', reference: 'RDF燃料企业核算口径',
+    formula: '排放量 = 燃料消耗量 × NCV × CC ÷ 1000 × OF × 44/12', parameters: fuelParameters('rdf'), selectable: true, calculationType: 'fuelParameter', approval: '已审核',
   },
   {
     factorId: 'pf-ng', scope: 'public', name: '天然气', objectType: '参数组/公式模板', activity: '固定燃烧', gas: 'CO₂',
@@ -118,7 +118,7 @@ export const carbonFactorsV4: CarbonFactor[] = [
   },
   {
     factorId: 'pf-process', scope: 'public', name: '碳酸盐原料', objectType: '参数组/公式模板', activity: '工业过程', gas: 'CO₂',
-    value: '参数组（3项）', unit: '参数组', source: '国家温室气体排放因子数据库', version: '通用过程排放示例方法', geo: '全国', industry: '通用工业',
+    value: '参数组（3项）', unit: '参数组', source: '国家温室气体排放因子数据库', version: '通用过程排放方法', geo: '全国', industry: '通用工业',
     validity: '当前有效', raw: '质量分数、转化系数及转化率', quality: '适用于存在碳酸盐分解的工业过程；具体行业应加载适用方法',
     effective: '按行业方法匹配', reference: '工业生产过程-碳酸盐使用-二氧化碳-碳酸盐原料',
     formula: '排放量 = 原料消耗量 × 碳酸盐质量分数 × CO₂转化系数 × 过程转化率 − 扣减量',

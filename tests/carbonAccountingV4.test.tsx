@@ -314,4 +314,26 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
     await click(button('保存企业数据'));
     expect(container.textContent).toContain('企业测试排放因子');
   });
+
+  it('shows factor details in a compact dialog without duplicated fields', async () => {
+    await render('/carbon-accounting/factors');
+    const factorRow = [...container.querySelectorAll('tr')].find((row) => row.textContent?.includes('天然气'))!;
+    const factorCells = factorRow.querySelectorAll('td');
+    expect(factorCells[0].textContent).toBe('能源活动-化石燃料燃烧-天然气-二氧化碳-固定燃烧');
+    expect(factorCells[0].querySelector('b')).toBeNull();
+    expect(factorCells[3].textContent).toBe('国家温室气体排放因子数据库 · 第二版（2026）');
+    expect(factorCells[3].querySelector('small')).toBeNull();
+    await click(button('查看', factorRow));
+
+    const factorDialog = container.querySelector('[role="dialog"]')!;
+    expect(factorDialog.textContent).toContain('天然气—固定燃烧（按体积） · 详情');
+    expect(factorDialog.textContent).toContain('基础信息');
+    expect(factorDialog.textContent).toContain('低位发热量 NCV');
+    expect(factorDialog.textContent).toContain('排放量 = 燃料消耗量');
+    expect(factorDialog.textContent).toContain('来源与适用范围');
+    expect(factorDialog.textContent).not.toContain('编码');
+    expect(factorDialog.textContent).not.toContain('原始值/结构');
+    expect([...factorDialog.querySelectorAll('table[class*="factorParameterTable"] th')].map((cell) => cell.textContent)).toEqual(['参数', '来源', '数值', '单位']);
+    expect(factorDialog.querySelector('table[class*="factorParameterTable"] tbody tr td small')).toBeNull();
+  });
 });

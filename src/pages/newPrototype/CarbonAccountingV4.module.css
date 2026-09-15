@@ -158,6 +158,9 @@
 .factorLibrary .factorTable th:nth-child(6), .factorLibrary .factorTable td:nth-child(6), .factorLibrary .factorTable th:nth-child(7), .factorLibrary .factorTable td:nth-child(7) { width: 13%; }
 .factorLibrary .factorTable th:nth-child(8), .factorLibrary .factorTable td:nth-child(8) { width: 11%; }
 .factorLibrary .factorTable td small { display: block; margin-top: 4px; color: #8a9998; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.factorName,
+.factorSource { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.factorName { color: #8a9998; font-size: 12px; }
 .factorValue { color: #0ba383; font-weight: 600; }
 .factorPickerFilters { display: grid; grid-template-columns: 180px 180px 180px minmax(0, 1fr); gap: 10px; margin-bottom: 12px; }
 .factorPickerFilters select { min-width: 0; height: 42px; padding: 0 12px; color: #34474c; background: #fff; border: 1px solid #dfe8e5; border-radius: 8px; }
@@ -2272,6 +2275,8 @@
 .factorDialog .factorPickerActions { margin-top: 10px; padding: 11px 13px; }
 .factorCustomDialog { width: min(780px, calc(100vw - 32px)); }
 .factorCustomDialog .modalBody { padding: 16px 20px; }
+.factorDetailDialog { width: min(780px, calc(100vw - 32px)); }
+.factorDetailDialog .modalBody { padding: 16px 20px; }
 .factorCustomFormGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
 .factorCustomFormGrid .fieldFull { grid-column: 1 / -1; }
 
@@ -2762,6 +2767,17 @@
   text-align: left;
   border-bottom: 1px solid #edf1ef;
   font-size: 12px;
+}
+
+.factorParameterTable { table-layout: fixed; }
+.factorParameterTable th:nth-child(1) { width: 23%; }
+.factorParameterTable th:nth-child(2) { width: 45%; }
+.factorParameterTable th:nth-child(3),
+.factorParameterTable th:nth-child(4) { width: 16%; }
+.factorParameterTable td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .detailBlock .parameterTable + .button { margin-top: 12px; }
