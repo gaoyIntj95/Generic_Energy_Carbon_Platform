@@ -25,3 +25,6 @@ td b,td small { display:inline; } td small { margin-left:4px; }
 .productPreview > strong { color:#009b68; font-size:30px; text-align:right; white-space:nowrap; }
 .productPreview > strong small { display:block; margin-top:5px; color:#748094; font-size:13px; font-weight:400; }
 @media(max-width:700px){.modal{max-height:100vh;border-radius:0}.productPreview{flex-direction:column}.productPreview > strong{text-align:left}}
+.deleteButton { color:#d14b4b; }
+.deletePrompt { width:min(420px,92vw); }
+.deletePromptBody { padding:22px 21px; color:#4b5563; font-size:14px; }

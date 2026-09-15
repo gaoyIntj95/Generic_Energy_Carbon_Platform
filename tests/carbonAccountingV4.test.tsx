@@ -119,7 +119,14 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
     expect(container.textContent).not.toContain('本次核算清单快照');
     const summaryTable = [...container.querySelectorAll('table')].find((table) => table.textContent?.includes('排放范围'))!;
     expect([...summaryTable.querySelectorAll('th')].map((cell) => cell.textContent)).toEqual(['排放范围', '排放类别', '排放量', '占比']);
+    const summaryRows = [...summaryTable.querySelectorAll('tbody tr:not(:last-child)')];
+    expect(summaryRows.map((row) => row.querySelectorAll('td').length)).toEqual([4, 3, 3, 3, 4, 4]);
+    expect(summaryRows.map((row) => row.textContent?.trim()).join('|')).toMatch(/化石燃料燃烧排放.*交通运输产生的排放/);
     expect(summaryTable.querySelector('tbody tr:last-child')?.textContent).toContain('12,980.53 tCO₂e');
+    const rankTable = [...container.querySelectorAll('table')].find((table) => table.textContent?.includes('排放源') && table.textContent?.includes('排放量'))!;
+    expect([...rankTable.querySelectorAll('th')].map((cell) => cell.textContent)).toEqual(['排名', '排放源', '排放量', '占比']);
+    expect(rankTable.querySelectorAll('tbody tr')).toHaveLength(5);
+    expect([...rankTable.querySelectorAll('tbody tr')].every((row) => row.querySelectorAll('td').length === 4)).toBe(true);
   });
 
   it('renders generated carbon reports and opens the verification package export dialog', async () => {

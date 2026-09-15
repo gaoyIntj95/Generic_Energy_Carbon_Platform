@@ -805,6 +805,8 @@
 }
 
 .rankTable {
+  width: 100%;
+  min-width: 0;
   margin-top: 7px;
   table-layout: fixed;
 }
@@ -816,9 +818,13 @@
 
 .rankTable th,
 .rankTable td {
+  min-width: 0;
   padding: 7px 7px;
   text-align: center;
   border-bottom: 1px solid #e9eeec;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rankTable th { font-size: 12px; }
@@ -2653,6 +2659,21 @@
   .factorPickerActions { align-items: flex-start; flex-direction: column; }
 }
 .field small { color: var(--muted); }
+
+/* 国家因子库选择器使用单行清单，保留名称、口径和值等必要信息。 */
+.factorChoices > label {
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 44px;
+  margin-bottom: 6px;
+  padding: 9px 12px;
+  border-radius: 6px;
+}
+.factorChoices > label:hover { background: #f5faf8; }
+.factorChoices > label > input { margin: 0; }
+.factorChoiceContent { width: 100%; }
+.factorChoiceSimpleMeta { display: block; overflow: hidden; color: #26343d; font-size: 13px; font-weight: 700; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.currentFactorTag { color: #0b8c68; font-size: 11px; white-space: nowrap; }
 
 .parameterTable th,
 .parameterTable td {
