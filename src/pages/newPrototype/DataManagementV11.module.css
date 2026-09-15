@@ -250,8 +250,11 @@
 }
 
 .wideTable {
-  min-width: 1380px !important;
+  min-width: 0 !important;
 }
+
+.wideTable th,
+.wideTable td { width: calc(100% / 9) !important; }
 
 .costTable {
   min-width: 2050px !important;
@@ -587,50 +590,12 @@
   table-layout: fixed;
 }
 
-.quantityTable th:first-child,
-.quantityTable td:first-child {
-  width: 250px;
-}
+.quantityTable th,
+.quantityTable td { width: calc(100% / 8) !important; }
 
-.quantityTable th:nth-child(2) {
-  width: 150px;
-}
-
-.quantityTable th:nth-child(3) {
-  width: 150px;
-}
-
-.quantityTable th:nth-child(4) {
-  width: 190px;
-}
-
-.quantityTable th:nth-child(5) {
-  width: 90px;
-}
-
-.quantityTable th:nth-child(6) {
-  width: 110px;
-}
-
-.quantityTable th:nth-child(7) {
-  width: 150px;
-}
-
-.quantityTable th:nth-child(8) {
-  width: 180px;
-}
-
-.scopeChild::before {
-  position: absolute;
-  top: 50%;
-  left: 18px;
-  width: 13px;
-  height: 18px;
-  border-bottom: 1px solid #c9d4cf;
-  border-left: 1px solid #c9d4cf;
-  content: '';
-  transform: translateY(-12px);
-}
+.operationTable { min-width: 0 !important; table-layout: fixed; }
+.operationTable th,
+.operationTable td { width: calc(100% / 8) !important; }
 
 .scopeChild span {
   display: block;

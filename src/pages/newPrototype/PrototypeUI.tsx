@@ -36,7 +36,7 @@ export function Table({ headers, rows, onRow }: { headers: string[]; rows: React
 export interface TableColumn<T> {
   key: keyof T | string;
   title: string;
-  width?: number;
+  width?: number | string;
   render?: (record: T, index: number) => ReactNode;
 }
 

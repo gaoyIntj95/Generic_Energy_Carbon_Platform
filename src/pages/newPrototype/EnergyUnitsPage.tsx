@@ -277,10 +277,10 @@ function AnnualEnergyUnitsPage() {
     {
       key: 'energyUnitName',
       title: '用能单元',
-      width: 350,
+      width: '20%',
       render: ({ unit, depth, childCount }) => (
         <div
-          className={`${styles.unitCell} ${depth ? styles.childName : ''} ${
+          className={`${styles.unitCell} ${
             depth === 1 ? styles.level2 : ''
           }`}
         >
@@ -310,7 +310,7 @@ function AnnualEnergyUnitsPage() {
     {
       key: 'unitLevel',
       title: '层级',
-      width: 140,
+      width: '20%',
       render: ({ unit }) => (
         <span
           className={`${styles.levelTag} ${
@@ -321,17 +321,17 @@ function AnnualEnergyUnitsPage() {
         </span>
       ),
     },
-    { key: 'unitType', title: '单元类型', width: 190, render: ({ unit }) => unitTypeLabel(unit.unitType) },
+    { key: 'unitType', title: '单元类型', width: '20%', render: ({ unit }) => unitTypeLabel(unit.unitType) },
     {
       key: 'year',
       title: '年份',
-      width: 110,
+      width: '20%',
       render: () => `${year}年`,
     },
     {
       key: 'actions',
       title: '操作',
-      width: 330,
+      width: '20%',
       render: ({ unit, childCount }) => (
         <div className={styles.actions}>
           {unit.unitLevel === 'level1' && childTypeRule(unit).options.length > 0 && <button

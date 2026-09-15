@@ -221,27 +221,8 @@
   font-weight: 600;
 }
 
-.childName {
-  position: relative;
-}
-
-.childName::before {
-  position: absolute;
-  top: 50%;
-  width: 13px;
-  height: 16px;
-  border-bottom: 1px solid #c9d4cf;
-  border-left: 1px solid #c9d4cf;
-  content: '';
-  transform: translateY(-10px);
-}
-
 .level2 {
   padding-left: 30px;
-}
-
-.level2::before {
-  left: 9px;
 }
 
 .toggle {
