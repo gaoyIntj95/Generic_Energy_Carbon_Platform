@@ -41,22 +41,22 @@ const energyAnalysisItems: NavItem[] = [
 const carbonAccountingItems: NavItem[] = [
   { label: '碳排放预览', path: '/carbon-accounting/preview', description: '查看当前核算任务的碳排放结果、构成与趋势。' },
   { label: '碳核算清单', path: '/carbon-accounting/inventory', description: '按排放类别维护排放源活动数据、计算参数与排放结果。' },
-  { label: '碳核查支撑', path: '/carbon-accounting/support', description: '维护核算基础材料和排放源支撑材料。' },
+  { label: '碳核查支撑', path: '/carbon-accounting/support', description: '维护核算基础材料和排放源证明材料。' },
   { label: '碳排放报告', path: '/carbon-accounting/report', description: '基于正式核算清单生成企业温室气体排放报告，并导出报告及核查凭证资料。' },
   { label: '碳排放因子库', path: '/carbon-accounting/factors', description: '按排放源类别和行业企业类别管理碳排放因子及参数。' },
 ];
 
 const productCarbonFootprintItems: NavItem[] = [
-  { label: '项目管理', pageTitle: '产品碳足迹项目', path: '/product-carbon-footprint/projects', description: '以产品项目为中心管理生命周期模型、活动数据、核算结果和报告。' },
-  { label: '核算清单', pageTitle: '产品碳足迹核算清单', path: '/product-carbon-footprint/data', description: '按产品项目维护生命周期排放活动、活动数据、排放因子与核算结果。' },
-  { label: '核算结果', pageTitle: '产品碳足迹核算结果', path: '/product-carbon-footprint/results', description: '按产品查看单位碳足迹、生命周期贡献和主要排放来源。' },
-  { label: '报告管理', pageTitle: '产品碳足迹报告', path: '/product-carbon-footprint/reports', description: '生成、预览和下载产品碳足迹量化报告。' },
+  { label: '碳足迹项目管理', pageTitle: '产品碳足迹项目', path: '/product-carbon-footprint/projects', description: '以产品项目为中心管理生命周期模型、活动数据、核算结果和报告。' },
+  { label: '碳足迹核算清单', pageTitle: '碳足迹核算清单', path: '/product-carbon-footprint/activity', description: '按生命周期过程维护活动数据、排放因子和单位产品排放结果。' },
+  { label: '碳足迹核算结果', pageTitle: '产品碳足迹核算结果', path: '/product-carbon-footprint/results', description: '按产品查看单位碳足迹、生命周期贡献和主要排放来源。' },
+  { label: '碳足迹报告管理', pageTitle: '产品碳足迹报告', path: '/product-carbon-footprint/reports', description: '生成、预览和下载产品碳足迹量化报告。' },
   { label: '碳足迹因子库', path: '/product-carbon-footprint/factors', description: '维护产品碳足迹核算所用的排放因子与数据来源。' },
 ];
 
 const supplyChainCarbonItems: NavItem[] = [
-  { label: '上游供应商碳数据', pageTitle: '供应链碳管理', path: '/supply-chain-carbon/suppliers', description: '维护供应商提供的材料/产品碳数据、业务数据及证明材料。' },
-  { label: '下游产品碳足迹交付', pageTitle: '供应链碳管理', path: '/supply-chain-carbon/delivery', description: '登记产品碳足迹报告向下游客户的交付情况。' },
+  { label: '供应商碳数据采集', pageTitle: '供应链碳管理', path: '/supply-chain-carbon/suppliers', description: '采集并维护供应商提供的材料/产品碳数据、业务数据及证明材料。' },
+  { label: '产品碳足迹披露', pageTitle: '供应链碳管理', path: '/supply-chain-carbon/delivery', description: '登记产品碳足迹报告向下游客户的对外披露情况。' },
 ];
 
 const assetStrategyItems: NavItem[] = [
@@ -126,6 +126,7 @@ export const router = createAppRouter([
     children: [
       { index: true, element: <Navigate to={allNavItems[0].path} replace /> },
       ...allNavItems.map((item) => ({ path: item.path.slice(1), element: <PlatformPage /> })),
+      { path: 'product-carbon-footprint/projects/:projectId', element: <PlatformPage /> },
       { path: 'data-management/energy-consumption', element: <Navigate to="/data-management/energy-data" replace /> },
       { path: 'data-management/energy-costs', element: <Navigate to="/data-management/energy-data?tab=costs" replace /> },
       { path: 'data-management/energy-relations', element: <Navigate to="/data-management/energy-data?tab=conversion" replace /> },

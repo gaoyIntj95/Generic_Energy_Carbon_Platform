@@ -19,6 +19,7 @@ describe('navigation manifest', () => {
       '能源数据',
       '重点设备',
       '设备产出数据',
+      '碳足迹核算清单',
     ]));
     expect(allNavItems.some((item) => item.label === '能碳数据采集')).toBe(false);
     expect(navigation.find((group) => group.key === 'data-management')?.items.map((item) => item.label)).toEqual([
@@ -48,8 +49,8 @@ describe('navigation manifest', () => {
     expect(carbonDisplay?.some((entry) => entry.label === '碳排放因子库')).toBe(false);
     const supplyChain = carbonDisplay?.find((entry) => entry.key === 'supply-chain-carbon');
     expect(supplyChain && 'items' in supplyChain ? supplyChain.items.map((item) => item.label) : []).toEqual([
-      '上游供应商碳数据',
-      '下游产品碳足迹交付',
+      '供应商碳数据采集',
+      '产品碳足迹披露',
     ]);
     expect(carbonDisplay?.filter((entry) => 'items' in entry).map((entry) => entry.key)).toEqual([
       'carbon-calculation',

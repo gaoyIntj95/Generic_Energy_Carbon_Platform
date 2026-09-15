@@ -289,7 +289,10 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
     expect(container.textContent).not.toContain('核算方法说明');
     expect(container.querySelectorAll('[data-support-table="basic"] col')).toHaveLength(4);
     expect(container.querySelectorAll('[data-support-table="basic"] tbody tr')).toHaveLength(2);
-    expect(container.querySelectorAll('[data-support-table="source"] col')).toHaveLength(8);
+    expect(container.querySelectorAll('[data-support-table="source"] col')).toHaveLength(5);
+    expect([...container.querySelectorAll('[data-support-table="source"] th')].map((cell) => cell.textContent)).toEqual(['排放源', '活动数据项', '支撑材料', '材料状态', '操作']);
+    expect(container.querySelector('[data-support-table="source"]')).not.toHaveTextContent('温室气体源类型');
+    expect(container.querySelector('[data-support-table="source"]')).not.toHaveTextContent('排放类别');
     expect(container.querySelector('[data-group-title="核算主体与边界"]')).toBeNull();
     expect(container.textContent).toContain('天然气燃烧（锅炉房）');
     expect(container.textContent).toContain('外购电力（企业整体）');

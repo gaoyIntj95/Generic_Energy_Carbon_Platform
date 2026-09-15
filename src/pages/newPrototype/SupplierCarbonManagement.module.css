@@ -28,3 +28,13 @@ td b,td small { display:inline; } td small { margin-left:4px; }
 .deleteButton { color:#d14b4b; }
 .deletePrompt { width:min(420px,92vw); }
 .deletePromptBody { padding:22px 21px; color:#4b5563; font-size:14px; }
+.evidenceModal { width:min(760px,96vw); }
+.evidenceTableWrap { overflow:auto; border:1px solid #e5e7eb; border-radius:8px; }
+.evidenceTable { min-width:0; }
+.evidenceTable th,.evidenceTable td { padding:12px 14px; }
+.downloadButton { display:inline-flex; align-items:center; height:32px; padding:0 11px; color:#087e59; border:1px solid #b9ead8; border-radius:6px; background:#effaf6; text-decoration:none; font-weight:600; }
+.evidenceSummary b,.evidenceSummary small { display:block; }
+.evidenceSummary b { color:#087e59; }
+.evidenceSummary small { margin-top:4px; color:#71808f; font-size:11px; }
+.card td .evidenceSummary b,.card td .evidenceSummary small { display:block; }
+.emptyEvidence { padding:26px; color:#6b7280; text-align:center; background:#fafbfc; border:1px dashed #d9dde5; border-radius:8px; }

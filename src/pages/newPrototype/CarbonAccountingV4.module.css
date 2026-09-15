@@ -1661,6 +1661,14 @@
   text-align: left !important;
 }
 
+.supportTable[data-support-table="source"] th:nth-child(2) {
+  text-align: right !important;
+}
+
+.supportTable[data-support-table="source"] tbody tr:not(.supportGroup):not(.supportScope):not(.supportColumnHeader) td:nth-child(1) {
+  text-align: left !important;
+}
+
 .supportTable[data-support-table="source"] th:nth-child(5),
 .supportTable[data-support-table="source"] tbody tr:not(.supportGroup):not(.supportScope):not(.supportColumnHeader) td:nth-child(5) {
   text-align: right !important;
@@ -1668,6 +1676,17 @@
 
 .supportTable[data-support-table="source"] tbody tr:not(.supportGroup):not(.supportScope):not(.supportColumnHeader) td:nth-child(6) {
   text-align: left !important;
+}
+
+.supportTable[data-support-table="source"] .supportScopeTitle {
+  height: 42px;
+}
+
+.supportTable[data-support-table="source"] .supportScopeTitle small {
+  margin-left: 4px;
+  color: #8a9895;
+  font-size: 11px;
+  font-weight: 400;
 }
 
 .supportTable[data-support-table="source"] tbody tr:not(.supportGroup):not(.supportScope):not(.supportColumnHeader) .materialPrimary {
@@ -2073,6 +2092,7 @@
 
 .carbonReportPaper {
   width: min(860px, calc(100% - 70px));
+  max-width: 100%;
   min-height: 1040px;
   box-sizing: border-box;
   margin: 0 auto;
@@ -2124,6 +2144,8 @@
 
 .carbonReportPaper table {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -2132,8 +2154,10 @@
 .carbonReportPaper td {
   padding: 5px 8px;
   border: 1px solid #89938f;
+  box-sizing: border-box;
   font-weight: 400;
   text-align: center;
+  overflow-wrap: anywhere;
   word-break: break-word;
 }
 
@@ -2237,6 +2261,19 @@
 }
 
 .modalWide { width: min(1180px, calc(100vw - 48px)); }
+
+/* 因子弹窗在宽屏下保持信息密度，同时让自定义因子输入框有明确的阅读宽度。 */
+.factorDialog { width: min(1080px, calc(100vw - 48px)); }
+.factorDialog .modalBody { padding: 16px 18px; }
+.factorDialog .factorContext { margin-bottom: 12px; }
+.factorDialog .factorPickerFilters { margin-bottom: 8px; }
+.factorDialog .factorGroups { max-height: min(46vh, 500px); }
+.factorDialog .factorChoices { max-height: none; margin-top: 8px; }
+.factorDialog .factorPickerActions { margin-top: 10px; padding: 11px 13px; }
+.factorCustomDialog { width: min(780px, calc(100vw - 32px)); }
+.factorCustomDialog .modalBody { padding: 16px 20px; }
+.factorCustomFormGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
+.factorCustomFormGrid .fieldFull { grid-column: 1 / -1; }
 
 .tableWrap {
   max-height: 360px;
@@ -2658,6 +2695,10 @@
   .factorActions { justify-content: flex-start; }
   .factorPickerActions { align-items: flex-start; flex-direction: column; }
 }
+
+@media (max-width: 480px) {
+  .factorCustomFormGrid { grid-template-columns: 1fr; }
+}
 .field small { color: var(--muted); }
 
 /* 国家因子库选择器使用单行清单，保留名称、口径和值等必要信息。 */
@@ -2668,6 +2709,46 @@
   margin-bottom: 6px;
   padding: 9px 12px;
   border-radius: 6px;
+}
+
+@media print {
+  .reportPage {
+    min-height: 0;
+  }
+
+  .reportSidebar,
+  .reportPreviewActions {
+    display: none;
+  }
+
+  .reportWorkbench,
+  .reportPreviewPane {
+    display: block;
+    min-height: 0;
+    border: 0;
+    box-shadow: none;
+    background: #fff;
+  }
+
+  .reportPreviewPane {
+    padding: 0;
+  }
+
+  .carbonReportPaper {
+    width: 100%;
+    max-width: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .carbonReportPaper table {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
 }
 .factorChoices > label:hover { background: #f5faf8; }
 .factorChoices > label > input { margin: 0; }
@@ -4150,6 +4231,52 @@
 .supportTable[data-support-table="source"] tbody tr:not(.supportGroup):not(.supportScope):not(.supportColumnHeader) .chainCell > b,
 .supportTable[data-support-table="source"] tbody tr:not(.supportGroup):not(.supportScope):not(.supportColumnHeader) .materialPrimary b {
   font-size: 12px;
+}
+
+/* Keep the five-column support table header and body on the same alignment grid. */
+.supportTable[data-support-table="source"] tbody tr:not(.supportGroup):not(.supportScope):not(.supportColumnHeader) td:nth-child(1),
+.supportTable[data-support-table="source"] tbody tr:not(.supportGroup):not(.supportScope):not(.supportColumnHeader) td:nth-child(3) {
+  text-align: left !important;
+}
+
+.supportTable[data-support-table="source"] tbody tr:not(.supportGroup):not(.supportScope):not(.supportColumnHeader) td:nth-child(2) {
+  text-align: center !important;
+}
+
+.supportTable[data-support-table="source"] tbody tr:not(.supportGroup):not(.supportScope):not(.supportColumnHeader) td:nth-child(3) {
+  text-align: center !important;
+}
+
+.supportTable[data-support-table="source"] tbody tr:not(.supportGroup):not(.supportScope):not(.supportColumnHeader) td:nth-child(2) .supportActivityValue,
+.supportTable[data-support-table="source"] tbody tr:not(.supportGroup):not(.supportScope):not(.supportColumnHeader) td:nth-child(3) .materialCell {
+  text-align: center !important;
+}
+
+.supportTable[data-support-table="source"] tbody tr:not(.supportGroup):not(.supportScope):not(.supportColumnHeader) td:nth-child(3) .materialPrimary {
+  justify-content: center;
+}
+
+.supportTable[data-support-table="source"] tbody tr:not(.supportGroup):not(.supportScope):not(.supportColumnHeader) td:nth-child(4),
+.supportTable[data-support-table="source"] tbody tr:not(.supportGroup):not(.supportScope):not(.supportColumnHeader) td:nth-child(5) {
+  text-align: center !important;
+}
+
+.supportTable[data-support-table="source"] thead th:nth-child(1),
+.supportTable[data-support-table="source"] thead th:nth-child(3) {
+  text-align: left !important;
+}
+
+.supportTable[data-support-table="source"] thead th:nth-child(2) {
+  text-align: center !important;
+}
+
+.supportTable[data-support-table="source"] thead th:nth-child(3) {
+  text-align: center !important;
+}
+
+.supportTable[data-support-table="source"] thead th:nth-child(4),
+.supportTable[data-support-table="source"] thead th:nth-child(5) {
+  text-align: center !important;
 }
 
 /* Unified compact context bar for preview, inventory and support pages. */
