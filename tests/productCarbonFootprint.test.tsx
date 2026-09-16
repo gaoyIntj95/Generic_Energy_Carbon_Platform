@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ProductCarbonFootprint } from '../src/pages/newPrototype/ProductCarbonFootprint';
 
@@ -11,6 +11,11 @@ function button(text: string, scope: ParentNode = container) {
   const result = [...scope.querySelectorAll('button')].find((item) => item.textContent?.includes(text));
   if (!result) throw new Error(`未找到按钮：${text}`);
   return result as HTMLButtonElement;
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location">{`${location.pathname}${location.search}`}</output>;
 }
 
 async function click(element: HTMLElement) {
@@ -29,7 +34,7 @@ describe('产品碳足迹运输活动', () => {
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
-    await act(async () => root.render(<MemoryRouter><ProductCarbonFootprint pathname="/product-carbon-footprint/activity" /></MemoryRouter>));
+    await act(async () => root.render(<MemoryRouter><ProductCarbonFootprint pathname="/product-carbon-footprint/activity" /><LocationProbe /></MemoryRouter>));
   });
 
   afterEach(async () => {
@@ -87,6 +92,8 @@ describe('产品碳足迹运输活动', () => {
     expect(container.textContent).toContain('工业变频器 VFD-75');
     expect(container.textContent).toContain('98.88');
     expect(container.textContent).toContain('已确认清单快照');
+    expect(container.textContent).toContain('排放量（kgCO₂e/1 台产品）');
+    expect(container.textContent).toContain('65.88 kgCO₂e/1 台产品');
     expect(container.querySelector('div[style*="conic-gradient"]')).not.toBeNull();
     expect(container.textContent).not.toContain('生成报告');
 
@@ -96,5 +103,29 @@ describe('产品碳足迹运输活动', () => {
     expect(container.textContent).toContain('01 报告摘要');
     expect(container.textContent).toContain('03 数据收集与核算方法');
     expect(container.textContent).toContain('06 排放热点与减排建议');
+  });
+
+  it('按核算项目切换清单，并将当前项目写入地址栏', async () => {
+    const projectSelect = container.querySelector<HTMLSelectElement>('select[aria-label="核算项目"]')!;
+    expect(projectSelect.value).toBe('1');
+    expect(container.textContent).toContain('热轧钢卷');
+
+    await act(async () => {
+      projectSelect.value = '2';
+      projectSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(projectSelect.value).toBe('2');
+    expect(container.textContent).toContain('铝锭');
+    expect(container.textContent).not.toContain('热轧钢卷');
+    expect(container.querySelector('[data-testid="location"]')?.textContent).toBe('/product-carbon-footprint/activity?projectId=2');
+  });
+
+  it('从项目链接打开清单时按 projectId 恢复对应项目', async () => {
+    await act(async () => root.render(<MemoryRouter key="project-3" initialEntries={['/product-carbon-footprint/activity?projectId=3']}><ProductCarbonFootprint pathname="/product-carbon-footprint/activity" /><LocationProbe /></MemoryRouter>));
+
+    expect(container.querySelector<HTMLSelectElement>('select[aria-label="核算项目"]')?.value).toBe('3');
+    expect(container.textContent).toContain('PCB 线路板');
+    expect(container.textContent).not.toContain('热轧钢卷');
   });
 });

@@ -3370,6 +3370,17 @@
   margin-top: 12px;
 }
 
+/* Keep the alert card aligned with the coverage card while using its extra height intentionally. */
+.referenceTwoCol > .referenceSection:last-child {
+  display: flex;
+  flex-direction: column;
+}
+
+.referenceTwoCol > .referenceSection:last-child .ruleList {
+  flex: 1;
+  align-content: center;
+}
+
 .referenceSection,
 .referenceForecast {
   padding: 16px 18px;
