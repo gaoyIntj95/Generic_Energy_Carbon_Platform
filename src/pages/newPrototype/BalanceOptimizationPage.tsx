@@ -600,7 +600,7 @@ export function BalanceOptimizationPage() {
         <div className={styles.panelHead}>
           <h2>能效与能耗指标诊断摘要</h2>
         </div>
-        <EnergyDiagnosisPanel rows={visibleUnitRows} onOpen={openDiagnosis} />
+        <EnergyDiagnosisPanel rows={visibleUnitRows} period={analysisPeriod} onOpen={openDiagnosis} />
       </section>
     </div>
     <section className={`${styles.card} ${styles.tableCard}`}>
@@ -796,20 +796,30 @@ function BalanceRankList({
 
 function EnergyDiagnosisPanel({
   rows,
+  period,
   onOpen,
 }: {
   rows: UnitBalanceRow[];
+  period: FlowPeriod;
   onOpen: (row: UnitBalanceRow, mode?: DiagnosisMode) => void;
 }) {
   const benchmarkIssueRows = rows.filter((row) => row.benchmarkDeviation !== null && (benchmarkGap(row) ?? 0) >= ENERGY_DEVIATION_ATTENTION);
   const trendIssueRows = rows.filter(trendNeedsAction);
+  // 年度视图需要保留可下钻的月度聚合结果，即使全年偏差未达到异常阈值；
+  // 否则用户无法查看年度趋势和明细来确认全年判断。
+  const annualBenchmarkRows = period.grain === 'year' && !benchmarkIssueRows.length
+    ? rows.filter((row) => row.benchmarkActual !== null && row.benchmarkTarget !== null)
+    : benchmarkIssueRows;
+  const annualTrendRows = period.grain === 'year' && !trendIssueRows.length
+    ? rows.filter((row) => row.intensityMetricValue !== null)
+    : trendIssueRows;
   const dataRows = rows.filter((row) => row.dataCompletenessStatus === 'incomplete');
   const groups = [
     {
       key: 'benchmark',
       label: '能效对标诊断',
       tone: 'blue',
-      rows: benchmarkIssueRows.slice(0, 1),
+      rows: annualBenchmarkRows.slice(0, 1),
       empty: '当前期间暂无可用能效对标数据',
       detail: (row: UnitBalanceRow) => row.benchmarkDeviation === null
         ? `${row.intensityMetricName} · 未配置目标`
@@ -819,7 +829,7 @@ function EnergyDiagnosisPanel({
       key: 'trend',
       label: '能耗指标变化',
       tone: 'orange',
-      rows: trendIssueRows.slice(0, 1),
+      rows: annualTrendRows.slice(0, 1),
       empty: '当前期间暂无可用同比/环比数据',
       detail: (row: UnitBalanceRow, _summary: boolean) => {
         const trends = [
@@ -1146,7 +1156,9 @@ function BalanceDiagnosisDrawer({
       : isBenchmarkMode
       ? `${selection.intensityMetricName}${currentValueText}；${metricIssue
         ? `较目标值 ${targetValueText} 存在不利对标偏差 ${format(Math.max(0, benchmarkGap(selection) ?? Math.abs(selection.benchmarkDeviation ?? 0)), 1)}%`
-        : '尚未配置对标目标，仅展示当前指标事实'}。`
+        : selection.benchmarkTarget === null
+          ? '尚未配置对标目标，仅展示当前指标事实'
+          : `较目标值 ${targetValueText} 当前表现正常`}。`
       : `${selection.intensityMetricName}${currentValueText}；同比/环比变化为 ${trendText}。该视图用于确认指标变化趋势，不直接替代对标结论。`;
   const primaryPath = dataIssue?.actionCode === 'GO_OPERATION_DATA'
     ? '/data-management/operations'
@@ -1183,13 +1195,22 @@ function BalanceDiagnosisDrawer({
           <div><span>对标目标</span><b>{targetValueText}</b></div>
           <div><span>对标偏差</span><b>{benchmarkDeviationValue}</b></div>
         </div>
-        <IntensityTrendChart
-          values={selection.benchmarkMonthlyActuals}
-          target={selection.benchmarkTarget}
-          targets={selection.benchmarkMonthlyTargets}
-          currentMonth={12}
-          benchmarkStyle
-        />
+        {period.grain === 'month' ? <DailyDataUnavailable /> : <>
+          <div className={styles.diagnosisContentHead}><strong>月度趋势</strong><span>按已填报月份汇总</span></div>
+          <IntensityTrendChart
+            values={selection.benchmarkMonthlyActuals}
+            target={selection.benchmarkTarget}
+            targets={selection.benchmarkMonthlyTargets}
+            currentMonth={12}
+            benchmarkStyle
+          />
+          <BenchmarkMonthlyDetailTable
+            actuals={selection.benchmarkMonthlyActuals}
+            targets={selection.benchmarkMonthlyTargets}
+            unit={selection.benchmarkMetricUnit}
+            direction={selection.benchmarkDirection}
+          />
+        </>}
       </section>
     </> : <>
       <section className={styles.diagnosisSection}>
@@ -1198,17 +1219,30 @@ function BalanceDiagnosisDrawer({
           <div><span>当前值</span><b>{metricValue}</b></div>
           <div><span>同比/环比变化</span><b>{deviationValue}</b></div>
         </div>
-        <IntensityTrendChart values={selection.intensityMonthlyValues} target={null} currentMonth={period.grain === 'month' ? period.month : 12} />
-        <IntensityMonthlyDetailTable
-          values={selection.intensityMonthlyValues}
-          momChanges={selection.intensityMonthlyMomChanges}
-          yoyChanges={selection.intensityMonthlyYoyChanges}
-          currentMonth={period.grain === 'month' ? period.month : 12}
-          unit={selection.intensityMetricUnit}
-        />
+        {period.grain === 'month' ? <DailyDataUnavailable /> : <>
+          <div className={styles.diagnosisContentHead}><strong>月度趋势</strong><span>用于确认全年指标变化</span></div>
+          <IntensityTrendChart values={selection.intensityMonthlyValues} target={null} currentMonth={12} />
+          <IntensityMonthlyDetailTable
+            values={selection.intensityMonthlyValues}
+            momChanges={selection.intensityMonthlyMomChanges}
+            yoyChanges={selection.intensityMonthlyYoyChanges}
+            currentMonth={12}
+            unit={selection.intensityMetricUnit}
+          />
+        </>}
       </section>
     </>}
   </Modal>;
+}
+
+function DailyDataUnavailable() {
+  return <div className={styles.diagnosisDailyEmpty}>
+    <div className={styles.diagnosisDailyEmptyIcon}>日</div>
+    <div><strong>日度趋势与明细暂不可用</strong>
+      <p>当前月份仅维护月度汇总数据，暂未接入日度计量数据。</p>
+      <small>月度能耗指标仍可正常使用；后续接入日度数据后将支持下钻查看。</small>
+    </div>
+  </div>;
 }
 
 function BalanceTrackingModal({
@@ -1320,6 +1354,40 @@ function IntensityMonthlyDetailTable({
         const status = risk >= ENERGY_DEVIATION_HIGH ? '高风险' : risk >= ENERGY_DEVIATION_ATTENTION ? '关注' : '正常';
         return <tr key={row.index}><td>{monthLabels[row.index]}</td><td>{row.value === null ? '—' : format(row.value, 2)}</td><td className={row.mom !== null && Math.abs(row.mom) >= ENERGY_DEVIATION_ATTENTION ? styles.diagnosisValueDanger : ''}>{row.mom === null ? '—' : `${row.mom >= 0 ? '+' : ''}${format(row.mom, 1)}%`}</td><td className={row.yoy !== null && Math.abs(row.yoy) >= ENERGY_DEVIATION_ATTENTION ? styles.diagnosisValueDanger : ''}>{row.yoy === null ? '—' : `${row.yoy >= 0 ? '+' : ''}${format(row.yoy, 1)}%`}</td><td><Tag tone={status === '高风险' ? 'red' : status === '关注' ? 'orange' : 'green'}>{status}</Tag></td></tr>;
       })}
+    </tbody></table>
+  </div>;
+}
+
+function BenchmarkMonthlyDetailTable({
+  actuals,
+  targets,
+  unit,
+  direction,
+}: {
+  actuals: Array<number | null>;
+  targets: Array<number | null>;
+  unit: string;
+  direction: 'low' | 'high' | null;
+}) {
+  const rows = monthLabels.map((month, index) => {
+    const actual = actuals[index] ?? null;
+    const target = targets[index] ?? null;
+    const deviation = actual === null || target === null || target === 0 ? null : (actual - target) / target * 100;
+    const adverse = deviation !== null && (direction === 'high' ? deviation < 0 : deviation > 0);
+    const risk = adverse ? Math.abs(deviation ?? 0) : 0;
+    const status = deviation === null ? '待补齐' : risk >= ENERGY_DEVIATION_HIGH ? '高风险' : risk >= ENERGY_DEVIATION_ATTENTION ? '关注' : '正常';
+    return { month, actual, target, deviation, adverse, status };
+  });
+  return <div className={styles.diagnosisDetailTableWrap} aria-label="年度能效对标月度明细">
+    <div className={styles.diagnosisDetailTableTitle}>月度明细</div>
+    <table className={styles.diagnosisDetailTable}><thead><tr><th>月份</th><th>实际值（{unit}）</th><th>对标目标（{unit}）</th><th>对标偏差</th><th>变化状态</th></tr></thead><tbody>
+      {rows.map((row) => <tr key={row.month}>
+        <td>{row.month}</td>
+        <td>{row.actual === null ? '—' : format(row.actual, 2)}</td>
+        <td>{row.target === null ? '—' : format(row.target, 2)}</td>
+        <td className={row.adverse && Math.abs(row.deviation ?? 0) >= ENERGY_DEVIATION_ATTENTION ? styles.diagnosisValueDanger : ''}>{row.deviation === null ? '—' : `${row.deviation >= 0 ? '+' : ''}${format(row.deviation, 1)}%`}</td>
+        <td><Tag tone={row.status === '高风险' ? 'red' : row.status === '关注' || row.status === '待补齐' ? 'orange' : 'green'}>{row.status}</Tag></td>
+      </tr>)}
     </tbody></table>
   </div>;
 }

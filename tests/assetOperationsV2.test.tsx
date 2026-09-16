@@ -102,26 +102,39 @@ describe('AssetOperationsV2 V2 prototype fidelity and interactions', () => {
     expect(diagnosisDialog?.textContent).not.toContain('基本闭合');
     expect(diagnosisDialog?.textContent).not.toContain('建议动作');
     expect(diagnosisDialog?.textContent).not.toContain('诊断上下文');
+    expect(container.textContent).toContain('当前月份仅维护月度汇总数据');
+    expect(container.textContent).toContain('月度能耗指标仍可正常使用');
     expect(container.textContent).toContain('指标证据');
-    expect(container.textContent).toContain('同比/环比变化');
-    expect(container.textContent).toContain('kgce/t');
+    expect(container.textContent).toContain('当前值');
+    expect(container.textContent).toContain('对标目标');
     expect(container.textContent).not.toContain('AI分析结论');
     expect(container.textContent).toContain('查看能效对标');
     expect(container.textContent).not.toContain('AI辅助说明');
     expect(diagnosisDialog?.textContent).not.toContain('核查详情');
   });
 
-  it('opens a trend-specific dialog from the B diagnosis group', async () => {
+  it('shows the phase-one daily-data empty state from the monthly trend diagnosis', async () => {
     await render('/asset-strategy/balance');
     const trendGroup = [...container.querySelectorAll('section[class*="energyDiagnosisGroup"]')]
       .find((section) => [...section.querySelectorAll('strong')].some((node) => node.textContent === '能耗指标变化'))!;
     await click(button('查看详情', trendGroup));
     expect(container.textContent).toContain('能耗指标变化详情｜生产车间B');
+    expect(container.textContent).toContain('暂未接入日度计量数据');
     expect(container.textContent).toContain('指标趋势');
-    expect(container.querySelector('[aria-label="能耗指标月度趋势图"]')).not.toBeNull();
-    expect(container.textContent).not.toContain('对标目标');
-    expect(container.textContent).not.toContain('查看能流分析');
+    expect(container.textContent).toContain('当前值');
+    expect(container.querySelector('[aria-label="能耗指标月度趋势图"]')).toBeNull();
     expect(container.textContent).toContain('查看能耗指标');
+  });
+
+  it('shows monthly trends and detail tables for annual benchmark diagnosis', async () => {
+    await render('/asset-strategy/balance?year=2026&grain=year&month=6');
+    await click(button('查看详情'));
+
+    expect(container.textContent).toContain('能效对标详情｜生产车间A');
+    expect(container.querySelector('[aria-label="能耗指标月度趋势图"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="年度能效对标月度明细"]')).not.toBeNull();
+    expect(container.textContent).toContain('月度明细');
+    expect(container.textContent).toContain('对标目标');
   });
 
   it('opens the follow-up dialog from a pending status and keeps progress out of the metric detail', async () => {
