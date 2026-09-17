@@ -766,7 +766,7 @@ function OperationsPage() {
       <tr className={styles.scopeGroupRow} key={`${unit.energyUnitId}-group`}>
         <td><div className={styles.scopeCell}><i /><span><b>{unit.energyUnitName}</b></span></div></td>
         <td colSpan={6} />
-        <td className={styles.scopeGroupActionCell}><div className={styles.scopeGroupActions}><button type="button" className={styles.scopeAddButton} onClick={() => { setNewScopeLevel(level as ScopeLevel); setNewUnitId(unit.energyUnitId); setNewMetricPreset(metricPresetForUnit(unit)); setEditing('new'); }}>＋ 新增运营数据</button>{level === '一级用能单元' && unit.unitType === '生产单元' && <button type="button" className={styles.scopeAddButton} onClick={() => setAllocationEditing({ energyUnitId: unit.energyUnitId })}>配置分配</button>}</div></td>
+        <td className={styles.scopeGroupActionCell}><div className={styles.scopeGroupActions}><button type="button" className={styles.scopeAddButton} onClick={() => { setNewScopeLevel(level as ScopeLevel); setNewUnitId(unit.energyUnitId); setNewMetricPreset(metricPresetForUnit(unit)); setEditing('new'); }}>＋ 新增</button>{level === '一级用能单元' && unit.unitType === '生产单元' && <button type="button" className={styles.scopeAddButton} onClick={() => setAllocationEditing({ energyUnitId: unit.energyUnitId })}>配置</button>}</div></td>
       </tr>,
       ...(unitRows.length ? unitRows.flatMap((row) => {
         const total = annual(row.monthlyValues, row.annualValue); const detail = expanded === row.operationMetricId;

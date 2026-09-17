@@ -657,9 +657,9 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     const officeGroup = [...container.querySelectorAll('tr[class*="scopeGroupRow"]')]
       .find((row) => row.textContent?.includes('办公区域'))!;
 
-    expect([...productionGroup.querySelectorAll('button')].map((item) => item.textContent)).toEqual(['＋ 新增运营数据', '配置分配']);
-    expect(officeGroup.textContent).not.toContain('配置分配');
-    expect([...container.querySelectorAll('tr')].filter((row) => row.textContent?.includes('产品产量') && row.textContent?.includes('配置分配'))).toHaveLength(0);
+    expect([...productionGroup.querySelectorAll('button')].map((item) => item.textContent)).toEqual(['＋ 新增', '配置']);
+    expect(officeGroup.textContent).not.toContain('配置');
+    expect([...container.querySelectorAll('tr')].filter((row) => row.textContent?.includes('产品产量') && row.textContent?.includes('配置'))).toHaveLength(0);
   });
 
   it('uses the configured energy-unit tree when assigning operation data and key devices', async () => {

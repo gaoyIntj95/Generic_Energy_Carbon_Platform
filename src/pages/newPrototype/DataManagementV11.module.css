@@ -256,6 +256,13 @@
 .wideTable th,
 .wideTable td { width: calc(100% / 9) !important; }
 
+/* 运营数据分组行可能同时显示新增和配置操作，确保按钮留在表格内。 */
+.wideTable .scopeGroupActionCell {
+  width: 170px !important;
+  padding-left: 8px;
+  white-space: nowrap;
+}
+
 .costTable {
   min-width: 2050px !important;
 }
@@ -569,7 +576,8 @@
 
 .scopeGroupActions {
   display: inline-flex;
-  gap: 8px;
+  flex-wrap: nowrap;
+  gap: 6px;
 }
 
 .scopeAddButton:hover {
