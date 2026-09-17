@@ -851,7 +851,7 @@ function EnergyUnitFormDialog({
                 {showRelationHelp && <span id={relationTooltipId} role="tooltip" className={styles.relationTooltip}>请按实际投入和产出的能源配置，不限定企业的单元名称。一期每个单元配置一种投入和一种产出。关系配置不代替数量填报，也不会自动重复计入投入。自定义组合从本年度能源品种中选择，缺少品种时请先在“能源品种”维护。余热产汽的产出同样选择“蒸汽”，回收来源由投入能源及转换记录保留。</span>}
               </span>
             </legend>
-            <p id={relationHintId}>示例：天然气 → 蒸汽</p>
+            <p id={relationHintId}>示例：天然气 → 蒸汽（锅炉系统）；电力 → 压缩空气（空压系统）；余热 → 电力（余热发电机组）</p>
             {hasMultipleRelations ? (
               <p>此单元包含多条历史转换关系，当前版本暂不支持编辑，原有数据已保留。</p>
             ) : (

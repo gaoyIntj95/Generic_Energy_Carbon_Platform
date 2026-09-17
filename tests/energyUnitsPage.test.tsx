@@ -144,7 +144,9 @@ describe('EnergyUnitsPage behavior', () => {
     expect(form.querySelectorAll('[role="group"]')).toHaveLength(0);
     const remark = form.querySelector('details')!;
     expect(remark.open).toBe(false);
-    expect(form.textContent).toContain('示例：天然气 → 蒸汽');
+    expect(form.textContent).toContain('天然气 → 蒸汽（锅炉系统）');
+    expect(form.textContent).toContain('电力 → 压缩空气（空压系统）');
+    expect(form.textContent).toContain('余热 → 电力（余热发电机组）');
     expect([...form.querySelector<HTMLSelectElement>('select[aria-label="投入能源"]')!.querySelectorAll('optgroup')].map((group) => group.label)).not.toContain('能源品种 / 电力');
     await setInput(form.querySelector('input[aria-label="用能单元名称"]')!, '新增空压站');
     await setSelect(form.querySelector('select[aria-label="投入能源"]')!, 'v11-energy-electricity');
