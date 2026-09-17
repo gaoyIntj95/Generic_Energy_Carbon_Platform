@@ -322,7 +322,7 @@ function AnnualEnergyDetail({
               <td><StatusTag tone={statusFor(item.standardCoalAmount) === '正常' ? 'ok' : 'warn'}>{statusFor(item.standardCoalAmount)}</StatusTag></td>
             </tr>
           ))}</tbody>
-          <tfoot><tr><td>合计</td><td>{format(row.physicalAmount)}</td><td>{row.measurementUnit}</td><td>{format(row.standardCoalAmount)}</td><td>100.0%</td><td>{percent(row.yearOnYear)}</td><td>—</td><td>完整</td></tr></tfoot>
+          <tfoot><tr><td>合计</td><td>{format(row.physicalAmount)}</td><td>{row.measurementUnit}</td><td>{format(row.standardCoalAmount)}</td><td>100.0%</td><td>{percent(row.yearOnYear)}</td><td>—</td><td>—</td></tr></tfoot>
         </table>
       </div>
       <div className={styles.modalNote}><strong>数据来源：</strong>{row.sourceDescription}<br /><strong>折标口径：</strong>各月读取对应能源品种的有效折标参数，年度值由已报月份记录汇总。<br /><strong>比较口径：</strong>同比为本月与上年同月比较，环比为本月与上月比较；首月无上月数据时不展示环比。<br /><strong>状态规则：</strong>月度折标量相对年度月均值高于或等于12%标记“偏高”，低于或等于-12%标记“偏低”，其余为“正常”。</div>
@@ -382,7 +382,7 @@ function MonthlyEnergyDetail({
               <td><StatusTag tone={item.dataStatus === '正常' ? 'ok' : 'warn'}>{item.dataStatus}</StatusTag></td>
             </tr>
           ))}</tbody>
-          <tfoot><tr><td>合计</td><td>{format(row.physicalAmount)}</td><td>{row.measurementUnit}</td><td>{format(row.standardCoalAmount)}</td><td>—</td><td>完整</td></tr></tfoot>
+          <tfoot><tr><td>合计</td><td>{format(row.physicalAmount)}</td><td>{row.measurementUnit}</td><td>{format(row.standardCoalAmount)}</td><td>—</td><td>—</td></tr></tfoot>
         </table>
       </div>
       <div className={styles.modalNote}><strong>数据来源：</strong>{row.sourceDescription}<br /><strong>统计说明：</strong>日度数据按当前用能单元和能源品种汇总；折标量合计与月度记录一致。<br /><strong>状态规则：</strong>日度折标量相对本月日均值高于或等于12%标记“偏高”，低于或等于-12%标记“偏低”，其余为“正常”。</div>

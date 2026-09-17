@@ -10,6 +10,7 @@ export type AnalysisCategory =
   | '化石燃料'
   | '可再生及替代能源'
   | '回收能源'
+  | '产出能源'
   | '其他能源';
 
 export type EnergyRole = '能源消费' | '回收能源' | '能源产出' | '外供能源';
@@ -158,13 +159,40 @@ const seedEnergyTypes: V11EnergyType[] = [
   { energyTypeId: 'v11-energy-electricity', analysisCategory: '电力', energyTypeName: '电力', measurementUnit: 'kWh', standardCoalFactor: 0.1229, standardCoalFactorUnit: 'kgce/kWh', remark: '' },
   { energyTypeId: 'v11-energy-steam', analysisCategory: '热力', energyTypeName: '蒸汽', measurementUnit: 'GJ', standardCoalFactor: 0.0341, standardCoalFactorUnit: 'tce/GJ', remark: '' },
   { energyTypeId: 'v11-energy-coal', analysisCategory: '化石燃料', energyTypeName: '原煤', measurementUnit: 't', standardCoalFactor: 0.7143, standardCoalFactorUnit: 'tce/t', remark: '' },
-  { energyTypeId: 'v11-energy-petcoke', analysisCategory: '化石燃料', energyTypeName: '石油焦', measurementUnit: 't', standardCoalFactor: 1.0918, standardCoalFactorUnit: 'tce/t', remark: '' },
-  { energyTypeId: 'v11-energy-natural-gas', analysisCategory: '化石燃料', energyTypeName: '天然气', measurementUnit: 'Nm³', standardCoalFactor: 1.33, standardCoalFactorUnit: 'kgce/Nm³', remark: '' },
-  { energyTypeId: 'v11-energy-rdf', analysisCategory: '可再生及替代能源', energyTypeName: 'RDF', measurementUnit: 't', standardCoalFactor: 0.6, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-bituminous-coal', analysisCategory: '化石燃料', energyTypeName: '烟煤', measurementUnit: 't', standardCoalFactor: 0.79174, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-petcoke', analysisCategory: '化石燃料', energyTypeName: '石油焦', measurementUnit: 't', standardCoalFactor: 1.05775, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-natural-gas', analysisCategory: '化石燃料', energyTypeName: '天然气', measurementUnit: 'Nm³', standardCoalFactor: 1.32836, standardCoalFactorUnit: 'kgce/Nm³', remark: '' },
+  { energyTypeId: 'v11-energy-rdf', analysisCategory: '可再生及替代能源', energyTypeName: 'RDF', measurementUnit: 't', standardCoalFactor: 0, standardCoalFactorUnit: 'tce/t', remark: '' },
   { energyTypeId: 'v11-energy-biomass', analysisCategory: '可再生及替代能源', energyTypeName: '生物质燃料', measurementUnit: 't', standardCoalFactor: 0.5, standardCoalFactorUnit: 'tce/t', remark: '' },
   { energyTypeId: 'v11-energy-waste-heat', analysisCategory: '回收能源', energyTypeName: '余热', measurementUnit: 'GJ', standardCoalFactor: 0.0341, standardCoalFactorUnit: 'tce/GJ', remark: '' },
   { energyTypeId: 'v11-energy-waste-pressure', analysisCategory: '回收能源', energyTypeName: '余压', measurementUnit: 'tce', standardCoalFactor: 1, standardCoalFactorUnit: 'tce/tce', remark: '生产过程余压按可回收折标量登记' },
   { energyTypeId: 'v11-energy-compressed-air', analysisCategory: '其他能源', energyTypeName: '压缩空气', measurementUnit: 'Nm³', standardCoalFactor: 0.04, standardCoalFactorUnit: 'kgce/Nm³', remark: '内部能源介质；参考值，企业可按实测耗电量/产气量修正' },
+  { energyTypeId: 'v11-energy-washed-clean-coal', analysisCategory: '化石燃料', energyTypeName: '洗精煤', measurementUnit: 't', standardCoalFactor: 0.9, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-washed-mid-coal', analysisCategory: '化石燃料', energyTypeName: '洗中煤', measurementUnit: 't', standardCoalFactor: 0.2857, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-coke', analysisCategory: '化石燃料', energyTypeName: '焦炭', measurementUnit: 't', standardCoalFactor: 0.9714, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-coal-tar', analysisCategory: '化石燃料', energyTypeName: '煤焦油', measurementUnit: 't', standardCoalFactor: 1.1429, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-crude-oil', analysisCategory: '化石燃料', energyTypeName: '原油', measurementUnit: 't', standardCoalFactor: 1.4286, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-fuel-oil', analysisCategory: '化石燃料', energyTypeName: '燃料油', measurementUnit: 't', standardCoalFactor: 1.4286, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-gasoline', analysisCategory: '化石燃料', energyTypeName: '汽油', measurementUnit: 't', standardCoalFactor: 1.4714, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-kerosene', analysisCategory: '化石燃料', energyTypeName: '煤油', measurementUnit: 't', standardCoalFactor: 1.4714, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-lng', analysisCategory: '化石燃料', energyTypeName: '液化天然气', measurementUnit: 't', standardCoalFactor: 1.7572, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-lpg', analysisCategory: '化石燃料', energyTypeName: '液化石油气', measurementUnit: 't', standardCoalFactor: 1.7143, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-refinery-dry-gas', analysisCategory: '化石燃料', energyTypeName: '炼厂干气', measurementUnit: 't', standardCoalFactor: 1.5714, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-blast-furnace-gas', analysisCategory: '化石燃料', energyTypeName: '高炉煤气', measurementUnit: 'Nm³', standardCoalFactor: 0.1286, standardCoalFactorUnit: 'kgce/Nm³', remark: '' },
+  { energyTypeId: 'v11-energy-crude-benzene', analysisCategory: '化石燃料', energyTypeName: '粗苯', measurementUnit: 't', standardCoalFactor: 1.4286, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-anthracite', analysisCategory: '化石燃料', energyTypeName: '无烟煤', measurementUnit: 't', standardCoalFactor: 0.83647, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-lignite', analysisCategory: '化石燃料', energyTypeName: '褐煤', measurementUnit: 't', standardCoalFactor: 0.49301, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-other-washed-coal', analysisCategory: '化石燃料', energyTypeName: '其他洗煤', measurementUnit: 't', standardCoalFactor: 0.52454, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-formed-coal', analysisCategory: '化石燃料', energyTypeName: '型煤', measurementUnit: 't', standardCoalFactor: 0.59575, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-other-petroleum', analysisCategory: '化石燃料', energyTypeName: '其他石油制品', measurementUnit: 't', standardCoalFactor: 1.37132, standardCoalFactorUnit: 'tce/t', remark: '' },
+  { energyTypeId: 'v11-energy-coke-oven-gas', analysisCategory: '化石燃料', energyTypeName: '焦炉煤气', measurementUnit: 'Nm³', standardCoalFactor: 0.5932, standardCoalFactorUnit: 'kgce/Nm³', remark: '' },
+  { energyTypeId: 'v11-energy-basic-oxygen-furnace-gas', analysisCategory: '化石燃料', energyTypeName: '转炉煤气', measurementUnit: 'Nm³', standardCoalFactor: 0.2714, standardCoalFactorUnit: 'kgce/Nm³', remark: '' },
+  { energyTypeId: 'v11-energy-other-coal-gas', analysisCategory: '化石燃料', energyTypeName: '其他煤气', measurementUnit: 'Nm³', standardCoalFactor: 0.17859, standardCoalFactorUnit: 'kgce/Nm³', remark: '' },
+  { energyTypeId: 'v11-output-electricity', analysisCategory: '产出能源', energyTypeName: '电力（产出）', measurementUnit: 'kWh', standardCoalFactor: 0.1229, standardCoalFactorUnit: 'kgce/kWh', remark: '' },
+  { energyTypeId: 'v11-output-steam', analysisCategory: '产出能源', energyTypeName: '蒸汽（产出）', measurementUnit: 'GJ', standardCoalFactor: 0.0341, standardCoalFactorUnit: 'tce/GJ', remark: '' },
+  { energyTypeId: 'v11-output-hot-water', analysisCategory: '产出能源', energyTypeName: '热水（产出）', measurementUnit: 'GJ', standardCoalFactor: 0.0341, standardCoalFactorUnit: 'tce/GJ', remark: '' },
+  { energyTypeId: 'v11-output-compressed-air', analysisCategory: '产出能源', energyTypeName: '压缩空气（产出）', measurementUnit: 'Nm³', standardCoalFactor: 0.04, standardCoalFactorUnit: 'kgce/Nm³', remark: '' },
+  { energyTypeId: 'v11-output-cold', analysisCategory: '产出能源', energyTypeName: '冷量（产出）', measurementUnit: 'GJ', standardCoalFactor: 0.0341, standardCoalFactorUnit: 'tce/GJ', remark: '原型默认按热量口径折标，企业可按实际口径调整。' },
 ];
 
 const seedEnergyRecords: V11EnergyRecord[] = [
@@ -359,6 +387,13 @@ missingPressureInput.monthlyAmounts[11] = 0;
 missingPressureInput.monthlyReportedMonths = Array.from({ length: 12 }, (_, index) => index !== 11);
 
 const annualEnergyTypes = createAnnualStore(seedEnergyTypes);
+// 列表仅展示企业已维护的品种；完整预设仍保留在各表单下拉中。
+const annualListedEnergyTypeIds = createAnnualStore([
+  'v11-energy-electricity', 'v11-energy-steam', 'v11-energy-coal',
+  'v11-energy-natural-gas', 'v11-energy-rdf', 'v11-energy-biomass', 'v11-energy-compressed-air',
+  'v11-energy-waste-heat', 'v11-energy-waste-pressure',
+  'v11-output-electricity', 'v11-output-steam', 'v11-output-hot-water', 'v11-output-compressed-air', 'v11-output-cold',
+]);
 const annualDisabledTypes = createAnnualStore<string>([]);
 let energyRecords = seedEnergyRecords.map(cloneRecord);
 let energyCosts = seedEnergyCosts.map(cloneCost);
@@ -519,6 +554,7 @@ function nextId(prefix: string) {
 
 export function listV11EnergyTypes(year = 2026) {
   const energyTypes = annualEnergyTypes.get(year); return energyTypes.map((item) => ({ ...item })); }
+export function listV11ListedEnergyTypeIds(year = 2026) { return [...annualListedEnergyTypeIds.get(year)]; }
 export function listV11EnergyTypeReferences(id: string, year = 2026): V11EnergyTypeReferenceSummary[] {
   const devices = annualDevices.get(year);
   const references: V11EnergyTypeReferenceSummary[] = [
@@ -623,9 +659,13 @@ export function saveV11EnergyType(input: Omit<V11EnergyType, 'energyTypeId'>, id
     const index = energyTypes.findIndex((item) => item.energyTypeId === id);
     if (index < 0) return { ok: false as const, error: '能源品种不存在。' };
     energyTypes[index] = { ...input, energyTypeId: id };
+    const listedIds = annualListedEnergyTypeIds.get(year);
+    if (!listedIds.includes(id)) listedIds.push(id);
     return { ok: true as const };
   }
-  energyTypes.push({ ...input, energyTypeId: nextId('v11-energy') });
+  const energyTypeId = nextId('v11-energy');
+  energyTypes.push({ ...input, energyTypeId });
+  annualListedEnergyTypeIds.get(year).push(energyTypeId);
   return { ok: true as const };
 }
 
@@ -635,6 +675,9 @@ export function deleteV11EnergyType(id: string, year = 2026) {
   if (references) return { ok: false as const, error: `该能源品种存在 ${references} 条业务引用，不能删除。` };
   const index = energyTypes.findIndex((item) => item.energyTypeId === id);
   if (index >= 0) energyTypes.splice(index, 1);
+  const listedIds = annualListedEnergyTypeIds.get(year);
+  const listedIndex = listedIds.indexOf(id);
+  if (listedIndex >= 0) listedIds.splice(listedIndex, 1);
   return { ok: true as const };
 }
 
@@ -1110,6 +1153,7 @@ export function v11ScopeName(energyUnitId: string | null, year = 2026) {
 
 export function resetDataManagementV11Store() {
   annualEnergyTypes.reset();
+  annualListedEnergyTypeIds.reset();
   annualDisabledTypes.reset();
   energyRecords = seedEnergyRecords.map(cloneRecord);
   energyCosts = seedEnergyCosts.map(cloneCost);

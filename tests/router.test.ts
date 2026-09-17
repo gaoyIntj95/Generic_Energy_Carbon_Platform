@@ -23,8 +23,8 @@ describe('navigation manifest', () => {
     ]));
     expect(allNavItems.some((item) => item.label === '能碳数据采集')).toBe(false);
     expect(navigation.find((group) => group.key === 'data-management')?.items.map((item) => item.label)).toEqual([
-      '用能单元',
       '能源品种',
+      '用能单元',
       '重点设备',
       '设备产出数据',
       '能源数据',

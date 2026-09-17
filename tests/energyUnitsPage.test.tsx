@@ -46,13 +46,6 @@ async function setSelect(element: HTMLSelectElement, value: string) {
   });
 }
 
-async function selectRelation(form: HTMLFormElement, label: string) {
-  const select = form.querySelector<HTMLSelectElement>('select[aria-label="常用能源转换关系"]')!;
-  const option = [...select.options].find((item) => item.textContent === label);
-  if (!option) throw new Error('未找到关系：' + label);
-  await setSelect(select, option.value);
-}
-
 function modalForm() {
   const form = container.querySelector('form');
   if (!form) throw new Error('未找到弹窗表单');
@@ -144,29 +137,31 @@ describe('EnergyUnitsPage behavior', () => {
     expect(form.querySelector('button')?.textContent).not.toContain('修改类型');
   });
 
-  it('keeps the initial power-center form compact and saves a common relation with an optional remark', async () => {
+  it('keeps the initial power-center form compact and saves a custom relation with an optional remark', async () => {
     await click(findButton('添加下级', findRow('动力中心')));
     const form = modalForm();
-    expect(form.querySelectorAll('select')).toHaveLength(1);
-    expect(form.querySelectorAll('[role="group"]')).toHaveLength(1);
+    expect(form.querySelectorAll('select')).toHaveLength(2);
+    expect(form.querySelectorAll('[role="group"]')).toHaveLength(0);
     const remark = form.querySelector('details')!;
     expect(remark.open).toBe(false);
-    expect(form.querySelector('select[aria-label="投入能源"]')).toBeNull();
+    expect(form.textContent).toContain('示例：天然气 → 蒸汽');
+    expect([...form.querySelector<HTMLSelectElement>('select[aria-label="投入能源"]')!.querySelectorAll('optgroup')].map((group) => group.label)).not.toContain('能源品种 / 电力');
     await setInput(form.querySelector('input[aria-label="用能单元名称"]')!, '新增空压站');
-    await selectRelation(form, '电力 → 压缩空气');
+    await setSelect(form.querySelector('select[aria-label="投入能源"]')!, 'v11-energy-electricity');
+    await setSelect(form.querySelector('select[aria-label="产出能源"]')!, 'v11-output-compressed-air');
     await click(remark.querySelector('summary')!);
     await setInput(form.querySelector('textarea[aria-label="备注"]')!, '备用系统');
     await click(findButton('保存', form));
     expect(listEnergyUnits().find((unit) => unit.energyUnitName === '新增空压站')).toMatchObject({
     unitType: '能源转换子系统', remark: '备用系统',
-      energyRelations: [{ inputEnergyTypeId: 'v11-energy-electricity', outputEnergyTypeId: 'v11-energy-compressed-air' }],
+      energyRelations: [{ inputEnergyTypeId: 'v11-energy-electricity', outputEnergyTypeId: 'v11-output-compressed-air' }],
     });
     await click(findButton('编辑', findRow('新增空压站')));
     expect(modalForm().querySelector('details')?.open).toBe(true);
     expect(modalForm().querySelector<HTMLTextAreaElement>('textarea[aria-label="备注"]')?.value).toBe('备用系统');
   });
 
-  it('uses a single relation and switches between presets and editable dictionary fields without losing values', async () => {
+  it('uses one editable energy pair and validates it before saving', async () => {
     const count = listEnergyUnits().length;
     await click(findButton('添加下级', findRow('动力中心')));
     const form = modalForm();
@@ -174,35 +169,31 @@ describe('EnergyUnitsPage behavior', () => {
     expect(form.textContent).not.toContain('添加一条关系');
     expect(form.textContent).not.toContain('热电联产');
     await click(findButton('保存', form));
-    expect(form.querySelector('[role="alert"]')?.textContent).toContain('请选择常用能源转换关系');
+    expect(form.querySelector('[role="alert"]')?.textContent).toContain('请补全第 1 条关系');
     expect(listEnergyUnits()).toHaveLength(count);
-    await selectRelation(form, '原煤 → 蒸汽');
-    await click(findButton('自定义', form));
     expect(form.querySelector('select[aria-label="常用能源转换关系"]')).toBeNull();
-    expect(findButton('自定义', form).getAttribute('aria-pressed')).toBe('true');
-    expect(form.querySelector<HTMLSelectElement>('select[aria-label="投入能源"]')?.value).toBe('v11-energy-coal');
-    expect(form.querySelector<HTMLSelectElement>('select[aria-label="产出能源"]')?.value).toBe('v11-energy-steam');
-    expect([...form.querySelector<HTMLSelectElement>('select[aria-label="产出能源"]')!.options].map((option) => option.textContent)).toEqual(['请选择产出能源', '电力', '蒸汽', '压缩空气']);
+    await setSelect(form.querySelector('select[aria-label="投入能源"]')!, 'v11-energy-coal');
+    await setSelect(form.querySelector('select[aria-label="产出能源"]')!, 'v11-output-steam');
+    expect([...form.querySelector<HTMLSelectElement>('select[aria-label="产出能源"]')!.options].map((option) => option.textContent)).toEqual(['请选择产出能源', '电力（产出）', '蒸汽（产出）', '热水（产出）', '压缩空气（产出）', '冷量（产出）']);
+    expect([...form.querySelector<HTMLSelectElement>('select[aria-label="投入能源"]')!.options].map((option) => option.textContent)).toContain('其他煤气');
+    expect([...form.querySelector<HTMLSelectElement>('select[aria-label="投入能源"]')!.options].map((option) => option.textContent)).not.toContain('电力（产出）');
     await setSelect(form.querySelector('select[aria-label="投入能源"]')!, 'v11-energy-electricity');
-    await setSelect(form.querySelector('select[aria-label="产出能源"]')!, 'v11-energy-electricity');
+    await setSelect(form.querySelector('select[aria-label="产出能源"]')!, 'v11-output-electricity');
     await click(findButton('保存', form));
-    expect(form.querySelector('[role="alert"]')?.textContent).toContain('投入与产出能源不能相同');
+    expect(form.querySelector('[role="alert"]')?.textContent).toContain('投入与产出不能是同一种能源');
     expect(listEnergyUnits()).toHaveLength(count);
     await setSelect(form.querySelector('select[aria-label="投入能源"]')!, 'v11-energy-coal');
-    await click(findButton('常用关系', form));
-    expect(form.querySelector<HTMLSelectElement>('select[aria-label="常用能源转换关系"]')?.selectedOptions[0].textContent).toBe('原煤 → 电力');
-    expect(form.querySelector('select[aria-label="投入能源"]')).toBeNull();
     await click(findButton('保存', form));
     expect(listEnergyUnits().find((unit) => unit.energyUnitName === '企业锅炉装置')?.energyRelations).toEqual([
-      { inputEnergyTypeId: 'v11-energy-coal', outputEnergyTypeId: 'v11-energy-electricity' },
+      { inputEnergyTypeId: 'v11-energy-coal', outputEnergyTypeId: 'v11-output-electricity' },
     ]);
   });
 
   it('does not truncate existing multiple relations through the single-relation editor', async () => {
     const original = listEnergyUnits().find((unit) => unit.energyUnitName === '锅炉系统')!;
     const relations = [
-      { inputEnergyTypeId: 'v11-energy-coal', outputEnergyTypeId: 'v11-energy-steam' },
-      { inputEnergyTypeId: 'v11-energy-coal', outputEnergyTypeId: 'v11-energy-electricity' },
+      { inputEnergyTypeId: 'v11-energy-coal', outputEnergyTypeId: 'v11-output-steam' },
+      { inputEnergyTypeId: 'v11-energy-coal', outputEnergyTypeId: 'v11-output-electricity' },
     ];
     expect(updateEnergyUnit(original.energyUnitId, { ...original, energyRelations: relations }).ok).toBe(true);
     await click(findButton('编辑', findRow('锅炉系统')));
@@ -222,16 +213,10 @@ describe('EnergyUnitsPage behavior', () => {
     await click(findButton('添加下级', findRow('动力中心')));
     const form = modalForm();
     await setInput(form.querySelector('input[aria-label="用能单元名称"]')!, '企业自定义装置');
-    await click(findButton('自定义', form));
     await setSelect(form.querySelector('select[aria-label="投入能源"]')!, fuel.energyTypeId);
-    await setSelect(form.querySelector('select[aria-label="产出能源"]')!, 'v11-energy-steam');
-    await click(findButton('常用关系', form));
+    await setSelect(form.querySelector('select[aria-label="产出能源"]')!, 'v11-output-steam');
     await click(findButton('保存', form));
-    expect(form.querySelector('[role="alert"]')?.textContent).toContain('请选择常用能源转换关系');
-    await click(findButton('自定义', form));
-    expect(form.querySelector<HTMLSelectElement>('select[aria-label="投入能源"]')?.value).toBe(fuel.energyTypeId);
-    await click(findButton('保存', form));
-    expect(listEnergyUnits().find((unit) => unit.energyUnitName === '企业自定义装置')?.energyRelations).toEqual([{ inputEnergyTypeId: fuel.energyTypeId, outputEnergyTypeId: 'v11-energy-steam' }]);
+    expect(listEnergyUnits().find((unit) => unit.energyUnitName === '企业自定义装置')?.energyRelations).toEqual([{ inputEnergyTypeId: fuel.energyTypeId, outputEnergyTypeId: 'v11-output-steam' }]);
     await click(findButton('编辑', findRow('企业自定义装置')));
     expect(modalForm().querySelector<HTMLSelectElement>('select[aria-label="投入能源"]')?.value).toBe(fuel.energyTypeId);
   });
@@ -257,17 +242,19 @@ describe('EnergyUnitsPage behavior', () => {
 
   it('restores the energy relation of an existing secondary energy unit', async () => {
     await click(findButton('编辑', findRow('锅炉系统')));
-    expect(modalForm().querySelector<HTMLSelectElement>('select[aria-label="常用能源转换关系"]')?.selectedOptions[0].textContent).toBe('天然气 → 蒸汽');
+    expect(modalForm().querySelector<HTMLSelectElement>('select[aria-label="投入能源"]')?.value).toBe('v11-energy-natural-gas');
+    expect(modalForm().querySelector<HTMLSelectElement>('select[aria-label="产出能源"]')?.value).toBe('v11-output-steam');
   });
 
   it('keeps the utility child type fixed to a utility subsystem', async () => {
     await click(findButton('添加下级', findRow('动力中心')));
     const form = modalForm();
-    await selectRelation(form, '天然气 → 蒸汽');
+    await setSelect(form.querySelector('select[aria-label="投入能源"]')!, 'v11-energy-natural-gas');
+    await setSelect(form.querySelector('select[aria-label="产出能源"]')!, 'v11-output-steam');
     await setInput(form.querySelector('input[aria-label="用能单元名称"]')!, '动力中心其他单元');
     await click(findButton('保存', form));
     expect(listEnergyUnits().find((unit) => unit.energyUnitName === '动力中心其他单元')).toMatchObject({
-      unitType: '能源转换子系统', energyRelations: [{ inputEnergyTypeId: 'v11-energy-natural-gas', outputEnergyTypeId: 'v11-energy-steam' }],
+      unitType: '能源转换子系统', energyRelations: [{ inputEnergyTypeId: 'v11-energy-natural-gas', outputEnergyTypeId: 'v11-output-steam' }],
     });
   });
 

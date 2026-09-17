@@ -28,7 +28,12 @@ export function energyRelationError(relations: EnergyRelation[] | undefined, typ
   for (const [index, relation] of relations.entries()) {
     if (!relation?.inputEnergyTypeId || !relation.outputEnergyTypeId) return `请补全第 ${index + 1} 条关系的投入能源和产出能源。`;
     if (!ids.has(relation.inputEnergyTypeId) || !ids.has(relation.outputEnergyTypeId)) return `第 ${index + 1} 条关系引用了本年度不存在的能源品种，请重新选择。`;
-    if (relation.inputEnergyTypeId === relation.outputEnergyTypeId) return `第 ${index + 1} 条关系的投入与产出能源不能相同。`;
+    const input = types.find((type) => type.energyTypeId === relation.inputEnergyTypeId);
+    const output = types.find((type) => type.energyTypeId === relation.outputEnergyTypeId);
+    const normalizeEnergyName = (name: string) => name.trim().replace(/[（(]产出[）)]$/, '');
+    if (relation.inputEnergyTypeId === relation.outputEnergyTypeId || normalizeEnergyName(input!.energyTypeName) === normalizeEnergyName(output!.energyTypeName)) {
+      return `第 ${index + 1} 条关系的投入与产出不能是同一种能源。`;
+    }
     const key = JSON.stringify([relation.inputEnergyTypeId, relation.outputEnergyTypeId]);
     if (seen.has(key)) return '相同的投入、产出能源组合不能重复添加。';
     seen.add(key);
@@ -41,8 +46,8 @@ export function conversionScenarioFor(relation: EnergyRelation, types: V11Energy
   if (input?.analysisCategory === '回收能源') {
     return input.energyTypeName === '余热' && output?.analysisCategory === '电力' ? '余热发电' : '回收利用';
   }
-  if (output?.energyTypeName === '压缩空气') return '空压产气/压缩空气';
-  if (output?.analysisCategory === '热力') return '锅炉产汽/产热';
+  if (output?.energyTypeName.includes('压缩空气')) return '空压产气/压缩空气';
+  if (output?.analysisCategory === '热力' || output?.energyTypeName.includes('蒸汽') || output?.energyTypeName.includes('热水')) return '锅炉产汽/产热';
   return '其他转换';
 }
 

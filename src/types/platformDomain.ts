@@ -13,7 +13,7 @@ export interface EnergyActivityRecord {
 
 export interface EnergyType {
   energyTypeId: string;
-  analysisCategory: '电力' | '热力' | '化石燃料' | '可再生及替代能源' | '回收能源' | '其他能源';
+  analysisCategory: '电力' | '热力' | '化石燃料' | '可再生及替代能源' | '回收能源' | '产出能源' | '其他能源';
   energyTypeName: string;
   measurementUnit: string;
   standardCoalFactor: number;

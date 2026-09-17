@@ -108,6 +108,9 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(dialog.textContent).toContain('12月');
     expect(dialog.textContent).toContain('58,900,000');
     expect(dialog.textContent).toContain('58,900');
+    const annualTotal = dialog.querySelector('table[aria-label="年度月明细"] tfoot');
+    expect(annualTotal?.textContent).toContain('合计');
+    expect(annualTotal?.textContent).not.toMatch(/合计.*完整/);
   });
 
   it('keeps flow query actions on the right without a balance-page shortcut', async () => {

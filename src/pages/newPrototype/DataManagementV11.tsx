@@ -21,6 +21,7 @@ import {
   listV11ExternalSupplyRecords,
   saveFlowConversion,
   listV11EnergyTypes,
+  listV11ListedEnergyTypeIds,
   listV11KeyDevices,
   listV11OperationMetrics,
   saveV11EnergyCost,
@@ -65,7 +66,7 @@ import { EnergyUnitsPage } from './EnergyUnitsPage';
 import styles from './DataManagementV11.module.css';
 
 const months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
-const categories: AnalysisCategory[] = ['电力', '热力', '化石燃料', '可再生及替代能源', '其他能源'];
+const categories: AnalysisCategory[] = ['电力', '热力', '化石燃料', '可再生及替代能源', '回收能源', '产出能源', '其他能源'];
 type EnergyScopeView = ScopeLevel | '重点设备';
 const levels: Array<'全部层级' | EnergyScopeView> = ['全部层级', '企业', '一级用能单元', '二级用能单元', '重点设备'];
 type OperationScopeView = ScopeLevel | '全部层级';
@@ -127,9 +128,10 @@ const metricCodes: Record<string, string> = {
 const energyPresets: Record<AnalysisCategory, Array<[string, string, number, string]>> = {
   电力: [['电力', 'kWh', 0.1229, 'kgce/kWh']],
   热力: [['蒸汽', 'GJ', 0.0341, 'tce/GJ'], ['热水', 'GJ', 0.0341, 'tce/GJ']],
-  化石燃料: [['原煤', 't', 0.7143, 'tce/t'], ['烟煤', 't', 0.7143, 'tce/t'], ['石油焦', 't', 1.0918, 'tce/t'], ['柴油', 't', 1.4571, 'tce/t'], ['天然气', 'Nm³', 1.33, 'kgce/Nm³']],
+  化石燃料: [['原煤', 't', 0.7143, 'tce/t'], ['烟煤', 't', 0.79174, 'tce/t'], ['石油焦', 't', 1.05775, 'tce/t'], ['柴油', 't', 1.4571, 'tce/t'], ['天然气', 'Nm³', 1.32836, 'kgce/Nm³'], ['洗精煤', 't', 0.9, 'tce/t'], ['洗中煤', 't', 0.2857, 'tce/t'], ['焦炭', 't', 0.9714, 'tce/t'], ['煤焦油', 't', 1.1429, 'tce/t'], ['原油', 't', 1.4286, 'tce/t'], ['燃料油', 't', 1.4286, 'tce/t'], ['汽油', 't', 1.4714, 'tce/t'], ['煤油', 't', 1.4714, 'tce/t'], ['液化天然气', 't', 1.7572, 'tce/t'], ['液化石油气', 't', 1.7143, 'tce/t'], ['炼厂干气', 't', 1.5714, 'tce/t'], ['高炉煤气', 'Nm³', 0.1286, 'kgce/Nm³'], ['粗苯', 't', 1.4286, 'tce/t'], ['无烟煤', 't', 0.83647, 'tce/t'], ['褐煤', 't', 0.49301, 'tce/t'], ['其他洗煤', 't', 0.52454, 'tce/t'], ['型煤', 't', 0.59575, 'tce/t'], ['其他石油制品', 't', 1.37132, 'tce/t'], ['焦炉煤气', 'Nm³', 0.5932, 'kgce/Nm³'], ['转炉煤气', 'Nm³', 0.2714, 'kgce/Nm³'], ['其他煤气', 'Nm³', 0.17859, 'kgce/Nm³'], ['其他（自定义）', '', 0, '']],
   可再生及替代能源: [['生物质燃料', 't', 0.5, 'tce/t'], ['RDF', 't', 0.6, 'tce/t'], ['废轮胎', 't', 0.8, 'tce/t']],
   回收能源: [['余热', 'GJ', 0.0341, 'tce/GJ'], ['余压', 'tce', 1, 'tce/tce']],
+  产出能源: [['电力（产出）', 'kWh', 0.1229, 'kgce/kWh'], ['蒸汽（产出）', 'GJ', 0.0341, 'tce/GJ'], ['热水（产出）', 'GJ', 0.0341, 'tce/GJ'], ['压缩空气（产出）', 'Nm³', 0.04, 'kgce/Nm³'], ['冷量（产出）', 'GJ', 0.0341, 'tce/GJ'], ['其他（自定义）', '', 0, '']],
   其他能源: [['压缩空气', 'Nm³', 0, 'kgce/Nm³'], ['其他（自定义）', '', 0, '']],
 };
 
@@ -227,8 +229,9 @@ function EnergyTypesPage() {
   const [editing, setEditing] = useState<V11EnergyType | 'new' | null>(null);
   const [deleting, setDeleting] = useState<V11EnergyType | null>(null);
   const [blocked, setBlocked] = useState<{ item: V11EnergyType; references: ReturnType<typeof listV11EnergyTypeReferences> } | null>(null);
-  // 回收能源通过来源入口维护，不作为外购能源消费品种展示。
-  const rows = listV11EnergyTypes(Number(maintenanceYear)).filter((item) => item.analysisCategory !== '回收能源' && (!keyword || item.energyTypeName.includes(keyword)) && (!category || item.analysisCategory === category));
+  const configuredEnergyTypeIds = new Set(listV11ListedEnergyTypeIds(Number(maintenanceYear)));
+  // 列表只展示企业已配置或已使用的品种；完整预设仍在新增及转换关系下拉中提供。
+  const rows = listV11EnergyTypes(Number(maintenanceYear)).filter((item) => configuredEnergyTypeIds.has(item.energyTypeId) && (!keyword || item.energyTypeName.includes(keyword)) && (!category || item.analysisCategory === category));
   void version;
   return <Page toast={toast}>
     <section className={styles.card}>
@@ -267,10 +270,14 @@ function EnergyTypeDialog({ item, onClose, onSaved }: { item?: V11EnergyType; on
   const [remark, setRemark] = useState(item?.remark ?? '');
   const [error, setError] = useState('');
   const custom = preset === '其他（自定义）';
+  const manualParameters = preset === '余压' || preset === '冷量（产出）';
   const choosePreset = (value: string, nextCategory = category) => {
     setPreset(value);
     const option = energyPresets[nextCategory].find((entry) => entry[0] === value);
-    if (option) { setUnit(option[1]); setFactor(String(option[2])); setFactorUnit(option[3]); }
+    if (option) {
+      const manual = value === '余压' || value === '冷量（产出）';
+      setUnit(manual ? '' : option[1]); setFactor(manual ? '' : String(option[2])); setFactorUnit(manual ? '' : option[3]);
+    }
   };
   return <Modal title={`${item ? '编辑能源品种' : '新增能源品种'}（${maintenanceYear}年度）`} width={760} onClose={onClose} onSubmit={() => {
     const name = custom ? customName.trim() : preset;
@@ -283,9 +290,9 @@ function EnergyTypeDialog({ item, onClose, onSaved }: { item?: V11EnergyType; on
     <Field label="能源分析类别" required><select value={category} onChange={(event) => { const next = event.target.value as AnalysisCategory; setCategory(next); setPreset(''); setUnit(''); setFactor(''); setFactorUnit(''); }}>{categories.map((value) => <option key={value}>{value}</option>)}</select></Field>
     <Field label="能源品种" required><select value={preset} onChange={(event) => choosePreset(event.target.value)}><option value="">请选择能源品种</option>{energyPresets[category].map(([name]) => <option key={name}>{name}</option>)}</select></Field>
     {custom && <Field label="自定义能源品种" required><input value={customName} onChange={(event) => setCustomName(event.target.value)} /></Field>}
-    <Field label="计量单位" required><input value={unit} readOnly={!custom} onChange={(event) => setUnit(event.target.value)} /></Field>
+    <Field label="计量单位" required><input value={unit} readOnly={!custom && !manualParameters} onChange={(event) => setUnit(event.target.value)} placeholder={manualParameters ? '请输入计量单位' : undefined} /></Field>
     <Field label="折标系数" required><input min="0" step="0.0001" type="number" value={factor} onChange={(event) => setFactor(event.target.value)} /></Field>
-    <Field label="折标单位" required><input value={factorUnit} readOnly={!custom} onChange={(event) => setFactorUnit(event.target.value)} /></Field>
+    <Field label="折标单位" required><input value={factorUnit} readOnly={!custom && !manualParameters} onChange={(event) => setFactorUnit(event.target.value)} placeholder={manualParameters ? '请输入折标单位' : undefined} /></Field>
     <div className={styles.full}><Field label="备注"><textarea value={remark} onChange={(event) => setRemark(event.target.value)} placeholder="选填" /></Field></div>
     {error && <div className={`${styles.error} ${styles.full}`}>{error}</div>}
   </div></Modal>;
@@ -340,7 +347,7 @@ function EnergyQuantityPage() {
   const renderEnergyDetails = (row: V11EnergyRecord, total: number, unit: string) => <MonthDetail values={row.monthlyAmounts} reported={reportedMonths(row)} annualValue={total} annualSupplemented={row.annualAmount > 0} unit={unit}
     onCollapse={() => showDetails(null)} />;
   const types = listV11EnergyTypes(Number(maintenanceYear));
-  const availableCategories = energyRole === '回收能源' ? ['回收能源'] : [...categories, '回收能源'];
+  const availableCategories = energyRole === '回收能源' ? ['回收能源'] : categories;
   const visibleLevels = energyRole === '回收能源' ? (['二级用能单元'] as const) : levels;
   const devices = listV11KeyDevices(Number(maintenanceYear));
   const records = listV11EnergyRecords();

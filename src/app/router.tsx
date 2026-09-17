@@ -23,8 +23,8 @@ export function navItemMatches(item: NavItem, pathname: string, search: string) 
 }
 
 const dataManagementItems: NavItem[] = [
-  { label: '用能单元', pageTitle: '用能单元管理', path: '/data-management/units', description: '配置企业用能单元及上下级关系，用于能源数据归属、查询与分析。' },
   { label: '能源品种', path: '/data-management/energy-types', description: '管理企业实际使用的能源品种、计量单位及默认折标参数。' },
+  { label: '用能单元', pageTitle: '用能单元管理', path: '/data-management/units', description: '配置企业用能单元及上下级关系，用于能源数据归属、查询与分析。' },
   { label: '重点设备', path: '/data-management/devices', description: '维护重点设备基础档案及其用能归属，为后续设备级分析提供基础。' },
   { label: '设备产出数据', path: '/data-management/device-output', description: '自动继承全部重点设备，优先展示已有产出；缺失数据可在此按月或按年度补录。' },
       { label: '能源数据', path: '/data-management/energy-data', description: '按企业及用能单元层级维护能源消费、能源转换和能源成本数据。' },

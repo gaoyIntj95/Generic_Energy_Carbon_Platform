@@ -75,8 +75,9 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(headers).toEqual(['能源分析类别', '能源品种', '计量单位', '折标系数', '折标单位', '年份', '操作']);
     expect(container.textContent).toContain('压缩空气');
     expect(container.textContent).not.toContain('回收蒸汽');
-    expect(container.textContent).not.toContain('余热');
-    expect(container.querySelectorAll('tbody > tr')).toHaveLength(8);
+    expect(container.textContent).toContain('余热');
+    expect(container.textContent).toContain('电力（产出）');
+    expect(container.querySelectorAll('tbody > tr')).toHaveLength(14);
     const compressedAir = listV11EnergyTypes().find((item) => item.energyTypeName === '压缩空气');
     expect(compressedAir).toMatchObject({ standardCoalFactor: 0.04, standardCoalFactorUnit: 'kgce/Nm³' });
     expect(container.textContent).toContain('0.0400');
@@ -99,10 +100,10 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     const keyword = container.querySelector('[aria-label="关键字"]') as HTMLInputElement;
     const category = container.querySelector('[aria-label="能源分析类别"]') as HTMLSelectElement;
 
-    expect(container.querySelectorAll('tbody > tr')).toHaveLength(8);
+    expect(container.querySelectorAll('tbody > tr')).toHaveLength(14);
     await change(keyword, '天然气');
     await change(category, '化石燃料');
-    expect(container.querySelectorAll('tbody > tr')).toHaveLength(8);
+    expect(container.querySelectorAll('tbody > tr')).toHaveLength(14);
 
     await click(button('查询'));
     expect(container.querySelectorAll('tbody > tr')).toHaveLength(1);
@@ -111,7 +112,7 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     await click(button('重置'));
     expect(keyword.value).toBe('');
     expect(category.value).toBe('');
-    expect(container.querySelectorAll('tbody > tr')).toHaveLength(8);
+    expect(container.querySelectorAll('tbody > tr')).toHaveLength(14);
   });
 
   it('keeps the energy quantity ledger limited to consumption and exposes monthly details inline', async () => {
@@ -148,6 +149,22 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     await click(button('下一页'));
     expect(container.textContent).toContain('2 / 3');
     expect(container.textContent).toContain('1#数控加工中心');
+  });
+
+  it('offers the complete fossil-fuel preset list and a custom option', async () => {
+    await render('/data-management/energy-types');
+    await click(button('＋ 新增能源品种'));
+    const dialog = container.querySelector('form')!;
+    const category = dialog.querySelectorAll('select')[0] as HTMLSelectElement;
+    await change(category, '化石燃料');
+    const energyType = dialog.querySelectorAll('select')[1] as HTMLSelectElement;
+    expect([...energyType.options].map((option) => option.textContent)).toEqual([
+      '请选择能源品种', '原煤', '烟煤', '石油焦', '柴油', '天然气', '洗精煤', '洗中煤', '焦炭', '煤焦油',
+      '原油', '燃料油', '汽油', '煤油', '液化天然气', '液化石油气', '炼厂干气', '高炉煤气', '粗苯', '无烟煤',
+      '褐煤', '其他洗煤', '型煤', '其他石油制品', '焦炉煤气', '转炉煤气', '其他煤气', '其他（自定义）',
+    ]);
+    await change(energyType, '其他（自定义）');
+    expect(dialog.querySelector('input')).toBeTruthy();
   });
 
   it('shows the current year as a read-only field in maintenance dialogs', async () => {
