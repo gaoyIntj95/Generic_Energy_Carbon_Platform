@@ -20,14 +20,15 @@ function isPlaceholder(item: NavDisplayEntry): item is NavPlaceholder {
 
 const iconNames: Record<string, string> = {
   能源监测与分析: 'energy',
-  碳排放核算与合规: 'carbon',
+  企业组织碳管理: 'carbon',
+  产品与供应链碳管理: 'footprint',
   能碳资产运营与策略: 'asset',
   数据管理: 'data',
-  碳排放核算: 'calculation',
+  碳因子库: 'factor',
   碳排放因子库: 'factor',
   供应链碳管理: 'supply',
   供应商碳数据采集: 'supply',
-  产品碳足迹披露: 'footprint',
+  碳数据披露: 'footprint',
   产品碳足迹: 'footprint',
   核算清单: 'inventory',
   碳足迹核算清单: 'inventory',

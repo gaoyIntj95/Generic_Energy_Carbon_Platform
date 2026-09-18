@@ -768,7 +768,7 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
   const query = () => { const next = { year: Number(year) || 2026, energyUnitId, deviceId }; setApplied(next); window.sessionStorage.setItem('energy-intensity-device-filters', JSON.stringify(next)); };
   const reset = () => { setYear('2026'); setEnergyUnitId('all'); setDeviceId('all'); const next = { year: 2026, energyUnitId: 'all', deviceId: 'all' }; setApplied(next); window.sessionStorage.setItem('energy-intensity-device-filters', JSON.stringify(next)); };
   const deviceOptions = devices.filter((row) => energyUnitId === 'all' || row.energyUnitId === energyUnitId);
-  const trendCandidates = rows.filter((row) => row.resultStatus === '已计算');
+  const trendCandidates = rows.filter((row) => row.resultStatus === '已计算' && row.monthlyMetricValues.length === 12 && row.monthlyMetricValues.every((value) => value !== null));
   const trendRow = trendCandidates.find((row) => row.deviceId === trendDeviceId) ?? trendCandidates[0];
   const trendMax = Math.max(...(trendRow?.monthlyMetricValues.filter((value): value is number => value !== null) ?? [0]), 0);
   const deviceTrendDisplayMax = trendMax > 0 ? trendMax * 1.15 : 1;
@@ -1086,9 +1086,8 @@ function IntensityPage() {
   const metricObjectMap = new Map(resultViews.flatMap((resultView) => resultView.metrics.map((metric) => [metric.intensityMetricId, resultView.object])));
   const metricViewFor = (metric: CalculatedIntensityMetric) => resultViews.find((resultView) => resultView.object.objectId === metricObjectMap.get(metric.intensityMetricId)?.objectId) ?? view;
   const metricGroupFor = (metric: CalculatedIntensityMetric) => metricObjectMap.get(metric.intensityMetricId)?.unitKind === 'production' ? '生产类用能单元' : '非生产类用能单元';
-  const defaultMonthlyMetric = visibleRows[0];
-  const trendRows = applied.objectType === 'unit' ? rows : visibleRows;
-  const displayedMonthlyMetric = trendRows.find((metric) => metric.intensityMetricId === trendMetricId) ?? (applied.objectType === 'unit' ? trendRows[0] : defaultMonthlyMetric);
+  const trendRows = (applied.objectType === 'unit' ? rows : visibleRows).filter((metric) => metric.resultType === 'ok' && metric.monthlyDataStatus === 'complete' && metric.monthlyMetrics.length === 12);
+  const displayedMonthlyMetric = trendRows.find((metric) => metric.intensityMetricId === trendMetricId) ?? trendRows[0];
   const comparisonMetricNames = [...new Set(visibleRows.map((metric) => metric.name))];
   const comparisonViews = resultViews
     .map((resultView) => ({ ...resultView, metrics: resultView.metrics.filter((metric) => visibleRows.some((item) => item.intensityMetricId === metric.intensityMetricId)) }))

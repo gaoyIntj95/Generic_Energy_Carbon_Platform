@@ -7,7 +7,8 @@ describe('navigation manifest', () => {
     expect(new Set(allNavItems.map((item) => item.path)).size).toBe(26);
     expect(navigation.map((group) => group.label)).toEqual([
       '能源监测与分析',
-      '碳排放核算与合规',
+      '企业组织碳管理',
+      '产品与供应链碳管理',
       '能碳资产运营与策略',
       '数据管理',
     ]);
@@ -30,32 +31,35 @@ describe('navigation manifest', () => {
       '能源数据',
       '运营数据',
     ]);
-    const carbonDisplay = navigation.find((group) => group.key === 'carbon-accounting')?.display;
-    const carbonCalculation = carbonDisplay?.find((entry) => 'items' in entry);
-    expect(carbonCalculation && 'items' in carbonCalculation
-      ? carbonCalculation.items.map((item) => item.label)
-      : []).toEqual([
-      '碳排放预览',
+    const enterpriseCarbon = navigation.find((group) => group.key === 'enterprise-carbon');
+    expect(enterpriseCarbon?.display?.map((entry) => entry.label)).toEqual([
+      '碳排放概览',
       '碳核算清单',
       '碳核查支撑',
       '碳排放报告',
       '碳排放因子库',
     ]);
-    expect(carbonDisplay?.map((entry) => entry.label)).toEqual([
-      '碳排放核算',
+    const productSupplyCarbon = navigation.find((group) => group.key === 'product-supply-carbon')?.display;
+    expect(productSupplyCarbon?.map((entry) => entry.label)).toEqual([
       '供应链碳管理',
       '产品碳足迹',
     ]);
-    expect(carbonDisplay?.some((entry) => entry.label === '碳排放因子库')).toBe(false);
-    const supplyChain = carbonDisplay?.find((entry) => entry.key === 'supply-chain-carbon');
+    const supplyChain = productSupplyCarbon?.find((entry) => entry.key === 'supply-chain-carbon');
     expect(supplyChain && 'items' in supplyChain ? supplyChain.items.map((item) => item.label) : []).toEqual([
       '供应商碳数据采集',
-      '产品碳足迹披露',
+      '碳数据披露',
     ]);
-    expect(carbonDisplay?.filter((entry) => 'items' in entry).map((entry) => entry.key)).toEqual([
-      'carbon-calculation',
+    expect(productSupplyCarbon?.filter((entry) => 'items' in entry).map((entry) => entry.key)).toEqual([
       'supply-chain-carbon',
       'product-carbon-footprint',
+    ]);
+    const productFootprint = productSupplyCarbon?.find((entry) => entry.key === 'product-carbon-footprint');
+    expect(productFootprint && 'items' in productFootprint ? productFootprint.items.map((item) => item.label) : []).toEqual([
+      '碳足迹项目管理',
+      '碳足迹核算清单',
+      '碳足迹核算结果',
+      '碳足迹报告管理',
+      '碳足迹因子库',
     ]);
   });
 
