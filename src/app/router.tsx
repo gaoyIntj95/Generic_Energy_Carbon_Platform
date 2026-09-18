@@ -56,7 +56,7 @@ const productCarbonFootprintItems: NavItem[] = [
 
 const supplyChainCarbonItems: NavItem[] = [
   { label: '供应商碳数据采集', pageTitle: '供应商碳数据采集', path: '/supply-chain-carbon/suppliers', description: '采集并维护供应商提供的材料/产品碳数据、业务数据及证明材料。' },
-  { label: '碳数据披露', pageTitle: '碳数据披露', path: '/supply-chain-carbon/delivery', description: '登记产品碳足迹报告向下游客户的对外披露情况。' },
+  { label: '产品碳足迹披露', pageTitle: '产品碳足迹披露', path: '/supply-chain-carbon/delivery', description: '登记系统核算或第三方认证的产品碳足迹向下游客户的对外披露情况。' },
 ];
 
 const assetStrategyItems: NavItem[] = [
@@ -79,10 +79,10 @@ export const navigation: NavGroup[] = [
   {
     key: 'product-supply-carbon',
     label: '产品与供应链碳管理',
-    items: [...supplyChainCarbonItems, ...productCarbonFootprintItems],
+    items: [...productCarbonFootprintItems, ...supplyChainCarbonItems],
     display: [
-      { key: 'supply-chain-carbon', label: '供应链碳管理', items: supplyChainCarbonItems },
       { key: 'product-carbon-footprint', label: '产品碳足迹', items: productCarbonFootprintItems },
+      { key: 'supply-chain-carbon', label: '供应链碳管理', items: supplyChainCarbonItems },
     ],
   },
   { key: 'asset-strategy', label: '能碳资产运营与策略', items: assetStrategyItems },

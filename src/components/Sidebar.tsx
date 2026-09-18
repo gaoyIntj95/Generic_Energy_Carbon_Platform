@@ -28,7 +28,7 @@ const iconNames: Record<string, string> = {
   碳排放因子库: 'factor',
   供应链碳管理: 'supply',
   供应商碳数据采集: 'supply',
-  碳数据披露: 'footprint',
+  产品碳足迹披露: 'footprint',
   产品碳足迹: 'footprint',
   核算清单: 'inventory',
   碳足迹核算清单: 'inventory',
