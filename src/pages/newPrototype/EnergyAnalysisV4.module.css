@@ -3238,6 +3238,10 @@
   gap: 10px;
 }
 
+.drillStatsFive {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .drillStats > span {
   min-height: 67px;
   padding: 11px 13px;
@@ -3641,6 +3645,10 @@
 
   .drillContext,
   .drillStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .drillStatsFive {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

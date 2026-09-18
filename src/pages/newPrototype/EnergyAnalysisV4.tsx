@@ -74,6 +74,21 @@ const percent = (value: number | null | undefined) =>
     ? '—'
     : `${value > 0 ? '+' : ''}${format(value, 1)}%`;
 
+type EnergyCompletenessStatus = '缺失' | '进行中' | '完整';
+
+function completenessTone(status: EnergyCompletenessStatus): 'ok' | 'warn' | 'bad' {
+  return status === '完整' ? 'ok' : status === '缺失' ? 'bad' : 'warn';
+}
+
+function completenessLabel(actual: number, expected: number, inProgress: boolean, unit: string) {
+  const status: EnergyCompletenessStatus = inProgress
+    ? '进行中'
+    : actual === expected
+      ? '完整'
+      : '缺失';
+  return { status, text: `${actual}/${expected}${unit}｜${status}` };
+}
+
 const metricDigits = (value: number | null) =>
   value === null ? 3 : value < 1 ? 3 : value < 10 ? 2 : value > 10000 ? 0 : 1;
 
@@ -273,24 +288,28 @@ function AnnualEnergyDetail({
   row,
   details,
   period,
+  isCurrentPeriod,
 }: {
   row: EnergyQueryRow;
   details: EnergyQueryMonthDetail[];
   period: string;
+  isCurrentPeriod: boolean;
 }) {
   const peak = details.reduce((current, item) => item.standardCoalAmount > current.standardCoalAmount ? item : current);
   const max = peak.standardCoalAmount;
   const peakIndex = details.findIndex((item) => item.detailId === peak.detailId);
   const monthlyAverage = row.standardCoalAmount / details.length;
   const statusFor = (amount: number) => amount >= monthlyAverage * 1.12 ? '偏高' : amount <= monthlyAverage * 0.88 ? '偏低' : '正常';
+  const completeness = completenessLabel(details.length, 12, isCurrentPeriod, '个月');
   return (
     <div className={styles.drilldown}>
       <DrilldownContext row={row} period={period} />
-      <div className={styles.drillStats}>
+      <div className={`${styles.drillStats} ${styles.drillStatsFive}`}>
         <span><small>年度实物量</small><b>{format(row.physicalAmount)} {row.measurementUnit}</b></span>
         <span><small>年度折标量</small><b>{format(row.standardCoalAmount)} tce</b></span>
         <span><small>{details.length < 12 ? '已报月份月均折标量' : '月均折标量'}</small><b>{format(row.standardCoalAmount / details.length, 1)} tce</b></span>
         <span><small>峰值月份</small><b>{peak.month}｜{format(peak.standardCoalAmount)} tce</b></span>
+        <span><small>数据完整性</small><b>{completeness.text}</b></span>
       </div>
       <div className={styles.drillSectionTitle}>
         <div><b>月度消费趋势</b><small>用于快速识别各月消费波动与峰值。</small></div>
@@ -322,7 +341,7 @@ function AnnualEnergyDetail({
               <td><StatusTag tone={statusFor(item.standardCoalAmount) === '正常' ? 'ok' : 'warn'}>{statusFor(item.standardCoalAmount)}</StatusTag></td>
             </tr>
           ))}</tbody>
-          <tfoot><tr><td>合计</td><td>{format(row.physicalAmount)}</td><td>{row.measurementUnit}</td><td>{format(row.standardCoalAmount)}</td><td>100.0%</td><td>{percent(row.yearOnYear)}</td><td>—</td><td>—</td></tr></tfoot>
+          <tfoot><tr><td>合计</td><td>{format(row.physicalAmount)}</td><td>{row.measurementUnit}</td><td>{format(row.standardCoalAmount)}</td><td>100.0%</td><td>{percent(row.yearOnYear)}</td><td>—</td><td><StatusTag tone={completenessTone(completeness.status)}>{completeness.status}</StatusTag></td></tr></tfoot>
         </table>
       </div>
       <div className={styles.modalNote}><strong>数据来源：</strong>{row.sourceDescription}<br /><strong>折标口径：</strong>各月读取对应能源品种的有效折标参数，年度值由已报月份记录汇总。<br /><strong>比较口径：</strong>同比为本月与上年同月比较，环比为本月与上月比较；首月无上月数据时不展示环比。<br /><strong>状态规则：</strong>月度折标量相对年度月均值高于或等于12%标记“偏高”，低于或等于-12%标记“偏低”，其余为“正常”。</div>
@@ -334,14 +353,19 @@ function MonthlyEnergyDetail({
   row,
   details,
   period,
+  isCurrentPeriod,
 }: {
   row: EnergyQueryRow;
   details: EnergyQueryDayDetail[];
   period: string;
+  isCurrentPeriod: boolean;
 }) {
   const peak = details.reduce((current, item) => item.standardCoalAmount > current.standardCoalAmount ? item : current);
   const max = peak.standardCoalAmount;
   const [peakMonth, peakDay] = peak.date.slice(5).split('-').map(Number);
+  const [year, month] = period.match(/(\d{4})年(\d{1,2})月/)?.slice(1).map(Number) ?? [0, 0];
+  const expectedDays = year && month ? new Date(year, month, 0).getDate() : details.length;
+  const completeness = completenessLabel(details.length, expectedDays, isCurrentPeriod, '天');
   return (
     <div className={styles.drilldown}>
       <DrilldownContext row={row} period={period} />
@@ -349,7 +373,7 @@ function MonthlyEnergyDetail({
         <span><small>本月折标量</small><b>{format(row.standardCoalAmount)} tce</b></span>
         <span><small>日均折标量</small><b>{format(row.standardCoalAmount / details.length, 1)} tce</b></span>
         <span><small>峰值日</small><b>{peakMonth}月{peakDay}日｜{format(peak.standardCoalAmount)} tce</b></span>
-        <span><small>数据完整性</small><b>{details.length}/{details.length}天｜完整</b></span>
+        <span><small>数据完整性</small><b>{completeness.text}</b></span>
       </div>
       <div className={styles.drillSectionTitle}>
         <div><b>日度消费趋势</b><small>用于识别月内波动和异常值，点击月度记录后下钻至每日汇总。</small></div>
@@ -382,7 +406,7 @@ function MonthlyEnergyDetail({
               <td><StatusTag tone={item.dataStatus === '正常' ? 'ok' : 'warn'}>{item.dataStatus}</StatusTag></td>
             </tr>
           ))}</tbody>
-          <tfoot><tr><td>合计</td><td>{format(row.physicalAmount)}</td><td>{row.measurementUnit}</td><td>{format(row.standardCoalAmount)}</td><td>—</td><td>—</td></tr></tfoot>
+          <tfoot><tr><td>合计</td><td>{format(row.physicalAmount)}</td><td>{row.measurementUnit}</td><td>{format(row.standardCoalAmount)}</td><td>—</td><td><StatusTag tone={completenessTone(completeness.status)}>{completeness.status}</StatusTag></td></tr></tfoot>
         </table>
       </div>
       <div className={styles.modalNote}><strong>数据来源：</strong>{row.sourceDescription}<br /><strong>统计说明：</strong>日度数据按当前用能单元和能源品种汇总；折标量合计与月度记录一致。<br /><strong>状态规则：</strong>日度折标量相对本月日均值高于或等于12%标记“偏高”，低于或等于-12%标记“偏低”，其余为“正常”。</div>
@@ -438,9 +462,11 @@ function ConsumptionQueryPage() {
 
   const openDetail = (row: EnergyQueryRow) => {
     const dailyDetails = monthMode ? createEnergyQueryMonthlyDetails(row) : null;
+    const isCurrentPeriod = queryYear === ENERGY_QUERY_CURRENT_YEAR
+      && (monthMode ? queryMonth === ENERGY_QUERY_REPORTED_MONTH : true);
     const body = monthMode
       ? dailyDetails?.length
-        ? <MonthlyEnergyDetail row={row} details={dailyDetails} period={appliedPeriodLabel} />
+        ? <MonthlyEnergyDetail row={row} details={dailyDetails} period={appliedPeriodLabel} isCurrentPeriod={isCurrentPeriod} />
         : <div className={styles.emptyState}>
           <strong>暂无日度数据</strong>
           <span>当前月份仅维护月度汇总数据，暂未接入日度计量数据，因此无法展示日度明细。</span>
@@ -454,6 +480,7 @@ function ConsumptionQueryPage() {
           monthlyStandardCoalAmounts: getEnergyQueryMonthlyAmounts(row).standardCoal,
         })}
         period={appliedPeriodLabel}
+        isCurrentPeriod={isCurrentPeriod}
       />;
     setDialog({
       title: `${monthMode && !dailyDetails?.length ? '暂无日度数据｜' : `${monthMode ? '月度' : '年度'}能源消费明细｜`}${row.energyTypeName}`,
