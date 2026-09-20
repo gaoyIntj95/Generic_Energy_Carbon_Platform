@@ -2324,8 +2324,6 @@
 .factorDialog .factorGroups { max-height: min(46vh, 500px); }
 .factorDialog .factorChoices { max-height: none; margin-top: 8px; }
 .factorDialog .factorPickerActions { margin-top: 10px; padding: 11px 13px; }
-.factorCustomDialog { width: min(780px, calc(100vw - 32px)); }
-.factorCustomDialog .modalBody { padding: 16px 20px; }
 .factorDetailDialog { width: min(980px, calc(100vw - 32px)); }
 .factorDetailDialog > header { min-height: 60px; padding: 0 20px; }
 .factorDetailDialog > header h2 { font-size: 20px; letter-spacing: .01em; }
@@ -2423,9 +2421,6 @@
 .reportInfoHint { margin-bottom: 16px; padding: 10px 12px; color: #536b63; background: #f4faf7; border: 1px solid #d9eee5; border-radius: 7px; font-size: 13px; line-height: 1.6; }
 .reportInfoDialog input::placeholder,
 .reportInfoDialog textarea::placeholder { color: #9aa6a1; opacity: 1; }
-.factorCustomFormGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
-.factorCustomFormGrid .fieldFull { grid-column: 1 / -1; }
-
 .tableWrap {
   max-height: 360px;
   margin-top: 14px;
@@ -2847,9 +2842,6 @@
   .factorPickerActions { align-items: flex-start; flex-direction: column; }
 }
 
-@media (max-width: 480px) {
-  .factorCustomFormGrid { grid-template-columns: 1fr; }
-}
 .field small { color: var(--muted); }
 
 /* 国家因子库选择器使用单行清单，保留名称、口径和值等必要信息。 */
@@ -3105,7 +3097,6 @@
   font-size: 13px;
 }
 
-.customFactorBack { margin-bottom: 12px; }
 .customFactorHint { margin-bottom: 14px; }
 
 .fileRow {
