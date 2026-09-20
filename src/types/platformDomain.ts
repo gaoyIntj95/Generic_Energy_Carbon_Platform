@@ -150,6 +150,10 @@ export interface EmissionSource {
   activityValue: number;
   activityUnit: string;
   activityData: string;
+  /** 净购入电力/热力场景保留购入量、外供量及净值，便于核查追溯。 */
+  purchasedAmount?: number;
+  exportedAmount?: number;
+  netActivityValue?: number;
   /** @deprecated 仅为历史页面兼容保留；追溯请使用 sourceModule / sourceRecordId。 */
   activityDataSource: string;
   factorName: string;

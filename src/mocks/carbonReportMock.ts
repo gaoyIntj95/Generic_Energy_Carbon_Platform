@@ -1,3 +1,17 @@
+export interface CarbonReportBasicInfo {
+  organizationName: string;
+  unifiedSocialCreditCode: string;
+  registeredAddress: string;
+  industryCategory: string;
+  businessScope: string;
+  legalRepresentative: string;
+  preparerPhone: string;
+  preparer: string;
+  preparerDepartment: string;
+  reviewer: string;
+  boundaryDescription: string;
+}
+
 export interface CarbonReportRecord {
   carbonReportId: string;
   carbonTaskId: string;
@@ -11,6 +25,7 @@ export interface CarbonReportRecord {
   organizationName: string;
   templateName: string;
   standardName: string;
+  basicInfo?: CarbonReportBasicInfo;
 }
 
 const seedCarbonReports: CarbonReportRecord[] = [
@@ -83,6 +98,7 @@ export function createCarbonReportMock(input: {
   year: number;
   version: number;
   generatedAt: string;
+  basicInfo?: CarbonReportBasicInfo;
 }) {
   const compactTime = input.generatedAt.replace(/\D/g, '').slice(0, 12);
   return {
@@ -98,5 +114,6 @@ export function createCarbonReportMock(input: {
     organizationName: 'XX科技有限公司',
     templateName: '通用工业企业模板',
     standardName: 'GB/T 32150—2025',
+    basicInfo: input.basicInfo,
   } satisfies CarbonReportRecord;
 }
