@@ -1085,7 +1085,7 @@ function SourceDrawer({
   const energyLinked = isEnergyLinkedSource(row);
   const result = factor ? recalculate(Number(activity), unit, factor) : 0;
   const submit = () => factor && save({ ...row, factorName: factor.name, emissionFactorId: factor.factorId, factorObjectId: factor.factorId, factorVersionId: factor.version, activityValue: Number(activity), activityUnit: unit, activityData: `${Number(activity).toLocaleString('zh-CN')} ${unit}`, emissionAmount: result }, row.emissionSourceId);
-  return <Dialog wide title={readOnly ? '排放源详情' : '编辑排放源'} onClose={close} footer={<><Button onClick={close}>{readOnly ? '关闭' : '取消'}</Button>{readOnly && allowEdit ? <Button primary onClick={edit}>编辑</Button> : !readOnly && allowEdit ? <Button primary onClick={submit}>保存并重新计算</Button> : null}</>}>
+  return <Dialog title={readOnly ? '排放源详情' : '编辑排放源'} className={styles.sourceDetailDialog} onClose={close} footer={<><Button onClick={close}>{readOnly ? '关闭' : '取消'}</Button>{readOnly && allowEdit ? <Button primary onClick={edit}>编辑</Button> : !readOnly && allowEdit ? <Button primary onClick={submit}>保存并重新计算</Button> : null}</>}>
     <DetailBlock title="基本信息"><div className={styles.basicInfoGrid}><div><span>排放类别</span><b>{row.emissionCategory}</b></div><div><span>温室气体源类型</span><b>{row.sourceType}</b></div><div><span>排放源</span><b>{row.sourceName}</b></div><div><span>温室气体种类</span><b>{row.greenhouseGasSpecies.join('、')}</b></div></div></DetailBlock>
     <DetailBlock title="核算数据"><div className={styles.calculationGrid}><div className={styles.activityPane}>{readOnly || energyLinked ? <><span>活动数据</span><b>{row.activityData}</b><small>{energyLinked ? '能源数据自动同步 · 活动数据只读' : row.activityDataSource}</small></> : <div className={styles.activityInputs}><Field label="活动数据值"><input type="number" min="0" value={activity} onChange={(event) => setActivity(event.target.value)} /></Field><Field label="单位"><input value={unit} onChange={(event) => setUnit(event.target.value)} /></Field></div>}</div><div className={styles.resultPane}><div><span>结果因子/折算值</span><b>{factor ? factorSummary(row, factor.factorId) : '待补充'}</b></div><div><span>排放量</span><b>{format(readOnly ? row.emissionAmount : result)} tCO₂e</b></div></div></div></DetailBlock>
     <FactorCalculationDetails factor={factor} row={row} />
@@ -1212,6 +1212,16 @@ function CarbonReportPage({
       amount: rows.reduce((total, row) => total + row.emissionAmount, 0),
     };
   });
+  const amountFor = (keyword: string) => categoryRows.find((row) => row.category.includes(keyword))?.amount ?? 0;
+  const reportSourceRows = [
+    { source: '化石燃料燃烧', scope: '范围一', gas: 'CO₂', gwp: '1', amount: amountFor('化石燃料') },
+    { source: '生产过程排放', scope: '范围一', gas: 'CO₂', gwp: '1', amount: amountFor('生产过程') },
+    { source: '废弃物处理处置排放', scope: '范围一', gas: 'CH₄', gwp: '27', amount: amountFor('废弃物') },
+    { source: '逸散排放', scope: '范围一', gas: 'HFCs', gwp: '—', amount: amountFor('逸散') },
+    { source: '购入电力', scope: '范围二', gas: 'CO₂', gwp: '1', amount: amountFor('购入的电力') },
+    { source: '购入热力', scope: '范围二', gas: 'CO₂', gwp: '1', amount: amountFor('购入的电力') },
+    { source: '其他排放源', scope: '范围三', gas: '—', gwp: '—', amount: 0 },
+  ];
   const selectYear = (nextYear: number) => {
     setYear(nextYear);
     const next = reports.find((report) => report.year === nextYear);
@@ -1321,11 +1331,59 @@ function CarbonReportPage({
           </tbody></table>
           <h3>1.2 核算边界说明</h3>
           <p>本报告主体以企业法人边界作为组织边界，核算并报告其运营控制范围内生产场所、辅助生产系统及办公区域产生的温室气体排放。</p>
-          <p>排放源、活动数据和排放因子均读取已确认的正式核算清单，报告生成后不随编辑副本实时变化。</p>
-          <h2>二、温室气体排放汇总</h2>
-          <table><thead><tr><th>排放类别</th><th>排放源数量</th><th>排放量（tCO₂e）</th><th>占比</th></tr></thead><tbody>
-            {categoryRows.map((row) => <tr key={row.category}><td>{row.category}</td><td>{row.count}项</td><td>{format(row.amount)}</td><td>{totalEmission ? format(row.amount / totalEmission * 100) : '0.00'}%</td></tr>)}
-            <tr className={styles.reportTotalRow}><td>合计</td><td>{reportInventory.length}项</td><td>{format(totalEmission)}</td><td>100.00%</td></tr>
+          <p>排放源、活动数据和排放因子均读取已确认的正式核算清单，报告生成后不随编辑副本实时变化。报告期内组织边界未发生变化。</p>
+
+          <h2>二、核算依据与规范性引用文件</h2>
+          <p>本报告依据以下文件编制：</p>
+          <ol><li>{selectedReport.standardName}《工业企业温室气体排放核算和报告通则》；</li><li>《工业其他行业企业温室气体排放核算方法与报告指南（试行）》；</li><li>《碳排放权交易管理办法（试行）》及相关行业标准；</li><li>与燃料热值、天然气计量和碳含量测定相关的国家标准。</li></ol>
+
+          <h2>三、温室气体排放源识别</h2>
+          <p>根据企业实际从事的产业活动和设施类型，识别本次核算范围内的排放源和温室气体种类。本报告核算的温室气体包括二氧化碳（CO₂）、甲烷（CH₄）及其他适用温室气体。</p>
+          <h3>3.1 排放源识别结果</h3>
+          <p>本企业报告边界内的排放源清单如下：</p>
+          <table className={styles.reportWideTable}><thead><tr><th>排放源类别</th><th>所属范围</th><th>是否核算</th><th>排放量（t）</th><th>备注</th></tr></thead><tbody>
+            {reportSourceRows.map((row) => <tr key={row.source}><td>{row.source}</td><td>{row.scope}</td><td>☑ 是　□ 不涉及</td><td>{format(row.amount)}</td><td>{row.amount ? '纳入正式核算清单' : '本企业不涉及此排放源'}</td></tr>)}
+          </tbody></table>
+
+          <h2>四、温室气体排放量核算</h2>
+          <h3>4.1 范围一：直接排放核算</h3>
+          <p>化石燃料燃烧、生产过程、废弃物处理及逸散排放按照正式核算清单中的活动数据与排放因子计算。</p>
+          <p className={styles.reportFormula}>排放量 = 活动数据 × 排放因子 × GWP</p>
+          {reportInventory.filter((row) => row.emissionCategory !== '购入的电力与热力产生的排放').map((row) => <p key={row.emissionSourceId}>本企业{row.sourceName}排放量：{format(row.emissionAmount)} tCO₂e。</p>)}
+          <h3>4.2 范围二：间接排放核算</h3>
+          <p>范围二包括企业净购入的电力和热力隐含的 CO₂ 排放。</p>
+          <p className={styles.reportFormula}>购入电力排放量 = 净购入电量 × 电力排放因子</p>
+          <p>本企业范围二排放量：{format(amountFor('购入的电力'))} tCO₂e。</p>
+          <h3>4.3 排放总量汇总</h3>
+          <p>本企业报告年度温室气体排放总量汇总如下：</p>
+          <table><thead><tr><th>排放源</th><th>范围</th><th>气体</th><th>GWP</th><th>排放量（吨）</th><th>折算 CO₂e（吨）</th></tr></thead><tbody>
+            {reportSourceRows.map((row) => <tr key={`${row.source}-summary`}><td>{row.source}</td><td>{row.scope}</td><td>{row.gas}</td><td>{row.gwp}</td><td>{row.amount ? format(row.amount) : '—'}</td><td>{row.amount ? format(row.amount) : '—'}</td></tr>)}
+            <tr className={styles.reportTotalRow}><td>范围一+范围二合计</td><td>—</td><td>—</td><td>—</td><td>—</td><td>{format(totalEmission)}</td></tr>
+          </tbody></table>
+          <p className={styles.reportFormula}>排放总量 = 范围一排放 + 范围二排放 + 范围三排放（如适用）</p>
+
+          <h2>五、活动水平数据及来源说明</h2>
+          <p>本企业各排放源活动水平数据及来源说明如下：</p>
+          <ol>{reportInventory.map((row) => <li key={`${row.emissionSourceId}-activity`}><strong>{row.sourceName}：</strong>{row.activityData}；数据来源：{row.activityDataSource}。</li>)}</ol>
+
+          <h2>六、排放因子数据及来源说明</h2>
+          <ol>{reportInventory.map((row) => <li key={`${row.emissionSourceId}-factor`}><strong>{row.factorName}：</strong>{factorSummary(row, row.emissionFactorId)}；来源：{row.sourceModule || '碳排放因子库'}。</li>)}</ol>
+
+          <h2>七、声明与签字盖章</h2>
+          <p>本单位郑重承诺：本报告所填写的全部数据和信息真实、完整、准确，核算方法符合国家相关标准和指南要求。如报告中的信息与实际情况不符，本企业将承担相应的法律责任。</p>
+          <p className={styles.reportSignature}>法人（签字）：____________________</p>
+          <p className={styles.reportSignature}>日期：________ 年 ____ 月 ____ 日</p>
+          <p className={styles.reportSignature}>单位盖章：</p>
+
+          <h2>附表</h2>
+          <h3>附表1 报告主体 {selectedReport.year} 年温室气体排放汇总表</h3>
+          <table><thead><tr><th>源类别</th><th>排放量（单位：吨）</th><th>温室气体排放量（单位：吨 CO₂e）</th></tr></thead><tbody>
+            {reportSourceRows.map((row) => <tr key={`${row.source}-appendix`}><td>{row.source}</td><td>{row.amount ? format(row.amount) : '—'}</td><td>{row.amount ? format(row.amount) : '—'}</td></tr>)}
+            <tr className={styles.reportTotalRow}><td>企业温室气体排放总量</td><td>—</td><td>{format(totalEmission)}</td></tr>
+          </tbody></table>
+          <h3>附表2 排放源活动水平和排放因子数据一览表</h3>
+          <table><thead><tr><th>排放源</th><th>活动数据</th><th>单位</th><th>排放因子</th><th>来源</th></tr></thead><tbody>
+            {reportInventory.map((row) => <tr key={`${row.emissionSourceId}-appendix-factor`}><td>{row.sourceName}</td><td>{row.activityValue}</td><td>{row.activityUnit}</td><td>{factorSummary(row, row.emissionFactorId)}</td><td>{row.sourceModule || '碳排放因子库'}</td></tr>)}
           </tbody></table>
           <p className={styles.reportDocumentFoot}>数据来源：{selectedReport.taskName} · 正式版本 V{selectedReport.version}　报告生成时间：{selectedReport.generatedAt}</p>
         </article> : <div className={styles.reportDocumentEmpty}>请选择或生成报告</div>}
@@ -1878,10 +1936,9 @@ function SupportDetailDrawer({ state, close, manage, save }: { state: Extract<Dr
 
 function FactorDetailDialog({ factor, close }: { factor: CarbonFactor; close: () => void }) {
   return <Dialog title={`${factor.name} · 详情`} className={styles.factorDetailDialog} onClose={close} footer={<Button onClick={close}>关闭</Button>}>
-    <DetailBlock title="基础信息"><div className={styles.kv}><span>对象类型</span><span className={styles.objectTag}>{factor.objectType}</span><span>当前值</span><b>{factor.value} {factor.unit === '参数组' ? '' : factor.unit}</b><span>排放活动</span><span>{factor.activity}</span><span>温室气体</span><span>{factor.gas}</span><span>有效状态</span><Tag>{factor.validity}</Tag></div></DetailBlock>
+    <DetailBlock title="基础信息"><div className={styles.kv}><span>当前值</span><b>{factor.value} {factor.unit === '参数组' ? '' : factor.unit}</b><span>排放活动</span><span>{factor.activity}</span><span>温室气体</span><span>{factor.gas}</span></div></DetailBlock>
     {factor.parameters?.length ? <DetailBlock title="参数组成"><table className={`${styles.parameterTable} ${styles.factorParameterTable}`}><thead><tr><th>参数</th><th>来源</th><th>数值</th><th>单位</th></tr></thead><tbody>{factor.parameters.map((parameter) => <tr key={parameter.key}><td title={parameter.name}>{parameter.name}</td><td title={`${parameter.sourceType} · ${parameter.source}`}>{parameter.sourceType} · {parameter.source}</td><td>{parameter.display}</td><td>{parameter.unit}</td></tr>)}</tbody></table></DetailBlock> : null}
     {factor.formula ? <DetailBlock title="公式"><div className={styles.formulaBox}>{factor.formula}</div></DetailBlock> : null}
-    <DetailBlock title="来源与适用范围"><div className={styles.sourceCard}><span>来源与版本</span><b>{factor.source} · {factor.version}</b><span>引用依据</span><span>{factor.reference}</span><span>适用期</span><span>{factor.effective}</span><span>适用范围</span><span>{factor.geo} · {factor.industry}</span><span>数据质量</span><span>{factor.quality}</span></div></DetailBlock>
   </Dialog>;
 }
 

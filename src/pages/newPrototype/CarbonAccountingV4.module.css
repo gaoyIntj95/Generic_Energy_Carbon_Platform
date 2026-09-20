@@ -2108,8 +2108,9 @@
 .reportPreviewPane {
   position: relative;
   min-width: 0;
+  max-height: calc(100vh - 170px);
   padding: 14px;
-  overflow: hidden;
+  overflow: auto;
   background: #fbfcfc;
 }
 
@@ -2121,35 +2122,35 @@
 }
 
 .carbonReportPaper {
-  width: min(860px, calc(100% - 70px));
+  width: min(1120px, calc(100% - 24px));
   max-width: 100%;
-  min-height: 1040px;
+  min-height: 1260px;
   box-sizing: border-box;
   margin: 0 auto;
-  padding: 56px 46px;
-  border: 1px solid #f0f1f1;
+  padding: 64px 48px 80px;
+  border: 1px solid #f1f1f1;
   background: #fff;
-  box-shadow: 0 3px 16px rgb(20 50 42 / 8%);
-  color: #202b28;
+  box-shadow: 0 3px 16px rgb(20 50 42 / 6%);
+  color: #171717;
   font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
-  font-size: 13px;
-  line-height: 1.75;
+  font-size: 16px;
+  line-height: 1.95;
 }
 
 .carbonReportPaper header {
-  margin-bottom: 22px;
+  margin-bottom: 30px;
 }
 
 .carbonReportPaper header h1 {
-  margin: 0 0 8px;
-  color: #101a17;
-  font-size: 24px;
+  margin: 0 0 14px;
+  color: #111;
+  font-size: 31px;
   font-weight: 700;
   text-align: center;
 }
 
 .carbonReportPaper header p {
-  margin: 3px 0;
+  margin: 7px 0;
 }
 
 .carbonReportPaper header p:first-of-type {
@@ -2158,19 +2159,34 @@
 }
 
 .carbonReportPaper h2 {
-  margin: 22px 0 9px;
-  font-size: 17px;
+  margin: 30px 0 12px;
+  font-size: 23px;
 }
 
 .carbonReportPaper h3 {
-  margin: 16px 0 8px;
-  font-size: 14px;
+  margin: 22px 0 10px;
+  font-size: 18px;
 }
 
 .carbonReportPaper > p {
-  margin: 7px 0;
+  margin: 10px 0;
   text-align: justify;
 }
+
+.carbonReportPaper ol {
+  margin: 10px 0 14px;
+  padding-left: 28px;
+}
+
+.carbonReportPaper li { padding-left: 4px; }
+
+.reportFormula {
+  margin: 16px 0 !important;
+  font-family: "Times New Roman", "Songti SC", SimSun, serif;
+  letter-spacing: .04em;
+}
+
+.reportSignature { margin-top: 22px !important; }
 
 .carbonReportPaper table {
   width: 100%;
@@ -2182,8 +2198,8 @@
 
 .carbonReportPaper th,
 .carbonReportPaper td {
-  padding: 5px 8px;
-  border: 1px solid #89938f;
+  padding: 7px 9px;
+  border: 1px solid #222;
   box-sizing: border-box;
   font-weight: 400;
   text-align: center;
@@ -2194,6 +2210,9 @@
 .carbonReportPaper th {
   font-weight: 700;
 }
+
+.carbonReportPaper .reportWideTable th,
+.carbonReportPaper .reportWideTable td { font-size: 14px; }
 
 .carbonReportPaper th:first-child,
 .carbonReportPaper td:first-child {
@@ -2291,6 +2310,11 @@
 }
 
 .modalWide { width: min(1180px, calc(100vw - 48px)); }
+
+.sourceDetailDialog { width: min(900px, calc(100vw - 32px)); }
+.sourceDetailDialog .modalBody { padding: 14px 16px; }
+.sourceDetailDialog .detailBlock { margin-bottom: 10px; padding: 12px; }
+.sourceDetailDialog .detailBlock > h3 { margin-bottom: 10px; }
 
 /* 因子弹窗在宽屏下保持信息密度，同时让自定义因子输入框有明确的阅读宽度。 */
 .factorDialog { width: min(1080px, calc(100vw - 48px)); }
@@ -2764,6 +2788,8 @@
 
   .reportPreviewPane {
     padding: 0;
+    max-height: none;
+    overflow: visible;
   }
 
   .carbonReportPaper {
