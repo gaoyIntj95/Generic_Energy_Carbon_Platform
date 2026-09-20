@@ -92,6 +92,13 @@ function completenessLabel(actual: number, expected: number, inProgress: boolean
 const metricDigits = (value: number | null) =>
   value === null ? 3 : value < 1 ? 3 : value < 10 ? 2 : value > 10000 ? 0 : 1;
 
+function displayDeviceFormula(formula: string) {
+  return formula
+    .replace(/\s*[×*]\s*1000\s*÷\s*/g, ' ÷ ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function deviceEnergyTypeId(metricCode: string) {
   return metricCode === 'compressed-air-electricity' || metricCode === 'electricity_consumption'
     ? 'v11-energy-electricity'
@@ -1177,7 +1184,9 @@ function IntensityPage() {
     const year = metric.period.replace('年度', '');
     const returnTo = `/energy-analysis/intensity?objectType=${applied.objectType}&year=${applied.year}&objectId=${encodeURIComponent(applied.objectId)}`;
     const status = intensityStatus(metric);
-    const displayFormula = metric.name.includes('单位产品')
+    const displayFormula = metricView.object.objectType === 'device'
+      ? displayDeviceFormula(metric.formula)
+      : metric.name.includes('单位产品')
       ? `${metric.name} = 综合能耗 × 1000 ÷ 产品产量`
       : metric.name.includes('单位产值')
         ? `${metric.name} = 综合能耗 ÷ 工业总产值`
@@ -1652,7 +1661,7 @@ function BenchmarkPage() {
 
           <section className={`${styles.basisSection} ${styles.basisFormula}`}>
             <h4>计算公式</h4>
-            <strong>{selected.formulaDescription}</strong>
+            <strong>{isDevice ? displayDeviceFormula(selected.formulaDescription) : selected.formulaDescription}</strong>
             {isDevice && <p>设备指标只读取通过稳定设备ID关联的设备级能源记录，不使用所属用能单元总量代替，也不重复计入组织汇总。</p>}
           </section>
 
