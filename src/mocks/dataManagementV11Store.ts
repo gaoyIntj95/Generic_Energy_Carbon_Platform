@@ -476,6 +476,7 @@ const completionCandidates = Object.entries(annualCompletionChildren).flatMap(([
     const type = energyTypeById.get(energyTypeId);
     if (!type || type.standardCoalFactor <= 0) return [];
     const existingPhysical = existingByType.get(energyTypeId) ?? 0;
+    // 必要单位换算：kgce/原始单位 -> tce/原始单位。
     const missingStandard = Math.max(allocatedPhysical - existingPhysical, 0) * type.standardCoalFactor
       / (type.standardCoalFactorUnit.startsWith('kgce') ? 1000 : 1);
     return children.map((childId, index) => ({
@@ -512,6 +513,7 @@ Object.entries(annualCompletionChildren).forEach(([parentId, children]) => {
       const used = existing
         .filter((record) => record.energyTypeId === energyTypeId)
         .reduce((total, record) => total + (record.monthlyAmounts[month] ?? 0), 0);
+      // 必要单位换算：kgce/原始单位 -> tce/原始单位。
       return Math.max(allocated - used, 0) * type.standardCoalFactor
         / (type.standardCoalFactorUnit.startsWith('kgce') ? 1000 : 1);
     });
@@ -520,6 +522,7 @@ Object.entries(annualCompletionChildren).forEach(([parentId, children]) => {
 });
 const monthlyBranchStandard = Array.from({ length: 12 }, (_, month) => conversionOutputs.reduce((total, output) => {
   const outputType = energyTypeById.get(output.outputEnergyTypeId ?? '');
+  // 必要单位换算：kgce/原始单位 -> tce/原始单位。
   const external = (output.monthlyExternalAmounts?.[month] ?? 0) * (outputType?.standardCoalFactor ?? 0)
     / (outputType?.standardCoalFactorUnit.startsWith('kgce') ? 1000 : 1);
   const recovery = output.inputMode === 'recovery'
@@ -542,6 +545,7 @@ const completionRows = completionCandidates.map((row) => ({
   annualAmount: 0,
   monthlyAmounts: Array.from({ length: 12 }, (_, month) => {
     const missing = monthlyMissingByKey.get(`${row.parentId}|${row.energyTypeId}`)?.[month] ?? 0;
+    // 必要反向换算：tce -> kgce，再除以 kgce/原始单位系数恢复台账量。
     return missing / row.childCount * monthlyScale[month]
       / row.factor * (row.factorUnit.startsWith('kgce') ? 1000 : 1);
   }),

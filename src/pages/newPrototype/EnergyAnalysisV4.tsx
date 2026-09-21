@@ -18,6 +18,11 @@ import {
   getEnergyQueryMonthlyAmounts,
 } from '../../mocks/energyQuerySelector';
 import {
+  ENERGY_ANALYSIS_CURRENT_YEAR,
+  ENERGY_ANALYSIS_DEFAULT_MONTH,
+  listAnalysisYears,
+} from '../../mocks/energyAnalysisPeriod';
+import {
   buildBenchmarkDataset,
   type BenchmarkMetric,
 } from '../../mocks/energyBenchmarkSelector';
@@ -67,6 +72,8 @@ const format = (value: number | null | undefined, digits = 0) =>
         maximumFractionDigits: digits,
       });
 
+const calculationDate = new Date().toISOString().slice(0, 10);
+
 const roundToTwo = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
 const percent = (value: number | null | undefined) =>
@@ -94,7 +101,6 @@ const metricDigits = (value: number | null) =>
 
 function displayDeviceFormula(formula: string) {
   return formula
-    .replace(/\s*[×*]\s*1000\s*÷\s*/g, ' ÷ ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -435,11 +441,11 @@ export function EnergyAnalysisV4({ pathname }: { pathname: string }) {
 
 function ConsumptionQueryPage() {
   const [draftPeriod, setDraftPeriod] = useState<EnergyAnalysisPeriod>('month');
-  const [draftTime, setDraftTime] = useState('2026-06');
+  const [draftTime, setDraftTime] = useState(ENERGY_ANALYSIS_DEFAULT_MONTH);
   const [draftScope, setDraftScope] = useState<EnergyAnalysisScope>('all');
   const [applied, setApplied] = useState({
     period: 'month' as EnergyAnalysisPeriod,
-    time: '2026-06',
+    time: ENERGY_ANALYSIS_DEFAULT_MONTH,
     scope: 'all' as EnergyAnalysisScope,
   });
   const [dialog, setDialog] = useState<DialogState>(null);
@@ -468,7 +474,7 @@ function ConsumptionQueryPage() {
     : `${applied.time}年度`;
 
   const openDetail = (row: EnergyQueryRow) => {
-    const dailyDetails = monthMode ? createEnergyQueryMonthlyDetails(row) : null;
+    const dailyDetails = monthMode ? createEnergyQueryMonthlyDetails(row, queryYear, queryMonth) : null;
     const isCurrentPeriod = queryYear === ENERGY_QUERY_CURRENT_YEAR
       && (monthMode ? queryMonth === ENERGY_QUERY_REPORTED_MONTH : true);
     const body = monthMode
@@ -501,12 +507,12 @@ function ConsumptionQueryPage() {
       <section className={`${styles.card} ${styles.filterCard}`}>
         <FilterField label="统计周期">
           <span className={styles.segment}>
-            <button type="button" className={draftPeriod === 'month' ? styles.active : ''} onClick={() => { setDraftPeriod('month'); setDraftTime('2026-06'); }}>月度</button>
-            <button type="button" className={draftPeriod === 'year' ? styles.active : ''} onClick={() => { setDraftPeriod('year'); setDraftTime('2026'); }}>年度</button>
+            <button type="button" className={draftPeriod === 'month' ? styles.active : ''} onClick={() => { setDraftPeriod('month'); setDraftTime(ENERGY_ANALYSIS_DEFAULT_MONTH); }}>月度</button>
+            <button type="button" className={draftPeriod === 'year' ? styles.active : ''} onClick={() => { setDraftPeriod('year'); setDraftTime(String(ENERGY_ANALYSIS_CURRENT_YEAR)); }}>年度</button>
           </span>
         </FilterField>
         <FilterField label="时间" wide>
-          {draftPeriod === 'month' ? <input aria-label="时间" type="month" value={draftTime} onChange={(event) => setDraftTime(event.target.value)} /> : <select aria-label="时间" value={draftTime} onChange={(event) => setDraftTime(event.target.value)}><option value="2026">2026年度</option><option value="2025">2025年度</option><option value="2024">2024年度</option></select>}
+          {draftPeriod === 'month' ? <input aria-label="时间" type="month" value={draftTime} onChange={(event) => setDraftTime(event.target.value)} /> : <select aria-label="时间" value={draftTime} onChange={(event) => setDraftTime(event.target.value)}>{listAnalysisYears().map((year) => <option key={year} value={year}>{year}年度</option>)}</select>}
         </FilterField>
         <FilterField label="用能单元" wide>
           <select aria-label="用能单元" value={draftScope} onChange={(event) => setDraftScope(event.target.value as EnergyAnalysisScope)}>
@@ -518,14 +524,14 @@ function ConsumptionQueryPage() {
         </FilterField>
         <div className={styles.filterSpacer} />
         <EnergyButton primary onClick={() => {
-          setApplied({ period: draftPeriod, time: draftTime || (draftPeriod === 'month' ? '2026-06' : '2026'), scope: draftScope });
+          setApplied({ period: draftPeriod, time: draftTime || (draftPeriod === 'month' ? ENERGY_ANALYSIS_DEFAULT_MONTH : String(ENERGY_ANALYSIS_CURRENT_YEAR)), scope: draftScope });
           notify('查询结果已按用能单元更新');
         }}>查询</EnergyButton>
         <EnergyButton onClick={() => {
           setDraftPeriod('month');
-          setDraftTime('2026-06');
+          setDraftTime(ENERGY_ANALYSIS_DEFAULT_MONTH);
           setDraftScope('all');
-          setApplied({ period: 'month', time: '2026-06', scope: 'all' });
+          setApplied({ period: 'month', time: ENERGY_ANALYSIS_DEFAULT_MONTH, scope: 'all' });
           notify('筛选条件已重置');
         }}>重置</EnergyButton>
       </section>
@@ -553,7 +559,7 @@ function ConsumptionQueryPage() {
 
       <div className={styles.queryCharts}>
         <section className={`${styles.card} ${styles.chartCard}`}>
-          <div className={styles.chartTitle}>能源消费趋势（{monthMode ? '2026年1—6月' : currentYearYtd ? `2022—2026年｜2026年截至${ENERGY_QUERY_REPORTED_MONTH}月` : '2022—2026年'}）</div>
+          <div className={styles.chartTitle}>能源消费趋势（{monthMode ? `${queryYear}年1—${queryMonth}月` : currentYearYtd ? `${data.labels[0]}—${queryYear}年｜${queryYear}年截至${ENERGY_QUERY_REPORTED_MONTH}月` : `${data.labels[0]}—${queryYear}年`}）</div>
           <div className={styles.chartSub}>{titleUnit}｜折标煤（tce），仅展示实际数据</div>
           <div className={styles.barChart}>
             {data.trend.map((value, index) => (
@@ -590,7 +596,7 @@ function ConsumptionQueryPage() {
       <section className={`${styles.card} ${styles.tableCard}`}>
         <div className={styles.tableToolbar}>
           <div>
-            <div className={styles.chartTitle}>能源消费明细（{titleUnit}｜{monthMode ? '2026年6月' : '2026年度'}）</div>
+            <div className={styles.chartTitle}>能源消费明细（{titleUnit}｜{appliedPeriodLabel}）</div>
             <div className={styles.exportHint}>导出内容与当前筛选条件一致，包含用能单元、能源品种、实物量、折标量及期间比较。</div>
           </div>
           <EnergyButton onClick={() => notify('能源消费明细台账已导出')}>⇩ 导出明细台账</EnergyButton>
@@ -641,13 +647,13 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
   const requestedYear = deviceSearch.get('year') ?? undefined;
   const requestedEnergyUnitId = deviceSearch.get('energyUnitId') ?? undefined;
   const savedFilters = (() => { try { return JSON.parse(window.sessionStorage.getItem('energy-intensity-device-filters') ?? 'null') as { year?: string; energyUnitId?: string; deviceId?: string } | null; } catch { return null; } })();
-  const [year, setYear] = useState(requestedYear ?? savedFilters?.year ?? '2026');
+  const [year, setYear] = useState(requestedYear ?? savedFilters?.year ?? String(ENERGY_ANALYSIS_CURRENT_YEAR));
   const [energyUnitId, setEnergyUnitId] = useState(requestedEnergyUnitId ?? savedFilters?.energyUnitId ?? 'all');
   const [deviceId, setDeviceId] = useState(requestedDeviceId ?? savedFilters?.deviceId ?? 'all');
   const [trendDeviceId, setTrendDeviceId] = useState(requestedDeviceId ?? (savedFilters?.deviceId !== 'all' ? savedFilters?.deviceId ?? '' : ''));
   const [showDeviceMonthly, setShowDeviceMonthly] = useState(false);
   const [showPendingDevices, setShowPendingDevices] = useState(false);
-  const [applied, setApplied] = useState({ year: Number(requestedYear ?? savedFilters?.year ?? 2026), energyUnitId: requestedEnergyUnitId ?? savedFilters?.energyUnitId ?? 'all', deviceId: requestedDeviceId ?? savedFilters?.deviceId ?? 'all' });
+  const [applied, setApplied] = useState({ year: Number(requestedYear ?? savedFilters?.year ?? ENERGY_ANALYSIS_CURRENT_YEAR), energyUnitId: requestedEnergyUnitId ?? savedFilters?.energyUnitId ?? 'all', deviceId: requestedDeviceId ?? savedFilters?.deviceId ?? 'all' });
   const [version, setVersion] = useState(0);
   const [dialog, setDialog] = useState<DialogState>(null);
   const { toast, notify } = useFeedback();
@@ -658,7 +664,7 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
     .sort((left, right) => (left.resultStatus === '已计算' ? 0 : 1) - (right.resultStatus === '已计算' ? 0 : 1)), [allRows]);
   const calculatedRows = useMemo(() => rows.filter((row) => row.resultStatus === '已计算'), [rows]);
   const pendingRows = useMemo(() => rows.filter((row) => row.resultStatus !== '已计算'), [rows]);
-  const devices = useMemo(() => buildDeviceIntensityRows(Number(year) || 2026), [year]);
+  const devices = useMemo(() => buildDeviceIntensityRows(Number(year) || ENERGY_ANALYSIS_CURRENT_YEAR), [year]);
   const openParameterDialog = (row: ReturnType<typeof buildDeviceIntensityRows>[number]) => {
     navigate(withReturnTo(deviceOutputDataPath(row.deviceId, applied.year, row.metricCode ?? 'custom-device-work', row.deviceName), returnToIntensityPath()));
   };
@@ -670,7 +676,7 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
     let denominatorUnit = row?.templateConfig?.denominator.unit ?? 't';
     let resultUnit = row?.templateConfig?.resultUnit ?? 'kWh/t';
     let denominatorMetricCode = row?.templateConfig?.denominator.metricCode ?? '';
-    const syncResultUnit = () => { resultUnit = `${energyTypeId === 'v11-energy-electricity' ? 'kWh' : 'kgce'}/${denominatorUnit}`; };
+    const syncResultUnit = () => { resultUnit = `tce/${denominatorUnit}`; };
     setDialog({
       title: '配置设备指标口径',
       wide: true,
@@ -695,7 +701,7 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
         if (!row) { notify('请从待配置设备进入指标口径配置'); return false; }
         const selected = DEVICE_METRIC_TEMPLATES.find((item) => item.templateId === templateId) ?? DEVICE_METRIC_TEMPLATES[0];
         const metricCode: DeviceIntensityMetricCode = row?.metricCode ?? 'device-output-energy';
-        const config: DeviceIntensityTemplateConfig = { templateId: selected.templateId, metricCode, metricName, calculationMethod: 'ratio', numerator: { source: 'device-energy', energyTypeId, name: '设备能源消耗', unit: energyTypeId === 'v11-energy-electricity' ? 'kWh' : 'kgce' }, denominator: { source: 'operation-data', metricCode: denominatorMetricCode.trim() || undefined, name: denominatorName.trim(), unit: denominatorUnit.trim() }, resultUnit, factor: 1, formula: `设备能源消耗 ÷ ${denominatorName.trim()}` };
+        const config: DeviceIntensityTemplateConfig = { templateId: selected.templateId, metricCode, metricName, calculationMethod: 'ratio', numerator: { source: 'device-energy', energyTypeId, name: '设备折标综合能耗', unit: 'tce' }, denominator: { source: 'operation-data', metricCode: denominatorMetricCode.trim() || undefined, name: denominatorName.trim(), unit: denominatorUnit.trim() }, resultUnit, factor: 1, formula: `设备折标综合能耗 ÷ ${denominatorName.trim()}` };
         saveDeviceIntensityTemplate({ deviceId: row.deviceId, year: applied.year, metricCode, config });
         setVersion((current) => current + 1);
         notify('设备指标口径已保存，设备已纳入待完善列表');
@@ -772,8 +778,8 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
       }, 0),
     });
   };
-  const query = () => { const next = { year: Number(year) || 2026, energyUnitId, deviceId }; setApplied(next); window.sessionStorage.setItem('energy-intensity-device-filters', JSON.stringify(next)); };
-  const reset = () => { setYear('2026'); setEnergyUnitId('all'); setDeviceId('all'); const next = { year: 2026, energyUnitId: 'all', deviceId: 'all' }; setApplied(next); window.sessionStorage.setItem('energy-intensity-device-filters', JSON.stringify(next)); };
+  const query = () => { const next = { year: Number(year) || ENERGY_ANALYSIS_CURRENT_YEAR, energyUnitId, deviceId }; setApplied(next); window.sessionStorage.setItem('energy-intensity-device-filters', JSON.stringify(next)); };
+  const reset = () => { setYear(String(ENERGY_ANALYSIS_CURRENT_YEAR)); setEnergyUnitId('all'); setDeviceId('all'); const next = { year: ENERGY_ANALYSIS_CURRENT_YEAR, energyUnitId: 'all', deviceId: 'all' }; setApplied(next); window.sessionStorage.setItem('energy-intensity-device-filters', JSON.stringify(next)); };
   const deviceOptions = devices.filter((row) => energyUnitId === 'all' || row.energyUnitId === energyUnitId);
   const trendCandidates = rows.filter((row) => row.resultStatus === '已计算');
   const trendRow = trendCandidates.find((row) => row.deviceId === trendDeviceId) ?? trendCandidates[0];
@@ -817,7 +823,7 @@ function DeviceIntensityTab({ onTabChange }: { onTabChange: (type: IntensityObje
   return <div className={styles.page}>
     <section className={`${styles.card} ${styles.filterCard}`}>
       <FilterField label="指标对象类型" wide><span className={styles.objectSegment}>{[['factory', '全厂'], ['unit', '一级用能单元'], ['product', '重点产品'], ['device', '重点设备']].map(([value, label]) => <button key={value} type="button" className={value === 'device' ? styles.active : ''} onClick={() => value !== 'device' && onTabChange(value as IntensityObjectType)}>{label}</button>)}</span></FilterField>
-      <FilterField label="分析年度"><select aria-label="分析年度" value={year} onChange={(event) => setYear(event.target.value)}><option value="2026">2026年</option><option value="2025">2025年</option><option value="2024">2024年</option></select></FilterField>
+      <FilterField label="分析年度"><select aria-label="分析年度" value={year} onChange={(event) => setYear(event.target.value)}>{listAnalysisYears().map((item) => <option key={item} value={item}>{item}年</option>)}</select></FilterField>
       <FilterField label="所属用能单元"><select aria-label="所属用能单元" value={energyUnitId} onChange={(event) => { setEnergyUnitId(event.target.value); setDeviceId('all'); }}><option value="all">全部用能单元</option>{[...new Map(devices.map((row) => [row.energyUnitId, row.energyUnitName])).entries()].map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></FilterField>
       <FilterField label="具体设备" wide><select aria-label="具体设备" value={deviceId} onChange={(event) => setDeviceId(event.target.value)}><option value="all">全部重点设备</option>{deviceOptions.map((row) => <option key={row.deviceId} value={row.deviceId}>{row.deviceName}</option>)}</select></FilterField>
       <div className={styles.filterSpacer} /><EnergyButton primary onClick={query}>查询</EnergyButton><EnergyButton onClick={reset}>重置</EnergyButton>
@@ -831,7 +837,7 @@ function ProductMetricDetail({ metric, objectName }: { metric: CalculatedIntensi
   return <>
     <section className={styles.modalSection}><h3>指标结果</h3><DetailGrid items={[['分析对象', `${objectName}｜产品`], ['指标名称', metric.name], ['计算结果', metric.value === null ? '—' : `${format(metric.value, metricDigits(metric.value))} ${metric.unit}`], ['统计期间', metric.period], ['结果说明', '产品关联生产用能单元的能源消费统计，不代表产品独立能耗']]} /></section>
     <section className={styles.modalSection}><h3>计算依据</h3><DetailGrid items={[['分子数据', metric.numerator], ['分子来源', metric.numeratorSource ?? '能源数据—企业层级—全厂'], ['分母数据', metric.denominator], ['分母来源', metric.denominatorSource ?? '运营数据—产品产量'], ['计算公式', metric.formula]]} /></section>
-    <section className={styles.modalSection}><h3>数据来源</h3><DetailGrid items={[['能源数据来源', metric.numeratorSource ?? '能源数据—关联一级用能单元'], ['运营数据来源', metric.denominatorSource ?? '运营数据—一级用能单元—产品产量'], ['多产品规则', '一期不进行能源分配；同一生产单元关联多个产品时不计算单位产品综合能耗'], ['最近计算时间', '2026-08-04']]} /></section>
+    <section className={styles.modalSection}><h3>数据来源</h3><DetailGrid items={[['能源数据来源', metric.numeratorSource ?? '能源数据—关联一级用能单元'], ['运营数据来源', metric.denominatorSource ?? '运营数据—一级用能单元—产品产量'], ['多产品规则', '一期不进行能源分配；同一生产单元关联多个产品时不计算单位产品综合能耗'], ['最近计算时间', calculationDate]]} /></section>
   </>;
 }
 
@@ -843,8 +849,8 @@ function ProductMetricDetail({ metric, objectName }: { metric: CalculatedIntensi
   const [deviceId, setDeviceId] = useState('all');
   const [dialog, setDialog] = useState<DialogState>(null);
   const { toast } = useFeedback();
-  const rows = useMemo(() => buildDeviceIntensityRows(Number(year) || 2026, deviceType, energyUnitId, deviceId), [year, deviceType, energyUnitId, deviceId]);
-  const devices = useMemo(() => buildDeviceIntensityRows(Number(year) || 2026), [year]);
+  const rows = useMemo(() => buildDeviceIntensityRows(Number(year) || ENERGY_ANALYSIS_CURRENT_YEAR, deviceType, energyUnitId, deviceId), [year, deviceType, energyUnitId, deviceId]);
+  const devices = useMemo(() => buildDeviceIntensityRows(Number(year) || ENERGY_ANALYSIS_CURRENT_YEAR), [year]);
   const calculated = rows.filter((row) => row.resultStatus === '已计算').length;
   const openEnergyData = (row: ReturnType<typeof buildDeviceIntensityRows>[number]) => {
     const entered = row.reportedMonths.map((item, index) => item ? `${index + 1}月` : '').filter(Boolean).join('、') || '暂无';
@@ -1047,13 +1053,14 @@ function IntensityPage() {
   const initialObjectType = requestedObjectType === 'factory' || requestedObjectType === 'unit' || requestedObjectType === 'product' || requestedObjectType === 'device'
     ? requestedObjectType
     : window.sessionStorage.getItem('energy-intensity-tab') === 'device' ? 'device' : 'factory';
-  const initialYear = intensitySearch.get('year') ?? '2026';
+  const requestedYear = Number(intensitySearch.get('year'));
+  const initialYear = listAnalysisYears().includes(requestedYear) ? String(requestedYear) : String(ENERGY_ANALYSIS_CURRENT_YEAR);
   const initialObjectId = intensitySearch.get('objectId') ?? 'all';
   const [draftYear, setDraftYear] = useState(initialYear);
   const [draftObjectType, setDraftObjectType] = useState<IntensityObjectType>(initialObjectType);
   const [draftObjectId, setDraftObjectId] = useState(initialObjectId);
   const [applied, setApplied] = useState({
-    year: Number(initialYear) || 2026,
+    year: Number(initialYear) || ENERGY_ANALYSIS_CURRENT_YEAR,
     objectType: initialObjectType,
     objectId: initialObjectType === 'factory' ? 'factory' : initialObjectId,
     unitLevel: initialObjectType === 'unit' ? 'level1' as const : 'all' as const,
@@ -1172,7 +1179,7 @@ function IntensityPage() {
         <section className={styles.modalSection}><h3>指标结果</h3><DetailGrid items={resultItems} /></section>
         <section className={styles.modalSection}><h3>计算依据</h3><DetailGrid items={calculationBasis as Array<[string, ReactNode]>} /></section>
         <section className={styles.modalSection}><h3>计算公式</h3><div className={styles.formulaBox}>{metric.formula}</div></section>
-        <section className={styles.modalSection}><h3>数据追溯</h3><div className={styles.modalNote}>{traceSource}<br />能源记录{metric.energyRecordIds.length}条；运营记录{metric.operationMetricIds.length}条；最近计算时间：2026-08-04。</div></section>
+        <section className={styles.modalSection}><h3>数据追溯</h3><div className={styles.modalNote}>{traceSource}<br />能源记录{metric.energyRecordIds.length}条；运营记录{metric.operationMetricIds.length}条；最近计算时间：{calculationDate}。</div></section>
       </>,
       submitText: '查看源数据',
       onSubmit: () => navigate(sourcePath),
@@ -1187,7 +1194,7 @@ function IntensityPage() {
     const displayFormula = metricView.object.objectType === 'device'
       ? displayDeviceFormula(metric.formula)
       : metric.name.includes('单位产品')
-      ? `${metric.name} = 综合能耗 × 1000 ÷ 产品产量`
+      ? `${metric.name} = 综合能耗 ÷ 产品产量`
       : metric.name.includes('单位产值')
         ? `${metric.name} = 综合能耗 ÷ 工业总产值`
         : metric.name.includes('单位增加值')
@@ -1321,7 +1328,7 @@ function IntensityPage() {
       setDraftObjectType(nextType);
       window.sessionStorage.setItem('energy-intensity-tab', nextType);
       setDraftObjectId('all');
-      setApplied({ year: Number(draftYear) || 2026, objectType: nextType, objectId: nextType === 'factory' ? 'factory' : 'all', unitLevel: nextType === 'unit' ? 'level1' : 'all' });
+                  setApplied({ year: Number(draftYear) || ENERGY_ANALYSIS_CURRENT_YEAR, objectType: nextType, objectId: nextType === 'factory' ? 'factory' : 'all', unitLevel: nextType === 'unit' ? 'level1' : 'all' });
     }} />;
   }
 
@@ -1345,14 +1352,14 @@ function IntensityPage() {
                   setDraftObjectType(nextType);
                   window.sessionStorage.setItem('energy-intensity-tab', nextType);
                   setDraftObjectId('all');
-                  setApplied({ year: Number(draftYear) || 2026, objectType: nextType, objectId: nextType === 'factory' ? 'factory' : 'all', unitLevel: nextType === 'unit' ? 'level1' : 'all' });
+                  setApplied({ year: Number(draftYear) || ENERGY_ANALYSIS_CURRENT_YEAR, objectType: nextType, objectId: nextType === 'factory' ? 'factory' : 'all', unitLevel: nextType === 'unit' ? 'level1' : 'all' });
                 }}
               >{label}</button>
             ))}
           </span>
         </FilterField>
         <FilterField label="分析年度">
-          <select aria-label="分析年度" value={draftYear} onChange={(event) => setDraftYear(event.target.value)}><option value="2026">2026年</option><option value="2025">2025年</option><option value="2024">2024年</option></select>
+          <select aria-label="分析年度" value={draftYear} onChange={(event) => setDraftYear(event.target.value)}>{listAnalysisYears().map((year) => <option key={year} value={year}>{year}年</option>)}</select>
         </FilterField>
         {draftObjectType === 'product' ? <FilterField label="产品对象" wide><select aria-label="具体分析对象" value={draftObjectId} onChange={(event) => setDraftObjectId(event.target.value)}><option value="all">全部产品</option>{draftObjects.map((object) => <option key={object.objectId} value={object.objectId}>{object.objectName}</option>)}</select></FilterField> : draftObjectType !== 'factory' && <FilterField label="具体一级用能单元" wide>
           <select aria-label="具体一级用能单元" value={draftObjectId} onChange={(event) => setDraftObjectId(event.target.value)}>
@@ -1363,7 +1370,7 @@ function IntensityPage() {
         <div className={styles.filterSpacer} />
         <EnergyButton primary onClick={() => {
           setApplied({
-            year: Number(draftYear) || 2026,
+            year: Number(draftYear) || ENERGY_ANALYSIS_CURRENT_YEAR,
             objectType: draftObjectType,
             objectId: draftObjectType === 'factory' ? 'factory' : draftObjectType === 'product' ? draftObjectId : draftObjectId,
             unitLevel: draftObjectType === 'unit' ? 'level1' : 'all',
@@ -1371,10 +1378,10 @@ function IntensityPage() {
           notify(draftObjectType === 'unit' ? '已按一级用能单元匹配能源数据与运营数据' : '已按分析对象匹配能源数据与运营数据');
         }}>查询</EnergyButton>
         <EnergyButton onClick={() => {
-          setDraftYear('2026');
+          setDraftYear(String(ENERGY_ANALYSIS_CURRENT_YEAR));
           setDraftObjectType('factory');
           setDraftObjectId('all');
-          setApplied({ year: 2026, objectType: 'factory', objectId: 'factory', unitLevel: 'all' });
+          setApplied({ year: ENERGY_ANALYSIS_CURRENT_YEAR, objectType: 'factory', objectId: 'factory', unitLevel: 'all' });
           notify('筛选条件已重置');
         }}>重置</EnergyButton>
       </section>
@@ -1423,7 +1430,8 @@ function BenchmarkPage() {
     ? requestedType
     : 'all';
   const initialObjectId = initialType === 'all' ? '' : initialParams.get('objectId') ?? '';
-  const initialYear = ['2024', '2025', '2026'].includes(initialParams.get('year') ?? '') ? initialParams.get('year')! : '2026';
+  const requestedYear = Number(initialParams.get('year'));
+  const initialYear = listAnalysisYears().includes(requestedYear) ? String(requestedYear) : String(ENERGY_ANALYSIS_CURRENT_YEAR);
   const [draftYear, setDraftYear] = useState(initialYear);
   const [draftType, setDraftType] = useState<BenchmarkType>(initialType);
   const [draftObjectId, setDraftObjectId] = useState(initialObjectId);
@@ -1451,7 +1459,7 @@ function BenchmarkPage() {
     return buildBenchmarkDataset(applied.year);
   }, [applied.year, dataVersion]);
   const metrics = dataset.rows;
-  const draftDataset = useMemo(() => buildBenchmarkDataset(Number(draftYear) || 2026), [draftYear]);
+  const draftDataset = useMemo(() => buildBenchmarkDataset(Number(draftYear) || ENERGY_ANALYSIS_CURRENT_YEAR), [draftYear]);
   const draftFilteredRows = (draftType === 'all'
     ? draftDataset.rows.filter((row) => row.objectTypeKey === 'enterprise')
     : draftDataset.rows.filter((row) => row.objectTypeKey === draftType))
@@ -1524,7 +1532,7 @@ function BenchmarkPage() {
   };
 
   const applyFilters = () => {
-    const nextYear = Number(draftYear) || 2026;
+    const nextYear = Number(draftYear) || ENERGY_ANALYSIS_CURRENT_YEAR;
     const nextDataset = buildBenchmarkDataset(nextYear);
     const nextRows = (draftType === 'all'
       ? nextDataset.rows.filter((row) => row.objectTypeKey === 'enterprise')
@@ -1682,7 +1690,7 @@ function BenchmarkPage() {
   return (
     <div className={styles.page}>
       <section className={`${styles.card} ${styles.filterCard} ${styles.benchmarkFilters}`}>
-        <FilterField label="分析年度"><select aria-label="分析年度" value={draftYear} onChange={(event) => setDraftYear(event.target.value)}><option value="2026">2026年</option><option value="2025">2025年</option><option value="2024">2024年</option></select></FilterField>
+          <FilterField label="分析年度"><select aria-label="分析年度" value={draftYear} onChange={(event) => setDraftYear(event.target.value)}>{listAnalysisYears().map((year) => <option key={year} value={year}>{year}年</option>)}</select></FilterField>
         <FilterField label="对象类型">
           <span className={styles.objectSegment}>
             {([
@@ -1699,8 +1707,8 @@ function BenchmarkPage() {
         <div className={styles.benchmarkFilterActions}>
           <EnergyButton primary onClick={applyFilters}>查询</EnergyButton>
           <EnergyButton onClick={() => {
-            setDraftYear('2026'); setDraftType('all'); setDraftUnitLevel('all'); setDraftObjectId(''); setDraftMetricGroup('all');
-            setApplied({ year: 2026, type: 'all', objectId: '', unitLevel: 'all' });
+            setDraftYear(String(ENERGY_ANALYSIS_CURRENT_YEAR)); setDraftType('all'); setDraftUnitLevel('all'); setDraftObjectId(''); setDraftMetricGroup('all');
+            setApplied({ year: ENERGY_ANALYSIS_CURRENT_YEAR, type: 'all', objectId: '', unitLevel: 'all' });
             setSelectedId('benchmark-enterprise-factory-factory-product-energy'); setDraftSelectedId('benchmark-enterprise-factory-factory-product-energy');
             notify('筛选条件已重置');
           }}>重置</EnergyButton>
@@ -1965,10 +1973,11 @@ function FlowAnalysisPage() {
   const navigate = useNavigate();
   const { search } = useLocation();
   const initialParams = new URLSearchParams(search);
-  const initialYear = ['2024', '2025', '2026'].includes(initialParams.get('year') ?? '') ? initialParams.get('year')! : '2026';
+  const requestedYear = Number(initialParams.get('year'));
+  const initialYear = listAnalysisYears().includes(requestedYear) ? String(requestedYear) : String(ENERGY_ANALYSIS_CURRENT_YEAR);
   const initialGrain = initialParams.get('grain') === 'year' ? 'year' as const : 'month' as const;
   const requestedMonth = Number(initialParams.get('month'));
-  const initialMonth = Number.isInteger(requestedMonth) && requestedMonth >= 1 && requestedMonth <= 12 ? String(requestedMonth) : '6';
+  const initialMonth = Number.isInteger(requestedMonth) && requestedMonth >= 1 && requestedMonth <= 12 ? String(requestedMonth) : String(ENERGY_QUERY_REPORTED_MONTH);
   const [draftYear, setDraftYear] = useState(initialYear);
   const [draftGrain, setDraftGrain] = useState<'month' | 'year'>(initialGrain);
   const [draftMonth, setDraftMonth] = useState(initialMonth);
@@ -2026,7 +2035,7 @@ function FlowAnalysisPage() {
     <div className={styles.page}>
       <section className={`${styles.card} ${styles.filterCard} ${styles.flowFilters}`}>
         <FilterField label="分析年度">
-          <select aria-label="分析年度" value={draftYear} onChange={(event) => setDraftYear(event.target.value)}><option value="2026">2026年</option><option value="2025">2025年</option><option value="2024">2024年</option></select>
+          <select aria-label="分析年度" value={draftYear} onChange={(event) => setDraftYear(event.target.value)}>{listAnalysisYears().map((year) => <option key={year} value={year}>{year}年</option>)}</select>
         </FilterField>
         <FilterField label="时间粒度">
           <select aria-label="时间粒度" value={draftGrain} onChange={(event) => setDraftGrain(event.target.value as 'month' | 'year')}>
@@ -2044,7 +2053,7 @@ function FlowAnalysisPage() {
         <div className={styles.filterSpacer} />
         <EnergyButton primary onClick={() => {
           setApplied({
-            year: Number(draftYear) || 2026,
+            year: Number(draftYear) || ENERGY_ANALYSIS_CURRENT_YEAR,
             grain: draftGrain,
             month: Number(draftMonth),
           });
@@ -2052,10 +2061,10 @@ function FlowAnalysisPage() {
           notify('已按当前期间重新生成全厂能源流向');
         }}>查询</EnergyButton>
         <EnergyButton onClick={() => {
-          setDraftYear('2026');
+          setDraftYear(String(ENERGY_ANALYSIS_CURRENT_YEAR));
           setDraftGrain('month');
-          setDraftMonth('6');
-          setApplied({ year: 2026, grain: 'month', month: 6 });
+          setDraftMonth(String(ENERGY_QUERY_REPORTED_MONTH));
+          setApplied({ year: ENERGY_ANALYSIS_CURRENT_YEAR, grain: 'month', month: ENERGY_QUERY_REPORTED_MONTH });
           setTab('diagram');
           setSelectedNode('');
           notify('筛选条件已重置');

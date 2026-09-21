@@ -2402,6 +2402,9 @@
 .factorEvidenceBody { padding: 22px 28px 28px; }
 .factorEvidenceBody p { margin: 0 0 16px; color: #6e8079; line-height: 1.65; }
 .factorEvidenceUpload { display: grid; gap: 10px; color: #647771; font-size: 13px; }
+.factorEvidenceListHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.factorEvidenceDeleteAll { padding: 0; color: #b65f58; border: 0; background: transparent; cursor: pointer; font-size: 12px; }
+.factorEvidenceDeleteAll:hover { color: #8f3e39; text-decoration: underline; }
 .factorEvidenceDropzone { display: grid; justify-items: center; gap: 8px; min-height: 178px; padding: 24px; border: 1px dashed #bddbd0; border-radius: 16px; background: #fbfdfc; color: #6f817d; text-align: center; transition: border-color .15s ease, background .15s ease; }
 .factorEvidenceDropzone strong { color: #2e74e6; font-size: 46px; font-weight: 400; line-height: .9; }
 .factorEvidenceDropzone span { font-size: 16px; }
@@ -2410,6 +2413,7 @@
 .factorEvidenceDropzoneActive { border-color: #2e74e6; background: #f2f7ff; }
 .factorEvidenceUpload input { display: none; }
 .factorEvidenceFile { display: flex; align-items: center; gap: 8px; padding: 9px 10px; background: #f5faf8; border-radius: 5px; }
+.factorEvidenceFileList { display: grid; gap: 6px; }
 .factorEvidenceFile span { color: #0b8a66; font-size: 11px; }
 .factorEvidenceFile b { flex: 1; color: #344b43; font-size: 12px; }
 .factorEvidenceFile button { color: #ba5b52; border: 0; background: transparent; cursor: pointer; }

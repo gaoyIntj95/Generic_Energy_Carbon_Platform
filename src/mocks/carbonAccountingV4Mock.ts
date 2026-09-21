@@ -1,3 +1,9 @@
+export type CarbonFactorEvidenceFile = {
+  evidenceFileId: string;
+  fileName: string;
+  fileType?: string;
+};
+
 export type CarbonFactorParameter = {
   key: string;
   name: string;
@@ -12,6 +18,7 @@ export type CarbonFactorParameter = {
   monitoringFrequency?: string;
   effectivePeriod?: string;
   evidenceRequired?: boolean;
+  evidenceFiles?: CarbonFactorEvidenceFile[];
 };
 
 export type CarbonFactor = {
@@ -173,7 +180,7 @@ export const carbonFactorsV4: CarbonFactor[] = [
       { key: 'flareVolume', name: '火炬销毁甲烷气体积量', value: 0, display: '0', unit: 'Nm³', sourceType: '流量监测值', source: '火炬入口流量计', editable: true, valueMode: '检测值', monitoringFrequency: '连续或至少每小时一次', evidenceRequired: true },
       { key: 'flareConcentration', name: '火炬入口甲烷体积浓度', value: 0, display: '0', unit: '%', sourceType: '企业监测值', source: 'GB/T 8984', editable: true, valueMode: '检测值', monitoringFrequency: '至少每周一次', evidenceRequired: true },
       { key: 'flareEfficiency', name: '火炬平均销毁效率', value: 0, display: '0', unit: '%', sourceType: '企业监测值', source: '火炬进出口质量变化测试', editable: true, valueMode: '检测值', monitoringFrequency: '至少每月一次', evidenceRequired: true },
-    ], selectable: true, calculationType: 'recoveryParameter',
+    ], selectable: false, calculationType: 'recoveryParameter',
   },
   {
     factorId: 'pf-co2-recovery', scope: 'public', name: '二氧化碳回收利用', objectType: '参数组/公式模板', activity: 'CO₂回收利用', gas: 'CO₂',
@@ -184,7 +191,7 @@ export const carbonFactorsV4: CarbonFactor[] = [
       { key: 'externalPurity', name: '外供气体 CO₂ 体积浓度', value: 0, display: '0', unit: '%', sourceType: '企业监测值', source: 'GB/T 8984', editable: true, valueMode: '检测值', monitoringFrequency: '至少每周一次', evidenceRequired: true },
       { key: 'selfUseVolume', name: 'CO₂回收作原料量', value: 0, display: '0', unit: '万Nm³', sourceType: '企业台账', source: '生产原料使用记录', editable: true, valueMode: '检测值', monitoringFrequency: '按月汇总', evidenceRequired: true },
       { key: 'selfUsePurity', name: '自用原料气 CO₂ 体积浓度', value: 0, display: '0', unit: '%', sourceType: '企业监测值', source: 'GB/T 8984', editable: true, valueMode: '检测值', monitoringFrequency: '至少每周一次', evidenceRequired: true },
-    ], selectable: true, calculationType: 'recoveryParameter',
+    ], selectable: false, calculationType: 'recoveryParameter',
   },
   {
     factorId: 'p-ng-ncv', scope: 'public', name: '天然气低位发热量 NCV', objectType: '基础核算参数', activity: '固定燃烧', gas: '—',

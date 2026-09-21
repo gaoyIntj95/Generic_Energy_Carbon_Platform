@@ -290,6 +290,7 @@ function hasPeriodData(record: V11EnergyRecord, period: FlowPeriod) {
 function standardAmount(physical: number, type: V11EnergyType | null) {
   if (!type) return 0;
   const converted = physical * type.standardCoalFactor;
+  // 必要单位换算：kgce/原始单位 -> tce/原始单位。
   return type.standardCoalFactorUnit.startsWith('kgce') ? converted / 1000 : converted;
 }
 
@@ -1524,6 +1525,7 @@ export function buildFlowAnalysisDataset(
     if (type && Number.isFinite(type.standardCoalFactor) && type.standardCoalFactor > 0) {
       // Use this branch's amount in the energy type's canonical unit, not the entire source record.
       link.calculation = {
+        // 必要反向换算：tce -> kgce，再除以 kgce/原始单位系数恢复原始量。
         physicalAmount: link.standardCoalAmount * (type.standardCoalFactorUnit.startsWith('kgce') ? 1000 : 1) / type.standardCoalFactor,
         physicalUnit: type.measurementUnit,
         standardCoalFactor: type.standardCoalFactor,

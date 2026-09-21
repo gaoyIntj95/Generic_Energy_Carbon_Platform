@@ -88,7 +88,7 @@ function productSummaryBenchmarkMetric(year: number): BenchmarkMetric {
     objectType: '产品',
     objectTypeKey: 'product',
     metricName: '单位产品综合能耗',
-    unit: metric?.unit ?? 'kgce/t',
+    unit: metric?.unit ?? 'tce/t',
     actual: metric?.value ?? 0,
     target: target?.value ?? 0,
     targetConfigured: Boolean(target),
@@ -107,7 +107,7 @@ function productSummaryBenchmarkMetric(year: number): BenchmarkMetric {
     numeratorDescription: metric?.numerator,
     denominatorDescription: metric?.denominator,
     allocationDescription: '企业级产品能源口径',
-    formulaDescription: metric?.formula ?? '企业年度综合能耗 ×1000 ÷ 产品年度产量合计',
+    formulaDescription: metric?.formula ?? '企业年度综合能耗 ÷ 产品年度产量合计',
     periodDescription: `${year}年度`,
     monthlyMetrics: metric?.monthlyMetrics?.map(toBenchmarkMonthlyMetric),
     monthlyDataStatus: metric?.monthlyDataStatus,
@@ -238,6 +238,7 @@ const annualOperationAmount = (record: V11OperationMetric) =>
 
 function standardCoalTce(amount: number, type: V11EnergyType) {
   const converted = amount * type.standardCoalFactor;
+  // 必要单位换算：kgce -> tce；对标实际值和趋势统一使用 tce。
   return type.standardCoalFactorUnit.startsWith('kgce') ? converted / 1000 : converted;
 }
 
@@ -282,7 +283,7 @@ function ratioTrend(
 ) {
   const energy = sumMonthlyEnergy(energyRecords, types);
   const outputs = sumMonthlyOperations(operations);
-  return energy.map((amount, index) => outputs[index] > 0 ? amount * 1000 / outputs[index] : 0);
+  return energy.map((amount, index) => outputs[index] > 0 ? amount / outputs[index] : 0);
 }
 
 function targetValue(
@@ -314,8 +315,8 @@ function unitMetric(
     objectType: '用能单元',
     objectTypeKey: 'unit',
     metricName: '单位产品综合能耗',
-    unit: 'kgce/t',
-    actual: totalEnergy * 1000 / output,
+    unit: 'tce/t',
+    actual: totalEnergy / output,
     target: target?.value ?? 0,
     targetConfigured: Boolean(target),
     direction: 'low',
@@ -354,7 +355,7 @@ function unavailableProductMetric(
     objectType: '产品',
     objectTypeKey: 'product',
     metricName: '单位产品综合能耗',
-    unit: `kgce/${product.unit}`,
+    unit: `tce/${product.unit}`,
     actual: 0,
     target,
     targetConfigured,
@@ -454,8 +455,8 @@ function productMetric(
     objectType: '产品',
     objectTypeKey: 'product',
     metricName: '单位产品综合能耗',
-    unit: `kgce/${product.unit}`,
-    actual: totalEnergy * 1000 / totalOutput,
+    unit: `tce/${product.unit}`,
+    actual: totalEnergy / totalOutput,
     target: target?.value ?? 0,
     targetConfigured: Boolean(target),
     direction: 'low',

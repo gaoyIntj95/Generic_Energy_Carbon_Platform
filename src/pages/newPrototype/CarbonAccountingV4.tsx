@@ -7,6 +7,7 @@ import {
   saveCarbonFactorV4,
   supportBasicV4,
   type CarbonFactor,
+  type CarbonFactorEvidenceFile,
   type CarbonFactorParameter,
 } from '../../mocks/carbonAccountingV4Mock';
 import {
@@ -261,6 +262,10 @@ const recalculate = (activity: number, unit: string, factor: CarbonFactor) => {
   }
   const factorValue = Number(factor.value);
   if (!Number.isFinite(factorValue)) return 0;
+  if (factor.unit === '%') {
+    const gwp = parameters.get('fugitiveGwp') ?? 0;
+    return activity * factorValue / 100 * gwp / 1000;
+  }
   return factor.unit.startsWith('kg') ? activity * factorValue / 1000 : activity * factorValue;
 };
 
@@ -1126,20 +1131,27 @@ function FactorPage({
     return matchesNode
       && (!appliedKeyword || [factor.name, factor.reference, factor.activity, factor.industry, factor.source, factor.objectType, factor.gas].some((value) => value.includes(appliedKeyword)));
   });
-  const displayValue = (factor: CarbonFactor) => factor.value.replace(/^折算因子\s*/, '');
+  const displayValue = (factor: CarbonFactor) => factor.unit === '参数组' ? `参数组（${displayParameters(factor).length}项）` : factor.value.replace(/^折算因子\s*/, '');
   const totalCount = 225;
+  const [pendingDeleteFactor, setPendingDeleteFactor] = useState<CarbonFactor>();
   const openEdit = (factor: CarbonFactor) => openDialog({ kind: 'factorDetail', factor, mode: 'edit' });
+  const confirmDelete = () => {
+    if (!pendingDeleteFactor) return;
+    setFactors(factors.filter((item) => item.factorId !== pendingDeleteFactor.factorId));
+    setPendingDeleteFactor(undefined);
+  };
   return (
     <div className={styles.page}>
       <section className={`${styles.card} ${styles.factorLibraryHeader}`}><div><h2>碳排放因子库 <small>因子总数：{totalCount}</small></h2></div><Button primary onClick={() => openDialog({ kind: 'enterpriseFactor' })}>新增因子</Button></section>
       <section className={`${styles.card} ${styles.factorLibrary}`}>
         <aside className={styles.factorCatalog}><div className={styles.factorCatalogSearch}><input value={keyword} onChange={(event) => setKeyword(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && setAppliedKeyword(keyword.trim())} placeholder="请输入类别" /><Button compact onClick={() => setAppliedKeyword(keyword.trim())}>⌕</Button></div><div className={styles.factorCatalogTree}><FactorCatalogTree nodes={factorSourceCatalog} selected={selectedCategory} select={setSelectedCategory} expanded={expanded} toggle={(key) => setExpanded((current) => ({ ...current, [key]: !(current[key] ?? true) }))} /></div></aside>
         <main className={styles.factorLibraryMain}>
-        {selectedCategory === '全球变暖潜势' ? <GwpTable /> : <div className={styles.factorTableWrap}><table className={styles.factorTable}><thead><tr><th>因子名称</th><th>数值</th><th>单位</th><th>数据来源</th><th>操作</th></tr></thead><tbody>
-          {rows.map((factor) => <tr key={factor.factorId} onClick={() => openDialog({ kind: 'factorDetail', factor })}><td><b className={styles.factorNamePrimary}>{factor.factorObject ?? factor.name}</b><span className={styles.factorName} title={factor.reference}>{factor.reference}</span></td><td className={styles.factorValue}>{displayValue(factor)}</td><td>{factor.unit}</td><td><span className={styles.factorSource} title={factor.source}>{factor.source}</span></td><td className={styles.rowActions}><button type="button" onClick={(event) => { event.stopPropagation(); openDialog({ kind: 'factorDetail', factor, mode: 'view' }); }}>查看</button><button type="button" onClick={(event) => { event.stopPropagation(); openEdit(factor); }}>编辑</button><button type="button" className={styles.deleteLink} onClick={(event) => { event.stopPropagation(); setFactors(factors.filter((item) => item.factorId !== factor.factorId)); }}>删除</button></td></tr>)}
+        {selectedCategory === '全球变暖潜势' ? <GwpTable /> : <div className={styles.factorTableWrap}><table className={styles.factorTable}><thead><tr><th>因子名称</th><th>核算参数</th><th>单位</th><th>数据来源</th><th>操作</th></tr></thead><tbody>
+          {rows.map((factor) => <tr key={factor.factorId} onClick={() => openDialog({ kind: 'factorDetail', factor })}><td><b className={styles.factorNamePrimary}>{factor.factorObject ?? factor.name}</b><span className={styles.factorName} title={factor.reference}>{factor.reference}</span></td><td className={styles.factorValue}>{displayValue(factor)}</td><td>{factor.unit}</td><td><span className={styles.factorSource} title={factor.source}>{factor.source}</span></td><td className={styles.rowActions}><button type="button" onClick={(event) => { event.stopPropagation(); openDialog({ kind: 'factorDetail', factor, mode: 'view' }); }}>查看</button><button type="button" onClick={(event) => { event.stopPropagation(); openEdit(factor); }}>编辑</button><button type="button" className={styles.deleteLink} onClick={(event) => { event.stopPropagation(); setPendingDeleteFactor(factor); }}>删除</button></td></tr>)}
         </tbody></table></div>}
-        <div className={styles.pagination}><span>共 {totalCount} 条</span><div><button>‹</button><button className={styles.currentPage}>1</button><button>2</button><button>3</button><button>4</button><button>5</button><span>…</span><button>23</button><button>›</button></div></div></main>
+        {selectedCategory !== '全球变暖潜势' && <div className={styles.pagination}><span>共 {totalCount} 条</span><div><button>‹</button><button className={styles.currentPage}>1</button><button>2</button><button>3</button><button>4</button><button>5</button><span>…</span><button>23</button><button>›</button></div></div>}</main>
       </section>
+      {pendingDeleteFactor && <Dialog title="删除碳排放因子" onClose={() => setPendingDeleteFactor(undefined)} footer={<><Button onClick={() => setPendingDeleteFactor(undefined)}>取消</Button><Button danger onClick={confirmDelete}>确认删除</Button></>}><div className={styles.confirmBox}>确认删除因子“{pendingDeleteFactor.factorObject ?? pendingDeleteFactor.name}”吗？删除后该因子将从当前因子库列表中移除，请确认名称和来源后再继续。</div><p><b>数据来源：</b>{pendingDeleteFactor.source}</p><p><b>当前版本：</b>{pendingDeleteFactor.version}</p></Dialog>}
     </div>
   );
 }
@@ -1737,7 +1749,7 @@ export function CarbonAccountingV4({ pathname }: { pathname: string }) {
     {dialog?.kind === 'deleteSource' && <Dialog title="删除排放源记录" onClose={() => setDialog(null)} footer={<><Button onClick={() => setDialog(null)}>取消</Button><Button danger onClick={() => { const result = deleteEmissionSource(dialog.row.emissionSourceId); if (!result.ok) { notify(result.error); return; } refresh(); setDialog(null); notify('排放源及其核算记录已删除'); }}>确认删除</Button></>}><div className={styles.confirmBox}>删除后，将从当前核算清单中移除该排放源及其在碳核算模块中的活动数据和核算记录；不会删除能源、运营等上游模块的原始数据。</div><p><b>{dialog.row.sourceName}</b></p></Dialog>}
     {dialog?.kind === 'deleteSupport' && <Dialog title="删除证明材料" onClose={() => setDialog(null)} footer={<><Button onClick={() => setDialog(null)}>取消</Button><Button danger onClick={() => { const item = dialog.item; if (item.emission) setSupportOverrides((items) => ({ ...items, [item.emission!.emissionSourceId]: { ...item.emission!, evidenceFiles: [], evidenceStatus: item.emission!.confirmedActivityDataSources.length ? '待补充' : '待确认' } })); else setBasicSupportOverrides((items) => ({ ...items, [item.item]: { evidenceFiles: [], supportRemark: item.supportRemark, materials: 0 } })); setDialog(null); notify('证明材料已删除'); }}>确认删除</Button></>}><div className={styles.confirmBox}>确认删除“{dialog.item.item}”的全部证明材料吗？删除后材料将从该条目中移除。</div></Dialog>}
     {dialog?.kind === 'viewSupport' && <SupportViewDialog item={dialog.item} close={() => setDialog(null)} openDialog={setDialog} />}
-    {dialog?.kind === 'factorDetail' && <FactorDetailDialog factor={dialog.factor} mode={dialog.mode ?? 'view'} close={() => setDialog(null)} save={(factor) => { saveCarbonFactorV4(factor); setFactors((items) => items.map((item) => item.factorId === factor.factorId ? factor : item)); setDialog(null); notify('企业实测参数已保存为当前企业参数'); }} />}
+    {dialog?.kind === 'factorDetail' && <FactorDetailDialog factor={dialog.factor} mode={dialog.mode ?? 'view'} close={() => setDialog(null)} onParametersChange={(parameters) => { const nextFactor = { ...dialog.factor, parameters }; saveCarbonFactorV4(nextFactor); setFactors((items) => items.map((item) => item.factorId === nextFactor.factorId ? nextFactor : item)); }} save={(factor) => { saveCarbonFactorV4(factor); setFactors((items) => items.map((item) => item.factorId === factor.factorId ? factor : item)); setDialog(null); notify('企业实测参数已保存为当前企业参数'); }} />}
     {dialog?.kind === 'deleteSupportFile' && <Dialog title="删除证明材料" onClose={() => setDialog(null)} footer={<><Button onClick={() => setDialog(null)}>取消</Button><Button danger onClick={() => { const item = dialog.item; const files = (item.evidenceFiles ?? []).filter((file) => file.evidenceFileId !== dialog.file.evidenceFileId); if (item.emission) setSupportOverrides((items) => ({ ...items, [item.emission!.emissionSourceId]: { ...item.emission!, evidenceFiles: files, evidenceStatus: files.length ? '已完成' : '待补充' } })); else setBasicSupportOverrides((items) => ({ ...items, [item.item]: { evidenceFiles: files, supportRemark: item.supportRemark, materials: files.length } })); setDialog(null); notify('证明材料已删除'); }}>确认删除</Button></>}><div className={styles.confirmBox}>确认删除文件“{dialog.file.fileName}”吗？</div></Dialog>}
     {dialog?.kind === 'completeUpdate' && <ConfirmSnapshot title="确认更新正式核算清单" previousVersion={version} version={version + 1} baseline={baseline ?? []} inventory={inventory} close={() => setDialog(null)} confirm={completeUpdate} />}
     {dialog?.kind === 'cancelUpdate' && <Dialog title="取消本次修改" onClose={() => setDialog(null)} footer={<><Button onClick={() => setDialog(null)}>继续编辑</Button><Button danger onClick={cancelUpdate}>确认取消</Button></>}><div className={styles.confirmBox}>取消后将恢复当前正式清单，本次编辑副本中的修改不会保留。</div></Dialog>}
@@ -1939,7 +1951,7 @@ function FactorSelectDialog({ row, factors, close, choose, onCreateFactor }: { r
   const contextUnit = row.activityUnit ?? current?.activityUnit ?? '—';
   const contextGas = row.greenhouseGasSpecies?.join('、') ?? current?.ghgType ?? '—';
   const contextBasis = current?.calculationBasis ? basisLabel[current.calculationBasis] : contextUnit === 'Nm³' ? '按体积' : contextUnit === 'GJ' ? '按热值' : contextUnit === 'MWh' ? '按电量' : contextUnit === 't' ? '按质量' : '按当前活动数据';
-  const displayValue = (factor: CarbonFactor) => factor.unit === '参数组' ? '—' : factor.value.replace(/^折算因子\s*/, '');
+  const displayValue = (factor: CarbonFactor) => factor.unit === '参数组' ? `参数组（${displayParameters(factor).length}项）` : factor.value.replace(/^折算因子\s*/, '');
   const renderFactor = (factor: CarbonFactor) => <label key={factor.factorId} className={selected === factor.factorId ? styles.selectedChoice : ''}><input type="radio" checked={selected === factor.factorId} onChange={() => setSelected(factor.factorId)} /><span className={styles.factorChoiceContent}><span className={styles.factorChoiceSimpleMeta}>{factor.reference} · {displayValue(factor)} {factor.unit} · {factor.source} · {factor.version}</span></span>{factor.factorId === current?.factorId && <span className={styles.currentFactorTag}>当前使用</span>}</label>;
   if (customOpen) return <FactorTemplateDialog context={row} close={close} onBack={() => setCustomOpen(false)} save={onCreateFactor} />;
   return <Dialog title="快速选择碳排放因子" wide className={styles.factorDialog} onClose={close} footer={<><Button onClick={close}>取消</Button><Button primary disabled={!selected} onClick={() => choose(selected)}>确认选择</Button></>}>
@@ -1948,15 +1960,16 @@ function FactorSelectDialog({ row, factors, close, choose, onCreateFactor }: { r
 }
 
 type FactorTemplateKey = 'fuel' | 'direct' | 'process' | 'wastewater' | 'balance' | 'fugitive' | 'recovery' | 'measured';
+const factorLibraryTemplateKeys: FactorTemplateKey[] = ['fuel', 'direct', 'process', 'wastewater', 'fugitive'];
 
 const factorTemplateMeta: Record<FactorTemplateKey, { label: string; title: string; activity: string; gas: string; scenario: string; notice: string; formula: string }> = {
-  fuel: { label: '参数合成因子型｜燃料燃烧', title: '柴油—移动燃烧（按质量）', activity: '移动燃烧', gas: 'CO₂', scenario: '化石燃料燃烧', notice: '燃料类因子由低位发热量、单位热值含碳量、碳氧化率和碳转化系数组合计算。因子库只维护综合核算配置，不单独创建 NCV、CC、OF 条目。', formula: '排放量 = 燃料消耗量 × NCV × CC ÷ 1000 × OF × 44/12' },
+  fuel: { label: '参数合成因子型｜燃料燃烧', title: '柴油—移动燃烧（按质量）', activity: '移动燃烧', gas: 'CO₂', scenario: '化石燃料燃烧', notice: '因子库维护 NCV、CC、OF 和 44/12 等可跨核算期复用的参数；燃料消费量属于核算期活动数据，不在因子库录入。', formula: '排放量 = 燃料消耗量 × NCV × CC ÷ 1000 × OF × 44/12' },
   direct: { label: '直接因子型｜电力、热力、运输', title: '外购电力—购入电力', activity: '购入电力', gas: 'CO₂e', scenario: '购入能源或运输活动', notice: '直接因子本身已经是可直接用于核算的综合因子；企业可以覆盖最终因子值，并上传检测报告、供应商证明或年度发布文件。', formula: '排放量 = 活动数据 × 结果因子' },
   process: { label: '工艺参数型｜碳酸盐分解', title: '碳酸盐原料—生产过程（按质量）', activity: '工业过程', gas: 'CO₂', scenario: '碳酸盐使用过程', notice: '碳酸盐过程按原料消耗量、碳酸盐纯度和 CO₂ 排放因子拆解。不同原料应作为不同的综合核算配置维护。', formula: '排放量 = Σ（碳酸盐消耗量 × 纯度 × CO₂排放因子）' },
   wastewater: { label: '废水参数型｜厌氧处理', title: '工业废水—厌氧处理', activity: '废水厌氧处理', gas: 'CH₄', scenario: 'COD 去除量法', notice: '废水排放参数与排放源活动数据分离：COD 去除量、污泥清除量可录入企业监测值，Bo、MCF、GWP 使用缺省值或经核验的企业参数；实际回收/销毁量另行扣除。', formula: 'CH₄ =（COD总量 − 污泥清除COD量）× Bo × MCF；CO₂e = CH₄ × GWP' },
   balance: { label: '物料平衡型｜含碳原料/产品', title: '物料平衡—碳输入输出', activity: '物料平衡', gas: 'CO₂', scenario: '碳元素输入输出', notice: '适用于以碳输入量与碳输出量核算的场景。输入、输出、库存变化等活动数据应保留各自来源和计量依据。', formula: '排放量 =（碳输入量 CCI − 碳输出量 CCO）× 44/12' },
-  fugitive: { label: '逸散型｜制冷剂、含氟气体', title: 'R134a—制冷剂逸散（按质量）', activity: '逸散排放', gas: 'CO₂e', scenario: '制冷剂补充/泄漏量', notice: '逸散排放以补充量、回收量或泄漏量作为活动数据，并按对应物质的 GWP100 折算 CO₂e；物质名称和 GWP 必须可追溯。', formula: '排放量 = 制冷剂逸散量 × GWP100' },
-  recovery: { label: '回收/销毁扣减型｜CH₄回收与火炬销毁', title: '甲烷回收与销毁', activity: 'CH₄回收与销毁', gas: 'CH₄', scenario: '回收利用、外供及火炬销毁', notice: '用于废水处理等过程中，对已产生的 CH₄ 中被回收自用、外供或火炬销毁的部分进行扣减。本模板是扣减参数组，不是普通排放因子；应记录回收量、浓度、氧化/销毁效率和依据材料。', formula: '回收与销毁量 = 自用回收量 + 外供回收量 + 火炬销毁量' },
+  fugitive: { label: '逸散型｜冷媒/灭火器/六氟化硫', title: '制冷剂/含氟气体常规逸散', activity: '逸散排放', gas: 'CO₂e', scenario: '制冷剂补充/泄漏量', notice: '填充量、补充量或泄漏量是活动数据；因子为按设备/物质选择的常规逸散率，逸散质量再按对应物质的 GWP100 折算 CO₂e。', formula: '逸散量 = 填充量 × 常规逸散率；CO₂e = 逸散量 × GWP100' },
+  recovery: { label: '回收/销毁扣减型｜CH₄回收与火炬销毁', title: '甲烷回收与销毁', activity: 'CH₄回收与销毁', gas: 'CH₄', scenario: '回收利用、外供及火炬销毁', notice: '回收/销毁是核算模板，不作为普通因子新增。因子库仅可维护氧化系数、销毁效率等可复用参数；回收量、外供量、火炬气量和浓度属于核算期活动或监测数据。', formula: '回收与销毁量 = 自用回收量 + 外供回收量 + 火炬销毁量' },
   measured: { label: '实测型｜CEMS 连续监测', title: 'CEMS—烟气连续排放监测', activity: '连续排放监测', gas: 'CO₂', scenario: '浓度 × 流量 × 时间', notice: 'CEMS 是实测核算配置，不作为普通因子库新增条目。系统展示监测设备、校准状态、数据完整性和实测排放结果。', formula: '排放量 = 污染物浓度 × 烟气流量 × 运行时间' },
 };
 
@@ -2001,7 +2014,7 @@ const templateForFactor = (factor: CarbonFactor): FactorTemplateKey => {
   if (factor.calculationScenario === 'carbonateProcess' || factor.calculationType === 'processParameter') return 'process';
   if (factor.calculationScenario === 'wastewaterAnaerobic' || factor.calculationType === 'wastewaterParameter') return 'wastewater';
   if (factor.calculationScenario === 'methaneRecovery' || factor.calculationScenario === 'co2Recovery' || factor.calculationType === 'recoveryParameter') return 'recovery';
-  if (factor.activity === '逸散排放' || factor.objectType === 'GWP值') return 'fugitive';
+  if (factor.activity === '逸散排放' || factor.objectType === 'GWP值' || factor.unit === '%') return 'fugitive';
   return 'direct';
 };
 
@@ -2022,24 +2035,57 @@ const templateUseCase = (template: FactorTemplateKey, activity?: string, scenari
   const selectedActivity = activity ?? initialTemplateSelection(template).activity;
   return scenarioOptionsFor(template, selectedActivity)[0] ?? factorTemplateMeta[template].scenario;
 };
-const currentValueLabel = (template: FactorTemplateKey, value: string, unit: string) => `${template === 'recovery' ? '扣减参数组 ' : template === 'fuel' || template === 'direct' || template === 'fugitive' ? '折算因子 ' : ''}${value} ${unit === '参数组' ? '参数组' : unit}`;
+const directParameterName = (activity: string) => activity.includes('热力') ? '热力排放因子' : activity.includes('运输') ? '运输排放因子' : '电力排放因子';
+const directFactorOptions = [
+  { name: '电力排放因子', activity: '购入电力', scenario: '全国电网 · MWh', unit: 'tCO₂e/MWh' },
+  { name: '热力排放因子', activity: '购入热力', scenario: '蒸汽 · GJ', unit: 'tCO₂/GJ' },
+  { name: '运输排放因子', activity: '交通运输', scenario: '公路货运 · t·km', unit: 'kgCO₂e/t·km' },
+];
+const directFactorOption = (name: string) => directFactorOptions.find((option) => option.name === name) ?? directFactorOptions[0];
+const fugitiveFactorOptions = [
+  { name: '冷媒逸散率｜冰箱', activity: '制冷剂逸散', scenario: '制冷剂补充量 · kg', value: 0.3, display: '0.30', unit: '%' },
+  { name: '冷媒逸散率｜空调', activity: '制冷剂逸散', scenario: '制冷剂补充量 · kg', value: 5.5, display: '5.50', unit: '%' },
+  { name: '冷媒逸散率｜汽车空调', activity: '制冷剂逸散', scenario: '制冷剂补充量 · kg', value: 15, display: '15.00', unit: '%' },
+  { name: '冷媒逸散率｜冷冻机', activity: '制冷剂逸散', scenario: '制冷剂补充量 · kg', value: 8.5, display: '8.50', unit: '%' },
+  { name: '冷媒逸散率｜恒温恒压机', activity: '制冷剂逸散', scenario: '制冷剂补充量 · kg', value: 8, display: '8.00', unit: '%' },
+  { name: 'SF₆逸散率｜高压电柜', activity: '含氟气体逸散', scenario: 'SF₆补充量 · kg', value: 0.5, display: '0.50', unit: '%' },
+  { name: 'FM200逸散率｜中央系统灭火器', activity: '含氟气体逸散', scenario: 'FM200补充量 · kg', value: 2, display: '2.00', unit: '%' },
+  { name: 'CO₂逸散率｜便携式灭火器', activity: '含氟气体逸散', scenario: 'CO₂补充量 · kg', value: 4, display: '4.00', unit: '%' },
+];
+const fugitiveFactorOption = (name: string) => fugitiveFactorOptions.find((option) => option.name === name) ?? fugitiveFactorOptions[0];
+const fugitiveGwpOptions = ar6GwpRows.map((row) => ({ name: `GWP100｜${row.gas}`, gas: row.gas, value: row.value, display: String(row.value), unit: 'kgCO₂e/kg' }));
+const fugitiveGwpOption = (name: string) => fugitiveGwpOptions.find((option) => option.name === name) ?? fugitiveGwpOptions.find((option) => option.gas === 'HFC-134a') ?? fugitiveGwpOptions[0];
+const directScenarioParts = (scenario: string) => {
+  const [object, unit] = scenario.split(' · ');
+  return { object, unit: unit || '按活动数据单位' };
+};
+const directScenarioFor = (activity: string, unit?: string) => scenarioOptionsFor('direct', activity).find((scenario) => directScenarioParts(scenario).unit === unit) ?? scenarioOptionsFor('direct', activity)[0] ?? '';
 
 const templateSeed = (template: FactorTemplateKey) => {
   const candidates: Record<FactorTemplateKey, string | undefined> = {
-    fuel: 'pf-diesel', direct: 'pf-power', process: 'pf-process', wastewater: 'pf-waste', balance: undefined,
+    fuel: 'pf-diesel', direct: undefined, process: 'pf-process', wastewater: 'pf-waste', balance: undefined,
     fugitive: 'pf-r134a', recovery: 'pf-ch4-recovery', measured: undefined,
   };
   return candidates[template] ? carbonFactorsV4.find((factor) => factor.factorId === candidates[template]) : undefined;
 };
 
-const templateParameters = (template: FactorTemplateKey, factor?: CarbonFactor): CarbonFactorParameter[] => {
-  if (factor?.parameters?.length) return displayParameters(factor);
+const reusableParametersForTemplate = (template: FactorTemplateKey, parameters: CarbonFactorParameter[]) => {
+  if (template === 'recovery') return parameters.filter((parameter) => ['selfUseOxidation', 'flareEfficiency'].includes(parameter.key));
+  if (template === 'balance') return parameters.filter((parameter) => parameter.key === 'mw');
+  if (template === 'measured') return [];
+  return parameters;
+};
+
+const templateParameters = (template: FactorTemplateKey, factor?: CarbonFactor, allowDirectEdit = false): CarbonFactorParameter[] => {
+  if (factor?.parameters?.length) return reusableParametersForTemplate(template, template === 'wastewater' ? displayParameters(factor).filter((parameter) => ['bo', 'mcf', 'gwp'].includes(parameter.key)) : displayParameters(factor));
+  if (template === 'direct' && factor) return displayParameters(factor).map((parameter) => ({ ...parameter, key: 'resultFactor', editable: allowDirectEdit }));
   const seed = templateSeed(template);
-  if (seed) return displayParameters(seed);
+  if (seed && template !== 'fugitive') return reusableParametersForTemplate(template, template === 'wastewater' ? displayParameters(seed).filter((parameter) => ['bo', 'mcf', 'gwp'].includes(parameter.key)) : displayParameters(seed));
   const parameter = (key: string, name: string, value: number, display: string, unit: string, editable = true): CarbonFactorParameter => ({ key, name, value, display, unit, sourceType: '官方缺省值', source: '方法学参数', editable, valueMode: editable ? '缺省值' : '方法学常数', evidenceRequired: editable });
-  if (template === 'balance') return [parameter('carbonInput', '碳输入量 CCI', 0, '0', 'tC'), parameter('carbonOutput', '碳输出量 CCO', 0, '0', 'tC'), parameter('mw', '碳转化为二氧化碳系数', 44 / 12, '44/12', '—', false)];
+  if (template === 'balance') return [parameter('mw', '碳转化为二氧化碳系数', 44 / 12, '44/12', '—', false)];
   if (template === 'measured') return [parameter('concentration', '污染物浓度', 0, '0', 'mg/Nm³'), parameter('flow', '烟气流量', 0, '0', 'Nm³/h'), parameter('hours', '运行时间', 0, '0', 'h')];
-  return [parameter('resultFactor', '结果因子/折算值', 0, '0', 'tCO₂e/活动单位')];
+  if (template === 'fugitive') { const rate = fugitiveFactorOptions[0]; const gwp = fugitiveGwpOption('GWP100｜HFC-134a'); return [parameter('fugitiveRate', rate.name, rate.value, rate.display, rate.unit), parameter('fugitiveGwp', gwp.name, gwp.value, gwp.display, gwp.unit)]; }
+  return [parameter('resultFactor', directFactorOptions[0].name, 0, '', directFactorOptions[0].unit)];
 };
 
 const sourceTypeOptions = ['官方缺省值', '企业实测', '供应商数据'];
@@ -2048,15 +2094,34 @@ const normalizedParameterSourceType = (sourceType: string) => sourceType === '�
 const factorYearOptions = ['2024年度', '2025年度', '2026年度', '2027年度', '2028年度', '2029年度', '2030年度'];
 
 const evidenceFileName = (parameter: CarbonFactorParameter) => parameter.source.startsWith('证明材料：') ? parameter.source.replace('证明材料：', '') : parameter.source.includes('依据材料：') ? parameter.source.split('依据材料：')[1] : parameter.source.includes('检测报告') || parameter.source.includes('供应商证明') ? parameter.source : '';
+const factorEvidenceFileType = (fileName: string) => fileName.split('.').pop()?.toUpperCase() || '文件';
+const factorEvidenceFiles = (parameter: CarbonFactorParameter): CarbonFactorEvidenceFile[] => {
+  if (parameter.evidenceFiles?.length) return parameter.evidenceFiles;
+  const fileName = evidenceFileName(parameter);
+  return fileName ? fileName.split('、').map((name) => name.trim()).filter(Boolean).map((name, index) => ({ evidenceFileId: `legacy-${parameter.key}-${index}-${name}`, fileName: name, fileType: factorEvidenceFileType(name) })) : [];
+};
 
-function ParameterEvidenceDialog({ parameter, mode, close, save }: { parameter: CarbonFactorParameter; mode: 'view' | 'edit'; close: () => void; save: (source: string) => void }) {
-  const existingFile = evidenceFileName(parameter);
-  const [fileName, setFileName] = useState(existingFile);
+function ParameterEvidenceDialog({ parameter, mode, close, save, change }: { parameter: CarbonFactorParameter; mode: 'view' | 'edit'; close: () => void; save: (files: CarbonFactorEvidenceFile[]) => void; change: (files: CarbonFactorEvidenceFile[]) => void }) {
+  const [files, setFiles] = useState(() => factorEvidenceFiles(parameter));
   const [dragging, setDragging] = useState(false);
-  const chooseFile = (file?: File) => setFileName(file?.name ?? '');
-  const downloadFile = () => { if (!fileName) return; const url = URL.createObjectURL(new Blob([`证明材料：${fileName}`], { type: 'text/plain;charset=utf-8' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = fileName; anchor.click(); URL.revokeObjectURL(url); };
+  const [pendingDelete, setPendingDelete] = useState<{ kind: 'file'; file: CarbonFactorEvidenceFile } | { kind: 'all' }>();
+  const addFiles = (selectedFiles: File[]) => {
+    if (!selectedFiles.length) return;
+    setFiles((items) => [...items, ...selectedFiles.map((file, index) => ({ evidenceFileId: `factor-${Date.now()}-${index}`, fileName: file.name, fileType: factorEvidenceFileType(file.name) }))]);
+  };
+  const downloadFile = (file: CarbonFactorEvidenceFile) => { const url = URL.createObjectURL(new Blob([`证明材料：${file.fileName}`], { type: 'text/plain;charset=utf-8' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = file.fileName; anchor.click(); URL.revokeObjectURL(url); };
+  const requestDelete = (pending: { kind: 'file'; file: CarbonFactorEvidenceFile } | { kind: 'all' }) => setPendingDelete(pending);
+  const confirmDelete = () => {
+    if (!pendingDelete) return;
+    const nextFiles = pendingDelete.kind === 'all' ? [] : files.filter((file) => file.evidenceFileId !== pendingDelete.file.evidenceFileId);
+    setFiles(nextFiles);
+    if (mode === 'view') change(nextFiles);
+    setPendingDelete(undefined);
+  };
+  const fileCountLabel = files.length ? `${files.length} 份材料` : '暂无已上传材料';
   return <div className={styles.factorEvidenceMask} role="dialog" aria-modal="true" aria-label={`${parameter.name} · 证明材料`}>
-    <section className={styles.factorEvidenceDialog}><header><h3>{parameter.name} · 证明材料</h3><button type="button" onClick={close}>×</button></header><div className={styles.factorEvidenceBody}><p>{mode === 'view' ? '查看该参数已关联的检测报告、供应商证明、监测台账或适用方法学证明材料。' : '上传该参数对应的检测报告、供应商证明、监测台账或适用方法学证明材料。'}</p><div className={styles.factorEvidenceUpload}><span>证明材料</span>{mode === 'edit' && <div className={`${styles.factorEvidenceDropzone} ${dragging ? styles.factorEvidenceDropzoneActive : ''}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); chooseFile(event.dataTransfer.files[0]); }}><strong>↑</strong><span>点击或拖拽文件到此处上传</span><small>支持上传证明材料文件</small><label><input type="file" onChange={(event) => chooseFile(event.target.files?.[0])} />选择文件</label></div>}{fileName ? <div className={styles.factorEvidenceFile}><span>FILE</span><b>{fileName}</b>{mode === 'view' && <button type="button" className={styles.factorEvidenceDownload} onClick={downloadFile}>下载材料</button>}{mode === 'edit' && <button type="button" onClick={() => setFileName('')}>移除</button>}</div> : <div className={styles.factorEvidenceEmpty}>暂无已上传材料</div>}</div></div><footer><Button onClick={close}>{mode === 'view' ? '关闭' : '取消'}</Button>{mode === 'edit' && <Button primary onClick={() => save(fileName ? `证明材料：${fileName}` : '企业证明材料待补充')}>保存材料</Button>}</footer></section>
+    <section className={styles.factorEvidenceDialog}><header><h3>{parameter.name} · 证明材料</h3><button type="button" onClick={close}>×</button></header><div className={styles.factorEvidenceBody}><p>{mode === 'view' ? '查看该参数已关联的检测报告、供应商证明、监测台账或适用方法学证明材料。' : '上传该参数对应的检测报告、供应商证明、监测台账或适用方法学证明材料。'}</p><div className={styles.factorEvidenceUpload}><div className={styles.factorEvidenceListHeading}><span>证明材料（{fileCountLabel}）</span>{files.length > 0 && <button type="button" className={styles.factorEvidenceDeleteAll} onClick={() => requestDelete({ kind: 'all' })}>删除全部材料</button>}</div>{mode === 'edit' && <div className={`${styles.factorEvidenceDropzone} ${dragging ? styles.factorEvidenceDropzoneActive : ''}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); addFiles(Array.from(event.dataTransfer.files)); }}><strong>↑</strong><span>点击或拖拽文件到此处上传</span><small>支持一次上传多个证明材料文件</small><label><input type="file" multiple onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />选择文件</label></div>}{files.length ? <div className={styles.factorEvidenceFileList}>{files.map((file) => <div className={styles.factorEvidenceFile} key={file.evidenceFileId}><span>{file.fileType ?? factorEvidenceFileType(file.fileName)}</span><b title={file.fileName}>{file.fileName}</b><button type="button" className={styles.factorEvidenceDownload} onClick={() => downloadFile(file)}>下载材料</button><button type="button" onClick={() => requestDelete({ kind: 'file', file })}>删除</button></div>)}</div> : <div className={styles.factorEvidenceEmpty}>暂无已上传材料</div>}</div></div><footer><Button onClick={close}>{mode === 'view' ? '关闭' : '取消'}</Button>{mode === 'edit' && <Button primary onClick={() => save(files)}>保存材料</Button>}</footer></section>
+    {pendingDelete && <Dialog title="删除证明材料" onClose={() => setPendingDelete(undefined)} footer={<><Button onClick={() => setPendingDelete(undefined)}>取消</Button><Button danger onClick={confirmDelete}>确认删除</Button></>}><div className={styles.confirmBox}>{pendingDelete.kind === 'all' ? `确认删除“${parameter.name}”的全部证明材料吗？删除后该参数将不再保留任何已上传材料。` : `确认删除文件“${pendingDelete.file.fileName}”吗？删除后该文件将从该参数的证明材料中移除。`}</div></Dialog>}
   </div>;
 }
 
@@ -2064,24 +2129,37 @@ function UnifiedParameterTable({ parameters, editable, onUpdate, onEvidence }: {
   return <div className={styles.factorParameterScroll}><table className={styles.factorUnifiedParamTable}><thead><tr><th>参数</th><th>来源类型</th><th>数值</th><th>单位</th><th>证明材料</th><th>材料状态</th><th>操作</th></tr></thead><tbody>{parameters.map((parameter) => {
     const sourceType = sourceTypeOptions.includes(parameter.sourceType) ? parameter.sourceType : normalizedParameterSourceType(parameter.sourceType);
     const sourceTypeLabel = sourceType;
-    const fileName = evidenceFileName(parameter);
+    const evidenceFiles = factorEvidenceFiles(parameter);
+    const fileName = evidenceFiles[0]?.fileName ?? '';
     const needsEvidence = sourceType === '企业实测' || sourceType === '供应商数据';
-    return <tr key={parameter.key}><td><b>{parameter.name}</b></td><td>{editable && parameter.editable ? <select value={sourceType} onChange={(event) => { const next = event.target.value; onUpdate(parameter.key, { sourceType: next, valueMode: methodOptions(next)[0] as CarbonFactorParameter['valueMode'] }); }}><option>{sourceTypeOptions[0]}</option><option>{sourceTypeOptions[1]}</option><option>{sourceTypeOptions[2]}</option></select> : <span>{sourceTypeLabel}</span>}</td><td>{editable && parameter.editable ? <input type="number" step="any" value={parameter.display.replace(/,/g, '')} onChange={(event) => { const numericValue = Number(event.target.value); onUpdate(parameter.key, { value: Number.isFinite(numericValue) ? numericValue : 0, display: event.target.value }); }} /> : <b>{parameter.display}</b>}</td><td>{parameter.unit}</td>{needsEvidence ? <><td>{fileName ? <span className={styles.factorEvidenceName} title={fileName}>{fileName}</span> : <span className={styles.factorEvidenceMissing}>未上传材料</span>}</td><td><span className={fileName ? styles.factorEvidenceUploaded : styles.factorEvidencePending}>{fileName ? '已上传' : '待补充'}</span></td><td><div className={styles.factorEvidenceActions}><button type="button" className={styles.factorEvidenceLink} disabled={!fileName} onClick={() => onEvidence(parameter, 'view')}>查看</button>{editable && parameter.editable && <><button type="button" className={styles.factorEvidenceLink} onClick={() => onEvidence(parameter, 'edit')}>{fileName ? '编辑' : '上传'}</button><button type="button" className={`${styles.factorEvidenceLink} ${styles.factorEvidenceDelete}`} disabled={!fileName} onClick={() => { if (window.confirm(`确认删除“${fileName}”吗？`)) onUpdate(parameter.key, { source: '方法学参数', evidenceRequired: true }); }}>删除</button></>}</div></td></> : <><td><span className={styles.factorEvidenceNotRequired}>不适用</span></td><td><span className={styles.factorEvidenceNotRequired}>无需上传</span></td><td><span className={styles.factorEvidenceNotRequired}>—</span></td></>}</tr>;
+    return <tr key={parameter.key}><td>{editable && parameter.editable && parameter.key === 'resultFactor' ? <select value={parameter.name} onChange={(event) => { const selected = directFactorOption(event.target.value); onUpdate(parameter.key, { name: selected.name, unit: selected.unit }); }}><option>{directFactorOptions[0].name}</option><option>{directFactorOptions[1].name}</option><option>{directFactorOptions[2].name}</option></select> : editable && parameter.editable && parameter.key === 'fugitiveRate' ? <select value={parameter.name} onChange={(event) => { const selected = fugitiveFactorOption(event.target.value); onUpdate(parameter.key, { name: selected.name, value: selected.value, display: selected.display, unit: selected.unit }); }}>{fugitiveFactorOptions.map((option) => <option key={option.name}>{option.name}</option>)}</select> : editable && parameter.editable && parameter.key === 'fugitiveGwp' ? <select value={parameter.name} onChange={(event) => { const selected = fugitiveGwpOption(event.target.value); onUpdate(parameter.key, { name: selected.name, value: selected.value, display: selected.display, unit: selected.unit }); }}>{fugitiveGwpOptions.map((option) => <option key={option.name}>{option.name}</option>)}</select> : <b>{parameter.name}</b>}</td><td>{editable && parameter.editable && parameter.key !== 'fugitiveGwp' ? <select value={sourceType} onChange={(event) => { const next = event.target.value; onUpdate(parameter.key, { sourceType: next, valueMode: methodOptions(next)[0] as CarbonFactorParameter['valueMode'] }); }}><option>{sourceTypeOptions[0]}</option><option>{sourceTypeOptions[1]}</option><option>{sourceTypeOptions[2]}</option></select> : <span>{sourceTypeLabel}</span>}</td><td>{editable && parameter.editable && parameter.key !== 'fugitiveGwp' ? <input type="number" step="any" value={parameter.display.replace(/,/g, '')} onChange={(event) => { const numericValue = Number(event.target.value); onUpdate(parameter.key, { value: Number.isFinite(numericValue) ? numericValue : 0, display: event.target.value }); }} /> : <b>{parameter.display}</b>}</td><td>{parameter.unit}</td>{needsEvidence ? <><td>{fileName ? <><span className={styles.factorEvidenceName} title={fileName}>{fileName}</span>{evidenceFiles.length > 1 && <small>等 {evidenceFiles.length} 份材料</small>}</> : <span className={styles.factorEvidenceMissing}>未上传材料</span>}</td><td><span className={fileName ? styles.factorEvidenceUploaded : styles.factorEvidencePending}>{fileName ? `已上传${evidenceFiles.length > 1 ? `（${evidenceFiles.length}份）` : ''}` : '待补充'}</span></td><td><div className={styles.factorEvidenceActions}><button type="button" className={styles.factorEvidenceLink} disabled={!fileName} onClick={() => onEvidence(parameter, 'view')}>查看</button>{editable && parameter.editable && <><button type="button" className={styles.factorEvidenceLink} onClick={() => onEvidence(parameter, 'edit')}>{fileName ? '编辑' : '上传'}</button><button type="button" className={`${styles.factorEvidenceLink} ${styles.factorEvidenceDelete}`} disabled={!fileName} onClick={() => onEvidence(parameter, 'view')}>删除</button></>}</div></td></> : <><td><span className={styles.factorEvidenceNotRequired}>不适用</span></td><td><span className={styles.factorEvidenceNotRequired}>无需上传</span></td><td><span className={styles.factorEvidenceNotRequired}>—</span></td></>}</tr>;
   })}</tbody></table></div>;
 }
 
-function UnifiedFactorSections({ template, mode, parameters, setParameters, meta, setMeta, onTemplateChange }: { template: FactorTemplateKey; mode: 'view' | 'edit' | 'add'; parameters: CarbonFactorParameter[]; setParameters: (parameters: CarbonFactorParameter[]) => void; meta: FactorFormMeta; setMeta: (meta: FactorFormMeta) => void; onTemplateChange?: (template: FactorTemplateKey) => void }) {
+function UnifiedFactorSections({ template, mode, parameters, setParameters, meta, setMeta, onTemplateChange, onParametersChange }: { template: FactorTemplateKey; mode: 'view' | 'edit' | 'add'; parameters: CarbonFactorParameter[]; setParameters: (parameters: CarbonFactorParameter[]) => void; meta: FactorFormMeta; setMeta: (meta: FactorFormMeta) => void; onTemplateChange?: (template: FactorTemplateKey) => void; onParametersChange?: (parameters: CarbonFactorParameter[]) => void }) {
   const [evidenceParameter, setEvidenceParameter] = useState<CarbonFactorParameter>();
   const [evidenceMode, setEvidenceMode] = useState<'view' | 'edit'>('edit');
   const editable = mode !== 'view';
-  const update = (key: string, patch: Partial<CarbonFactorParameter>) => setParameters(parameters.map((parameter) => parameter.key === key ? { ...parameter, ...patch } : parameter));
+  const update = (key: string, patch: Partial<CarbonFactorParameter>) => {
+    const next = parameters.map((parameter) => parameter.key === key ? { ...parameter, ...patch } : parameter);
+    setParameters(next);
+    onParametersChange?.(next);
+    if (template === 'direct' && key === 'resultFactor') {
+      const selected = directFactorOption(patch.name ?? parameters.find((parameter) => parameter.key === key)?.name ?? directFactorOptions[0].name);
+      setMeta({ ...meta, value: patch.display ?? meta.value, unit: selected.unit, activity: selected.activity, scenario: selected.scenario });
+    }
+    if (template === 'fugitive' && key === 'fugitiveRate') {
+      const selected = fugitiveFactorOption(patch.name ?? parameters.find((parameter) => parameter.key === key)?.name ?? fugitiveFactorOptions[0].name);
+      setMeta({ ...meta, value: patch.display ?? selected.display, unit: selected.unit, activity: selected.activity, scenario: selected.scenario });
+    }
+  };
   const metaInfo = factorTemplateMeta[template];
   return <>
-    <div className={styles.factorTemplateBox}><div className={styles.factorTemplateFormGrid}><label>因子名称 *{mode === 'add' ? <input value={meta.name} placeholder={template === 'recovery' ? '示例：污水处理 CH₄ 回收与销毁' : '示例：柴油'} onChange={(event) => setMeta({ ...meta, name: event.target.value })} /> : <span className={styles.factorTemplateValue}>{meta.name}</span>}</label><label>因子类型 *{mode === 'add' ? <select value={template} onChange={(event) => onTemplateChange?.(event.target.value as FactorTemplateKey)}>{(Object.keys(factorTemplateMeta) as FactorTemplateKey[]).map((key) => <option key={key} value={key}>{factorTemplateMeta[key].label}</option>)}</select> : <span className={styles.factorTemplateValue}>{factorTemplateMeta[template].label}</span>}</label></div><p>{metaInfo.notice}</p></div>
-    <DetailBlock title="核算参数"><div className={styles.factorUnifiedSummary}><div><span>{template === 'recovery' ? '扣减参数组 / 扣减量' : '综合因子 / 核算结果'}</span><b>{currentValueLabel(template, meta.value, meta.unit)}</b></div></div><UnifiedParameterTable parameters={parameters} editable={editable} onUpdate={update} onEvidence={(parameter, nextMode) => { setEvidenceMode(nextMode); setEvidenceParameter(parameter); }} /></DetailBlock>
+    <div className={styles.factorTemplateBox}><div className={styles.factorTemplateFormGrid}><label>因子名称 *{mode === 'add' ? <input value={meta.name} placeholder={template === 'recovery' ? '示例：污水处理 CH₄ 回收与销毁' : '示例：柴油'} onChange={(event) => setMeta({ ...meta, name: event.target.value })} /> : <span className={styles.factorTemplateValue}>{meta.name}</span>}</label><label>因子类型 *{mode === 'add' ? <select value={template} onChange={(event) => onTemplateChange?.(event.target.value as FactorTemplateKey)}>{factorLibraryTemplateKeys.map((key) => <option key={key} value={key}>{factorTemplateMeta[key].label}</option>)}</select> : <span className={styles.factorTemplateValue}>{factorTemplateMeta[template].label}</span>}</label></div><p>{metaInfo.notice}</p></div>
+    <DetailBlock title="核算参数"><UnifiedParameterTable parameters={parameters} editable={editable} onUpdate={update} onEvidence={(parameter, nextMode) => { setEvidenceMode(nextMode); setEvidenceParameter(parameter); }} /></DetailBlock>
     <DetailBlock title="计算关系"><div className={styles.factorUnifiedFormula}>{metaInfo.formula}</div></DetailBlock>
     <DetailBlock title="适用与来源"><div className={styles.factorUnifiedSourceGrid}><label>适用年度<select value={meta.year} onChange={(event) => setMeta({ ...meta, year: event.target.value })} disabled={mode === 'view'}>{factorYearOptions.map((year) => <option key={year}>{year}</option>)}</select></label><label>因子来源<select value={meta.sourceType} onChange={(event) => setMeta({ ...meta, sourceType: event.target.value, source: event.target.value })} disabled={mode === 'view'}>{sourceTypeOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>备注<textarea value={meta.remark} onChange={(event) => setMeta({ ...meta, remark: event.target.value })} placeholder="请输入适用边界、数据口径或其他说明" readOnly={mode === 'view'} />{mode === 'view' && !meta.remark && <small>暂无备注</small>}</label></div></DetailBlock>
-    {evidenceParameter && <ParameterEvidenceDialog parameter={evidenceParameter} mode={evidenceMode} close={() => setEvidenceParameter(undefined)} save={(source) => { update(evidenceParameter.key, { source, evidenceRequired: true }); setEvidenceParameter(undefined); }} />}
+    {evidenceParameter && <ParameterEvidenceDialog parameter={evidenceParameter} mode={evidenceMode} close={() => setEvidenceParameter(undefined)} change={(files) => update(evidenceParameter.key, { source: files.length ? `证明材料：${files.map((file) => file.fileName).join('、')}` : '企业证明材料待补充', evidenceFiles: files, evidenceRequired: true })} save={(files) => { update(evidenceParameter.key, { source: files.length ? `证明材料：${files.map((file) => file.fileName).join('、')}` : '企业证明材料待补充', evidenceFiles: files, evidenceRequired: true }); setEvidenceParameter(undefined); }} />}
   </>;
 }
 
@@ -2096,9 +2174,12 @@ function createTemplateFactor(template: FactorTemplateKey, parameters: CarbonFac
   const resolvedSourceType = context?.sourceType && context.sourceType !== '其他/自定义' ? normalizeSourceType(context.sourceType) : meta.activity;
   const resolvedGas = context?.greenhouseGasSpecies?.[0] ?? current?.ghgType ?? metaInfo.gas;
   const resolvedBasis = current?.calculationBasis ?? (resolvedActivityUnit === 'Nm³' || resolvedActivityUnit === '万Nm³' ? 'volume' : resolvedActivityUnit === 'GJ' ? 'heat' : resolvedActivityUnit === 'MWh' ? 'electricity' : resolvedActivityUnit === 't' || resolvedActivityUnit === 'kg' ? 'mass' : 'other');
+  const fugitiveRate = parameters.find((parameter) => parameter.key === 'fugitiveRate');
+  const factorValue = template === 'fugitive' && fugitiveRate ? fugitiveRate.display : meta.value.trim() || '0';
+  const factorUnit = template === 'fugitive' && fugitiveRate ? fugitiveRate.unit : meta.unit.trim() || '参数组';
   const factorId = `ef-${Date.now()}`;
   const calculationType = template === 'fuel' ? 'fuelParameter' : template === 'process' ? 'processParameter' : template === 'wastewater' ? 'wastewaterParameter' : template === 'recovery' ? 'recoveryParameter' : 'direct';
-  return { factorId, scope: 'enterprise', name: meta.name.trim() || factorObject || metaInfo.title, objectType: template === 'direct' || template === 'fugitive' ? '综合排放因子' : '参数组/公式模板', activity: resolvedActivity, gas: resolvedGas, value: meta.value.trim() || '0', unit: meta.unit.trim() || '参数组', source: meta.sourceType.trim() || '官方缺省值', version: meta.year, geo: meta.organization, industry: '通用工业企业', validity: '当前有效', raw: `${meta.value} ${meta.unit}`, quality: '企业参数覆盖', effective: meta.year, reference: meta.remark || '企业新增核算配置', formula: metaInfo.formula, parameters, selectable: true, calculationType, calculationScenario: template === 'fuel' ? 'fuelCombustion' : template === 'process' ? 'carbonateProcess' : template === 'wastewater' ? 'wastewaterAnaerobic' : template === 'recovery' ? 'methaneRecovery' : 'extension', approval: '待审核', factorObject: contextObject ?? factorObject ?? metaInfo.title.split('—')[0], emissionSourceType: resolvedSourceType, activityUnit: resolvedActivityUnit, ghgType: resolvedGas, calculationBasis: resolvedBasis, publishedYear: Number(meta.year.replace(/\D/g, '')) || 2026, enterpriseId: 'org-xx-tech' };
+  return { factorId, scope: 'enterprise', name: meta.name.trim() || factorObject || metaInfo.title, objectType: template === 'direct' || template === 'fugitive' ? '综合排放因子' : '参数组/公式模板', activity: resolvedActivity, gas: resolvedGas, value: factorValue, unit: factorUnit, source: meta.sourceType.trim() || '官方缺省值', version: meta.year, geo: meta.organization, industry: '通用工业企业', validity: '当前有效', raw: `${factorValue} ${factorUnit}`, quality: '企业参数覆盖', effective: meta.year, reference: meta.remark || '企业新增核算配置', formula: metaInfo.formula, parameters, selectable: true, calculationType, calculationScenario: template === 'fuel' ? 'fuelCombustion' : template === 'process' ? 'carbonateProcess' : template === 'wastewater' ? 'wastewaterAnaerobic' : template === 'recovery' ? 'methaneRecovery' : 'extension', approval: '待审核', factorObject: contextObject ?? factorObject ?? metaInfo.title.split('—')[0], emissionSourceType: resolvedSourceType, activityUnit: resolvedActivityUnit, ghgType: resolvedGas, calculationBasis: resolvedBasis, publishedYear: Number(meta.year.replace(/\D/g, '')) || 2026, enterpriseId: 'org-xx-tech' };
 }
 
 function FactorTemplateDialog({ close, save, context, onBack }: { close: () => void; save: (factor: CarbonFactor) => void; context?: FactorSelectionRow; onBack?: () => void }) {
@@ -2107,12 +2188,12 @@ function FactorTemplateDialog({ close, save, context, onBack }: { close: () => v
   const initialSeed = templateSeed(initialTemplate);
   const initialSelection = initialTemplateSelection(initialTemplate);
   const [template, setTemplate] = useState<FactorTemplateKey>(initialTemplate);
-  const [parameters, setParameters] = useState(() => templateParameters(initialTemplate, current));
-  const [meta, setMeta] = useState<FactorFormMeta>({ name: '', value: current?.value.replace(/^折算因子\s*/, '') ?? initialSeed?.value.replace(/^折算因子\s*/, '') ?? '0', unit: current?.unit ?? initialSeed?.unit ?? (initialTemplate === 'direct' ? 'tCO₂e/活动单位' : '参数组'), source: '官方缺省值', sourceType: '官方缺省值', year: '2026年度', organization: 'XX科技有限公司', remark: '', ...initialSelection, ...(current ? { activity: current.activity, scenario: current.factorObject && current.activityUnit ? `${current.factorObject} · ${current.activityUnit}` : templateUseCase(initialTemplate, current.activity) } : {}) });
+  const [parameters, setParameters] = useState(() => templateParameters(initialTemplate, current, true));
+  const [meta, setMeta] = useState<FactorFormMeta>({ name: '', value: initialTemplate === 'fugitive' ? fugitiveFactorOptions[0].display : current?.value.replace(/^折算因子\s*/, '') ?? initialSeed?.value.replace(/^折算因子\s*/, '') ?? '0', unit: initialTemplate === 'fugitive' ? '%' : current?.unit ?? initialSeed?.unit ?? (initialTemplate === 'direct' ? 'tCO₂e/活动单位' : '参数组'), source: '官方缺省值', sourceType: '官方缺省值', year: '2026年度', organization: 'XX科技有限公司', remark: '', ...initialSelection, ...(current ? { activity: current.activity, scenario: initialTemplate === 'direct' ? directScenarioFor(current.activity, current.activityUnit) : initialTemplate === 'fugitive' ? fugitiveFactorOptions[0].scenario : templateUseCase(initialTemplate, current.activity) } : {}) });
   const [error, setError] = useState('');
-  const changeTemplate = (next: FactorTemplateKey) => { const seed = templateSeed(next); const selection = initialTemplateSelection(next); setTemplate(next); setParameters(templateParameters(next)); setMeta({ name: '', value: seed?.value.replace(/^折算因子\s*/, '') ?? '0', unit: seed?.unit ?? (next === 'direct' ? 'tCO₂e/活动单位' : '参数组'), source: '官方缺省值', sourceType: '官方缺省值', year: '2026年度', organization: 'XX科技有限公司', remark: '', ...selection }); };
-  const submit = () => { if (template === 'measured') return; if (!meta.name.trim() || !meta.value.trim() || !meta.unit.trim()) { setError('请补齐名称、当前值和单位'); return; } setError(''); save(createTemplateFactor(template, parameters, meta, context)); };
-  return <Dialog title={context ? '新增自定义因子' : meta.name || '新增企业因子'} className={styles.factorDetailDialog} onClose={close} footer={<><Button onClick={onBack ?? close}>{onBack ? '返回因子列表' : '取消'}</Button><Button primary disabled={template === 'measured'} onClick={submit}>{template === 'measured' ? '不在因子库新增' : context ? '保存并应用自定义因子' : '保存企业因子'}</Button></>}>
+  const changeTemplate = (next: FactorTemplateKey) => { const seed = templateSeed(next); const selection = initialTemplateSelection(next); const selectedUnit = next === 'direct' ? directScenarioParts(selection.scenario).unit : undefined; const nextParameters = templateParameters(next); setTemplate(next); setParameters(next === 'direct' ? nextParameters.map((parameter) => ({ ...parameter, name: directParameterName(selection.activity), unit: `tCO₂e/${selectedUnit}` })) : nextParameters); setMeta({ name: '', value: next === 'direct' ? '' : next === 'fugitive' ? fugitiveFactorOptions[0].display : seed?.value.replace(/^折算因子\s*/, '') ?? '0', unit: next === 'direct' ? `tCO₂e/${selectedUnit}` : next === 'fugitive' ? '%' : seed?.unit ?? '参数组', source: '官方缺省值', sourceType: '官方缺省值', year: '2026年度', organization: 'XX科技有限公司', remark: '', ...selection, ...(next === 'fugitive' ? { activity: fugitiveFactorOptions[0].activity, scenario: fugitiveFactorOptions[0].scenario } : {}) }); };
+  const submit = () => { if (!factorLibraryTemplateKeys.includes(template)) { setError('回收销毁、物料平衡和实测属于核算模板，不在因子库新增'); return; } if (!meta.name.trim() || !meta.value.trim() || !meta.unit.trim()) { setError('请补齐名称、当前值和单位'); return; } setError(''); save(createTemplateFactor(template, parameters, meta, context)); };
+  return <Dialog title={context ? '新增自定义因子' : meta.name || '新增企业因子'} className={styles.factorDetailDialog} onClose={close} footer={<><Button onClick={onBack ?? close}>{onBack ? '返回因子列表' : '取消'}</Button><Button primary disabled={!factorLibraryTemplateKeys.includes(template)} onClick={submit}>{!factorLibraryTemplateKeys.includes(template) ? '不在因子库新增' : context ? '保存并应用自定义因子' : '保存企业因子'}</Button></>}>
     {context && <div className={`${styles.infoBox} ${styles.customFactorHint}`}>自定义因子仅适用于当前企业，并将按当前排放源的适用对象、活动单位和温室气体类型参与匹配。</div>}
     {context && <div className={styles.factorContext}><div><span>当前排放源</span><b>{context.sourceName ?? '当前排放源'}</b></div><div><span>适用对象</span><b>{factorObjectForRow(context, current) ?? '当前排放源'}</b></div><div><span>使用场景</span><b>{context.sourceType ?? current?.emissionSourceType ?? '—'}</b></div><div><span>活动单位</span><b>{context.activityUnit ?? current?.activityUnit ?? '—'}</b></div><div><span>温室气体</span><b>{context.greenhouseGasSpecies?.join('、') ?? current?.ghgType ?? factorTemplateMeta[template].gas}</b></div></div>}
     <UnifiedFactorSections template={template} mode="add" parameters={parameters} setParameters={setParameters} meta={meta} setMeta={setMeta} onTemplateChange={changeTemplate} />
@@ -2123,7 +2204,7 @@ function FactorTemplateDialog({ close, save, context, onBack }: { close: () => v
 function SupportViewDialog({ item, close, openDialog }: { item: SupportItem; close: () => void; openDialog: (dialog: Extract<DialogState, { kind: 'deleteSupport' | 'deleteSupportFile' | 'viewSupport' }>) => void }) {
   const files = item.evidenceFiles ?? [];
   const scope = item.emission ? emissionScopeDictionary.find((entry) => entry.categories.some((category) => category === item.emission?.emissionCategory))?.label : undefined;
-  return <Dialog title="查看核查材料" onClose={close} footer={<Button onClick={close}>关闭</Button>}>
+  return <Dialog title="查看核查材料" onClose={close} footer={<><Button onClick={close}>关闭</Button>{files.length > 0 && <Button danger onClick={() => openDialog({ kind: 'deleteSupport', item })}>删除全部材料</Button>}</>}>
     <div className={styles.viewMaterialMeta}><div><span>材料类别</span><b>{item.emission ? '排放源证明材料' : '核算基础材料'}</b></div><div><span>材料说明</span><b>{item.item}</b></div>{item.emission && <div><span>清单属性</span><b>{scope} · {item.emission.emissionCategory} · {item.emission.sourceType}</b></div>}</div>
     <div className={styles.viewMaterialLabel}>文件列表</div>
     {files.length ? <div className={styles.materialFileTable}><div className={styles.materialFileHeader}><b>文件名称</b><b>文件类型</b><b>操作</b></div>{files.map((file) => <div className={styles.materialFileRow} key={file.evidenceFileId}><span>{file.fileName}</span><span>{materialType(file.fileName)}</span><div className={styles.materialFileActions}><button type="button" className={styles.downloadButton} onClick={() => downloadEvidenceFile(file)}>下载材料</button><button type="button" className={styles.fileDeleteButton} onClick={() => openDialog({ kind: 'deleteSupportFile', item, file })}>删除</button></div></div>)}</div> : <div className={styles.emptyMaterialPanel}>暂无证明材料</div>}
@@ -2171,6 +2252,7 @@ function SupportDetailDrawer({ state, close, manage, save }: { state: Extract<Dr
   const [files, setFiles] = useState(source?.evidenceFiles ?? item.evidenceFiles ?? []);
   const [remark, setRemark] = useState(source?.supportRemark ?? item.supportRemark ?? '');
   const [dragging, setDragging] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ evidenceFileId: string; fileName: string }>();
   const uploadInputId = `support-upload-${item.id ?? item.item}`;
   const submit = () => source
     ? save({ ...item, emission: { ...source, evidenceFiles: files, evidenceStatus: files.length ? '已完成' : '待补充', supportRemark: remark } })
@@ -2179,20 +2261,21 @@ function SupportDetailDrawer({ state, close, manage, save }: { state: Extract<Dr
     if (!selectedFiles.length) return;
     setFiles((items) => [...items, ...selectedFiles.map((file, index) => ({ evidenceFileId: `ev-${Date.now()}-${index}`, fileName: file.name, activityDataSource: item.activityDataSources }))]);
   };
-  const fileSection = <DetailBlock title="证明材料和备注">{files.map((file) => <div className={styles.fileRow} key={file.evidenceFileId}><i>FILE</i><span><b>{file.fileName}</b><small>关联来源：{file.activityDataSource}</small></span><button type="button" className={styles.downloadButton} onClick={() => downloadEvidenceFile(file)}>下载材料</button>{state.manage && <button type="button" className={`${styles.textButton} ${styles.fileDeleteButton}`} onClick={() => setFiles((items) => items.filter((current) => current.evidenceFileId !== file.evidenceFileId))}>删除</button>}</div>)}{state.manage && <><input id={uploadInputId} className={styles.hiddenFileInput} type="file" multiple onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} /><div className={`${styles.uploadDropzone} ${dragging ? styles.uploadDropzoneActive : ''}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); addFiles(Array.from(event.dataTransfer.files)); }}><span>将文件拖到此处，或</span><label className={styles.uploadButton} htmlFor={uploadInputId}>选择文件</label><small>支持多文件上传</small></div></>}<textarea className={styles.textarea} value={remark} onChange={(event) => setRemark(event.target.value)} placeholder="填写数据口径、年度汇总方法、缺失月份处理或来源差异说明" readOnly={!state.manage} />{state.manage && source && <Button primary onClick={submit}>保存证明材料</Button>}</DetailBlock>;
-  if (!source) return <Drawer title={state.upload ? '上传基础材料' : '基础材料详情'} onClose={close} footer={<><Button onClick={close}>关闭</Button>{state.manage ? <Button primary onClick={submit}>保存上传材料</Button> : <Button outline onClick={manage}>上传</Button>}</>}><DetailBlock title={item.item}><div className={styles.kv}><span>核查事项</span><span>{item.group}</span><span>材料数量</span><b>{files.length} 份</b></div></DetailBlock>{fileSection}</Drawer>;
+  const fileSection = <DetailBlock title="证明材料和备注">{files.map((file) => <div className={styles.fileRow} key={file.evidenceFileId}><i>FILE</i><span><b>{file.fileName}</b><small>关联来源：{file.activityDataSource}</small></span><button type="button" className={styles.downloadButton} onClick={() => downloadEvidenceFile(file)}>下载材料</button>{state.manage && <button type="button" className={`${styles.textButton} ${styles.fileDeleteButton}`} onClick={() => setPendingDelete({ evidenceFileId: file.evidenceFileId, fileName: file.fileName })}>删除</button>}</div>)}{state.manage && <><input id={uploadInputId} className={styles.hiddenFileInput} type="file" multiple onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} /><div className={`${styles.uploadDropzone} ${dragging ? styles.uploadDropzoneActive : ''}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); addFiles(Array.from(event.dataTransfer.files)); }}><span>将文件拖到此处，或</span><label className={styles.uploadButton} htmlFor={uploadInputId}>选择文件</label><small>支持多文件上传</small></div></>}<textarea className={styles.textarea} value={remark} onChange={(event) => setRemark(event.target.value)} placeholder="填写数据口径、年度汇总方法、缺失月份处理或来源差异说明" readOnly={!state.manage} />{state.manage && source && <Button primary onClick={submit}>保存证明材料</Button>}</DetailBlock>;
+  const deleteDialog = pendingDelete && <Dialog title="删除证明材料" onClose={() => setPendingDelete(undefined)} footer={<><Button onClick={() => setPendingDelete(undefined)}>取消</Button><Button danger onClick={() => { setFiles((items) => items.filter((file) => file.evidenceFileId !== pendingDelete.evidenceFileId)); setPendingDelete(undefined); }}>确认删除</Button></>}><div className={styles.confirmBox}>确认删除文件“{pendingDelete.fileName}”吗？删除后请点击“保存证明材料”使修改生效。</div></Dialog>;
+  if (!source) return <><Drawer title={state.upload ? '上传基础材料' : '基础材料详情'} onClose={close} footer={<><Button onClick={close}>关闭</Button>{state.manage ? <Button primary onClick={submit}>保存上传材料</Button> : <Button outline onClick={manage}>上传</Button>}</>}><DetailBlock title={item.item}><div className={styles.kv}><span>核查事项</span><span>{item.group}</span><span>材料数量</span><b>{files.length} 份</b></div></DetailBlock>{fileSection}</Drawer>{deleteDialog}</>;
   const scope = emissionScopeDictionary.find((entry) => entry.categories.some((category) => category === source.emissionCategory))?.label;
-  return <Drawer title={state.upload ? '上传证明材料' : '证明材料详情'} onClose={close} footer={<><Button onClick={close}>关闭</Button>{state.manage ? <Button primary onClick={submit}>保存上传材料</Button> : <Button outline onClick={manage}>上传</Button>}</>}><DetailBlock title="核算数据（只读）"><div className={styles.kv}><span>排放源</span><b>{source.sourceName}</b><span>清单属性</span><span>{scope} · {source.emissionCategory} · {source.sourceType}</span><span>活动数据</span><b>{source.activityData}</b><span>温室气体种类</span><span>{source.greenhouseGasSpecies.join('、')}</span><span>清单状态</span><span>当前正式清单</span></div></DetailBlock>{fileSection}</Drawer>;
+  return <><Drawer title={state.upload ? '上传证明材料' : '证明材料详情'} onClose={close} footer={<><Button onClick={close}>关闭</Button>{state.manage ? <Button primary onClick={submit}>保存上传材料</Button> : <Button outline onClick={manage}>上传</Button>}</>}><DetailBlock title="核算数据（只读）"><div className={styles.kv}><span>排放源</span><b>{source.sourceName}</b><span>清单属性</span><span>{scope} · {source.emissionCategory} · {source.sourceType}</span><span>活动数据</span><b>{source.activityData}</b><span>温室气体种类</span><span>{source.greenhouseGasSpecies.join('、')}</span><span>清单状态</span><span>当前正式清单</span></div></DetailBlock>{fileSection}</Drawer>{deleteDialog}</>;
 }
 
-function FactorDetailDialog({ factor, mode, close, save }: { factor: CarbonFactor; mode: 'view' | 'edit'; close: () => void; save: (factor: CarbonFactor) => void }) {
+function FactorDetailDialog({ factor, mode, close, save, onParametersChange }: { factor: CarbonFactor; mode: 'view' | 'edit'; close: () => void; save: (factor: CarbonFactor) => void; onParametersChange?: (parameters: CarbonFactorParameter[]) => void }) {
   const template = templateForFactor(factor);
   const [parameters, setParameters] = useState(() => templateParameters(template, factor));
-  const [meta, setMeta] = useState<FactorFormMeta>({ name: factor.factorObject ?? factor.name, value: factor.value.replace(/^折算因子\s*/, ''), unit: factor.unit, source: factor.source, sourceType: normalizedParameterSourceType(factor.source), year: factor.version, organization: factor.scope === 'enterprise' && factor.geo === '当前企业' ? 'XX科技有限公司' : factor.geo, remark: factor.reference, activity: factor.activity, scenario: factor.factorObject && factor.activityUnit ? `${factor.factorObject} · ${factor.activityUnit}` : templateUseCase(template, factor.activity) });
+  const [meta, setMeta] = useState<FactorFormMeta>({ name: factor.factorObject ?? factor.name, value: factor.value.replace(/^折算因子\s*/, ''), unit: factor.unit, source: factor.source, sourceType: normalizedParameterSourceType(factor.source), year: factor.version, organization: factor.scope === 'enterprise' && factor.geo === '当前企业' ? 'XX科技有限公司' : factor.geo, remark: factor.reference, activity: factor.activity, scenario: template === 'direct' ? directScenarioFor(factor.activity, factor.activityUnit) : factor.factorObject && factor.activityUnit ? `${factor.factorObject} · ${factor.activityUnit}` : templateUseCase(template, factor.activity) });
   const editable = mode === 'edit' && parameters.some((parameter) => parameter.editable);
   const submit = () => save({ ...factor, name: meta.name, value: meta.value, unit: meta.unit, source: meta.source, version: meta.year, geo: meta.organization, reference: meta.remark, scope: 'enterprise', quality: '企业参数覆盖', approval: '待审核', parameters });
   return <Dialog title={`${factor.factorObject ?? factor.name} · ${mode === 'edit' ? '编辑企业因子' : '详情'}`} className={styles.factorDetailDialog} onClose={close} footer={<><Button onClick={close}>{mode === 'edit' ? '取消' : '关闭'}</Button>{mode === 'edit' && <Button primary disabled={!editable} onClick={submit}>保存企业参数</Button>}</>}>
-    <UnifiedFactorSections template={template} mode={mode} parameters={parameters} setParameters={setParameters} meta={meta} setMeta={setMeta} />
+    <UnifiedFactorSections template={template} mode={mode} parameters={parameters} setParameters={setParameters} meta={meta} setMeta={setMeta} onParametersChange={onParametersChange} />
     {mode === 'edit' && !editable && <div className={styles.infoBox}>当前记录没有可编辑参数；公共电力、热力等因子应使用主管部门发布值。</div>}
   </Dialog>;
 }

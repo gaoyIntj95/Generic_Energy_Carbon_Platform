@@ -14,10 +14,11 @@ const IOT_DAILY_ENERGY_TYPE_IDS = new Set(['v11-energy-electricity', 'v11-energy
 export const ENERGY_QUERY_CURRENT_YEAR = ENERGY_ANALYSIS_CURRENT_YEAR;
 export const ENERGY_QUERY_REPORTED_MONTH = ENERGY_ANALYSIS_REPORTED_MONTH;
 
-function standardCoalAmount(amount: number, energyTypeId: string, year = 2026) {
+function standardCoalAmount(amount: number, energyTypeId: string, year = ENERGY_ANALYSIS_CURRENT_YEAR) {
   const type = listV11EnergyTypes(year).find((item) => item.energyTypeId === energyTypeId);
   if (!type) return 0;
   const converted = amount * type.standardCoalFactor;
+  // 必要单位换算：能源品种配置仍以 kgce/原始单位维护，分析结果统一为 tce。
   return type.standardCoalFactorUnit.startsWith('kgce') ? converted / 1000 : converted;
 }
 

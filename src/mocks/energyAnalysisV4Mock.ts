@@ -1,3 +1,5 @@
+import { ENERGY_ANALYSIS_CURRENT_YEAR, ENERGY_ANALYSIS_REPORTED_MONTH } from './energyAnalysisPeriod';
+
 export type EnergyAnalysisScope = 'all' | 'prodA' | 'prodB' | 'utilities';
 export type EnergyAnalysisPeriod = 'month' | 'year';
 export type BenchmarkType = 'all' | 'unit' | 'product' | 'device';
@@ -98,7 +100,11 @@ export function createEnergyQueryAnnualDetails(row: EnergyQueryRow): EnergyQuery
   });
 }
 
-export function createEnergyQueryMonthlyDetails(row: EnergyQueryRow): EnergyQueryDayDetail[] {
+export function createEnergyQueryMonthlyDetails(
+  row: EnergyQueryRow,
+  year = ENERGY_ANALYSIS_CURRENT_YEAR,
+  month = ENERGY_ANALYSIS_REPORTED_MONTH,
+): EnergyQueryDayDetail[] {
   if (row.dailyDataAvailable !== true) return [];
 
   const physicalAmounts = allocateIntegerTotal(row.physicalAmount, monthDayWeights);
@@ -108,7 +114,7 @@ export function createEnergyQueryMonthlyDetails(row: EnergyQueryRow): EnergyQuer
     const deviation = (standardCoalAmounts[index] - dailyAverage) / dailyAverage * 100;
     return {
       detailId: `${row.energyQueryRowId}-day-${String(index + 1).padStart(2, '0')}`,
-      date: `2026-06-${String(index + 1).padStart(2, '0')}`,
+      date: `${year}-${String(month).padStart(2, '0')}-${String(index + 1).padStart(2, '0')}`,
       physicalAmount: physicalAmounts[index],
       standardCoalAmount: standardCoalAmounts[index],
       deviationFromDailyAverage: deviation,
