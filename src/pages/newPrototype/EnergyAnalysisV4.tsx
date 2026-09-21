@@ -1096,14 +1096,13 @@ function IntensityPage() {
       ? '一级用能单元指标一期只展示一级用能单元，仅读取当前一级单元能源数据，不读取或汇总二级能源消费记录。'
       : '产品 Tab 按产品—一级用能单元展示关联生产单元综合能耗，不进行多产品能源分配。';
   const scopeNote = applied.objectType === 'product' ? '产品Tab读取一级用能单元运营数据中的产品产量，并匹配关联生产单元能源数据；一期不进行多产品能源分配。' : legacyScopeNote;
-  const productScopeNote = '产品Tab展示产品关联生产用能单元的能源消费统计，不代表产品独立能耗；一期不进行多产品能源分配，同一生产单元关联多个产品时不计算单位产品综合能耗。';
+  const productScopeNote = '产品Tab按产品能源分配比例计算单位产品综合能耗；未配置有效分配比例时显示“—”。';
   const metricObjectMap = new Map(resultViews.flatMap((resultView) => resultView.metrics.map((metric) => [metric.intensityMetricId, resultView.object])));
   const metricViewFor = (metric: CalculatedIntensityMetric) => resultViews.find((resultView) => resultView.object.objectId === metricObjectMap.get(metric.intensityMetricId)?.objectId) ?? view;
   const metricGroupFor = (metric: CalculatedIntensityMetric) => metricObjectMap.get(metric.intensityMetricId)?.unitKind === 'production' ? '生产类用能单元' : '非生产类用能单元';
   const defaultMonthlyMetric = visibleRows[0];
   const trendRows = applied.objectType === 'unit' ? rows : visibleRows;
   const displayedMonthlyMetric = trendRows.find((metric) => metric.intensityMetricId === trendMetricId) ?? (applied.objectType === 'unit' ? trendRows[0] : defaultMonthlyMetric);
-  const comparisonMetricNames = [...new Set(visibleRows.map((metric) => metric.name))];
   const comparisonViews = resultViews
     .map((resultView) => ({ ...resultView, metrics: resultView.metrics.filter((metric) => visibleRows.some((item) => item.intensityMetricId === metric.intensityMetricId)) }))
     .filter((resultView) => resultView.metrics.length > 0);
@@ -1399,8 +1398,8 @@ function IntensityPage() {
           </section>)}
         </div> : <div className={styles.tableWrap}>
           <table className={styles.comparisonTable}>
-            <thead><tr><th>产品</th><th>关联一级用能单元</th>{comparisonMetricNames.map((name) => <th key={name}>{name}</th>)}<th>环比变化</th><th>同比变化</th><th>操作</th></tr></thead>
-            <tbody>{comparisonViews.map((resultView) => { const primaryMetric = resultView.metrics.find((metric) => metric.resultType === 'ok') ?? resultView.metrics[0]; const changes = metricChanges(primaryMetric, resultView.object.objectId); return <tr key={resultView.object.objectId}><td>{resultView.object.objectName}</td><td>{primaryMetric.relatedEnergyUnitNames?.join('、') || '—'}</td>{comparisonMetricNames.map((name) => { const metric = resultView.metrics.find((item) => item.name === name && item.resultType === 'ok'); return <td key={name}>{metric ? <><strong>{format(metric.value, metricDigits(metric.value))}</strong><small>{metric.unit}</small></> : '—'}</td>; })}<td className={styles.changeCell}>{percent(changes.mom)}</td><td className={styles.changeCell}>{percent(changes.yoy)}</td><td><button type="button" className={styles.link} onClick={() => { setTrendMetricId(primaryMetric.intensityMetricId); openMetricDialog(primaryMetric, true, resultView); }}>{primaryMetric.resultType === 'ok' ? '查看详情' : missingDataActionLabel(primaryMetric)}</button></td></tr>; })}</tbody>
+            <thead><tr><th>产品</th><th>关联一级用能单元</th><th>指标名称</th><th>指标值</th><th>环比变化</th><th>同比变化</th><th>操作</th></tr></thead>
+            <tbody>{comparisonViews.map((resultView) => { const primaryMetric = resultView.metrics.find((metric) => metric.name === '单位产品综合能耗') ?? resultView.metrics[0]; const changes = metricChanges(primaryMetric, resultView.object.objectId); return <tr key={resultView.object.objectId}><td>{resultView.object.objectName}</td><td>{primaryMetric.relatedEnergyUnitNames?.join('、') || '—'}</td><td>{primaryMetric.name}</td><td>{primaryMetric.value === null ? '—' : <><strong>{format(primaryMetric.value, metricDigits(primaryMetric.value))}</strong><small>{primaryMetric.unit}</small></>}</td><td className={styles.changeCell}>{percent(changes.mom)}</td><td className={styles.changeCell}>{percent(changes.yoy)}</td><td><button type="button" className={styles.link} onClick={() => { setTrendMetricId(primaryMetric.intensityMetricId); openMetricDialog(primaryMetric, true, resultView); }}>{primaryMetric.resultType === 'ok' ? '查看详情' : missingDataActionLabel(primaryMetric)}</button></td></tr>; })}</tbody>
           </table>
         </div>}
         {applied.objectType === 'unit' && unitMetricGroups.length === 0 && <div className={styles.slimNote}><div><i>i</i><span>当前筛选对象暂无适用的能耗指标结果。</span></div></div>}

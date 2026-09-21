@@ -9,7 +9,7 @@ import {
   type V11EnergyRecord,
   type V11OperationMetric,
 } from './dataManagementV11Store';
-import { getProduct, listProducts } from './productMasterStore';
+import { getProduct, listProducts, resolveProductEnergyAllocation } from './productMasterStore';
 import { listEnergyUnits } from './energyUnitMockStore';
 import type { EnergyUnit } from '../types/energyUnit';
 import { ENERGY_ANALYSIS_CURRENT_YEAR } from './energyAnalysisPeriod';
@@ -71,6 +71,7 @@ export interface CalculatedIntensityMetric {
   allocatedEnergyAmount?: number;
   allocatedElectricityAmount?: number;
   allocationRule?: string;
+  allocationRatios?: Record<string, number>;
   source: string;
   period: string;
   issue?: IntensityIssue;
@@ -222,10 +223,11 @@ function calculateMonthlyMetrics(metric: CalculatedIntensityMetric, energyRecord
   const energyReported = Array.from({ length: 12 }, () => true);
   energyRecords.forEach((record) => {
     const amounts = monthlyRecordAmounts(record);
+    const allocationRatio = metric.allocationRatios?.[record.energyUnitId ?? ''] ?? 1;
     const reported = record.monthlyReportedMonths ?? record.monthlyAmounts.map((value) => value !== 0);
     reported.forEach((isReported, index) => { energyReported[index] = energyReported[index] && Boolean(isReported); });
-    addMonthly(electricity, energyTypeName(record.energyTypeId, record.year) === '电力' ? amounts : Array(12).fill(0));
-    addMonthly(standardCoal, amounts.map((amount) => amount * standardCoalFactor(record.energyTypeId, record.year)));
+    addMonthly(electricity, energyTypeName(record.energyTypeId, record.year) === '电力' ? amounts.map((amount) => amount * allocationRatio) : Array(12).fill(0));
+    addMonthly(standardCoal, amounts.map((amount) => amount * allocationRatio * standardCoalFactor(record.energyTypeId, record.year)));
   });
   const denominator = Array.from({ length: 12 }, () => 0);
   const operationReported = Array.from({ length: 12 }, () => true);
@@ -411,8 +413,7 @@ function utilityMetrics(object: IntensityObjectOption, year: number, energy: V11
 }
 
 function productMetrics(object: IntensityObjectOption, year: number, enterpriseEnergy: V11EnergyRecord[], operations: V11OperationMetric[]) {
-  // 一期产品口径：产品产量来自一级用能单元运营数据，能源量取关联生产单元统计。
-  // 不做多产品能源分配；同一生产单元关联多个产品时不计算产品独立能耗。
+  // 产品产量来自一级用能单元运营数据，能源量按产品与生产单元的年度分配关系归属。
   const scopedOutputRecords = operations.filter((record) => record.metricCode === 'product_output' && record.productId === object.objectId && annualAmount(record) > 0);
   const outputByUnit = new Map<string, V11OperationMetric[]>();
   scopedOutputRecords.forEach((record) => {
@@ -427,27 +428,33 @@ function productMetrics(object: IntensityObjectOption, year: number, enterpriseE
   const outputAmount = selectedOutputs.reduce((sum, record) => sum + annualAmount(record), 0);
   const coal = standardCoalTotal(enterpriseEnergy);
   const productUnit = output?.metricUnit ?? 't';
-  const unitProductIds = new Map<string, Set<string>>();
-  operations
-    .filter((record) => record.metricCode === 'product_output' && record.energyUnitId && annualAmount(record) > 0)
-    .forEach((record) => {
-      const products = unitProductIds.get(record.energyUnitId!) ?? new Set<string>();
-      if (record.productId) products.add(record.productId);
-      unitProductIds.set(record.energyUnitId!, products);
-    });
   const relatedUnitIds = [...new Set(selectedOutputs.map((record) => record.energyUnitId).filter((id): id is string => Boolean(id)))];
-  const hasSharedUnit = relatedUnitIds.some((unitId) => (unitProductIds.get(unitId)?.size ?? 0) > 1);
+  const allocationRatios: Record<string, number> = {};
+  const allocationReasons: string[] = [];
+  relatedUnitIds.forEach((unitId) => {
+    const allocation = resolveProductEnergyAllocation(object.objectId, unitId, year);
+    if (allocation.ok) allocationRatios[unitId] = allocation.share;
+    else allocationReasons.push(allocation.reason);
+  });
   const missing: IntensityIssue | undefined = !relatedUnitIds.length
       ? '未关联生产用能单元'
     : !enterpriseEnergy.length
       ? '缺少能源数据'
+    : allocationReasons.length
+      ? '多产品共用生产用能单元，未配置能源分配'
+    : !output
+      ? '缺少产品产量'
       : undefined;
   const operationIds = selectedOutputs.map((record) => record.operationMetricId);
   const denominator = output ? `${object.objectName}产量 ${outputAmount.toLocaleString('zh-CN')} ${productUnit}` : '缺少当前产品产量';
   const relatedUnits = relatedUnitIds;
-  const directMetric = baseMetric(`${object.objectId}-linked-unit-energy`, '关联生产单元综合能耗', 'tce', '产品关联一级用能单元综合能源消费量（tce）', enterpriseEnergy.length ? coal : null, `关联生产用能单元综合能耗 ${coal.toLocaleString('zh-CN')} tce`, denominator, year, enterpriseEnergy.map((record) => record.energyRecordId), operationIds, missing);
+  const directMissing: IntensityIssue | undefined = !relatedUnitIds.length ? '未关联生产用能单元' : !enterpriseEnergy.length ? '缺少能源数据' : undefined;
+  const directMetric = baseMetric(`${object.objectId}-linked-unit-energy`, '关联生产单元综合能耗', 'tce', '产品关联一级用能单元综合能源消费量（tce）', enterpriseEnergy.length ? coal : null, `关联生产用能单元综合能耗 ${coal.toLocaleString('zh-CN')} tce`, denominator, year, enterpriseEnergy.map((record) => record.energyRecordId), operationIds, directMissing);
+  const allocatedCoal = enterpriseEnergy.reduce((sum, record) => sum + standardCoalAmount(annualAmount(record), record.energyTypeId, year) * (allocationRatios[record.energyUnitId ?? ''] ?? 0), 0);
+  const productMetric = baseMetric(`${object.objectId}-product-energy`, '单位产品综合能耗', `tce/${productUnit}`, '产品分配后的综合能耗（tce）÷ 产品产量', missing ? null : allocatedCoal / outputAmount, `产品分配后的综合能耗 ${allocatedCoal.toLocaleString('zh-CN')} tce`, denominator, year, enterpriseEnergy.map((record) => record.energyRecordId), operationIds, missing);
   return [
-    { ...directMetric, benchmarkable: false, relatedEnergyUnitNames: relatedUnits.map((id) => listEnergyUnits(year).find((unit) => unit.energyUnitId === id)?.energyUnitName ?? id), relatedProductName: object.objectName, allocationDescription: hasSharedUnit ? '同一生产用能单元关联多个产品，一期不进行能源分配。' : '一期按产品关联一级用能单元展示综合能源消费量。', relatedProductOutputTotal: outputAmount },
+    { ...directMetric, benchmarkable: false, relatedEnergyUnitNames: relatedUnits.map((id) => listEnergyUnits(year).find((unit) => unit.energyUnitId === id)?.energyUnitName ?? id), relatedProductName: object.objectName, allocationDescription: allocationReasons.length ? allocationReasons.join('；') : '按产品能源分配比例归属关联生产单元综合能耗。', relatedProductOutputTotal: outputAmount },
+    { ...productMetric, allocationRatios, relatedEnergyUnitNames: relatedUnits.map((id) => listEnergyUnits(year).find((unit) => unit.energyUnitId === id)?.energyUnitName ?? id), relatedProductName: object.objectName, allocationDescription: allocationReasons.length ? allocationReasons.join('；') : '按产品能源分配比例归属关联生产单元综合能耗。', relatedProductOutputTotal: outputAmount },
   ];
 }
 
