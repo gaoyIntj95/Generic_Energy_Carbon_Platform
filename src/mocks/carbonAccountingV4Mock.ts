@@ -147,7 +147,7 @@ export const carbonFactorsV4: CarbonFactor[] = [
     factorId: 'pf-waste', scope: 'public', name: '工业废水厌氧处理', objectType: '参数组/公式模板', activity: '废水厌氧处理', gas: 'CH₄',
     value: '参数组（5项）', unit: '参数组', source: '工业其他行业企业核算指南', version: '试行版', geo: '全国',
     industry: '通用工业', validity: '当前有效', raw: 'COD、Bo、MCF及GWP参数组', quality: '支持企业实测 COD 和 MCF', effective: '按适用指南',
-    reference: '工业废水厌氧处理-甲烷排放', formula: 'CH₄排放量 =（COD总量 − 污泥清除COD量）× Bo × MCF；CO₂e = CH₄ × GWP', parameters: [
+    reference: '工业废水厌氧处理-甲烷排放', formula: '排放量 =（COD去除量 − 污泥清除COD量）× Bo × MCF × GWP', parameters: [
       { key: 'codRemoved', name: '厌氧系统去除 COD 量', value: 5206.89, display: '5,206.89', unit: 'kg COD', sourceType: '企业监测值', source: '废水处理系统台账', editable: true, valueMode: '检测值', method: '环保部门水质监测标准方法', monitoringFrequency: '至少每2小时采样，采用24小时混合样', evidenceRequired: true },
       { key: 'sludgeCod', name: '污泥清除 COD 量', value: 0, display: '0', unit: 'kg COD', sourceType: '企业数据', source: '无污泥COD统计时按0', editable: true, valueMode: '缺省值', evidenceRequired: true },
       { key: 'bo', name: '甲烷最大生产能力 Bo', value: 0.25, display: '0.25', unit: 'kg CH₄/kg COD', sourceType: '官方缺省值', source: '工业其他行业企业核算指南', editable: true, valueMode: '缺省值', evidenceRequired: true },
@@ -159,7 +159,7 @@ export const carbonFactorsV4: CarbonFactor[] = [
     factorId: 'pf-r134a', scope: 'public', name: 'R134a', objectType: 'GWP值', activity: '逸散排放', gas: 'CO₂e',
     value: '1.526', unit: 'tCO₂e/kg', source: 'IPCC AR6 WGI（Forster 等，2021）', version: 'AR6 GWP100', geo: '全球', industry: '通用工业',
     validity: '当前有效', raw: 'GWP100=1526 kgCO₂e/kg', quality: '国际权威参数', effective: '按核算方法选用',
-    reference: '逸散排放-制冷剂使用-含氢氟碳化合物-R134a', formula: '排放量 = 制冷剂逸散量 × GWP', selectable: true, calculationType: 'direct',
+    reference: '逸散排放-制冷剂使用-含氢氟碳化合物-R134a', formula: '排放量 = 活动数据 × 逸散系数 × 对应GWP', selectable: true, calculationType: 'direct',
   },
   {
     factorId: 'pf-transport', scope: 'public', name: '公路货运', objectType: '综合排放因子', activity: '其他间接排放', gas: 'CO₂e',
