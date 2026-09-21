@@ -1100,8 +1100,14 @@ function IntensityPage() {
   const metricObjectMap = new Map(resultViews.flatMap((resultView) => resultView.metrics.map((metric) => [metric.intensityMetricId, resultView.object])));
   const metricViewFor = (metric: CalculatedIntensityMetric) => resultViews.find((resultView) => resultView.object.objectId === metricObjectMap.get(metric.intensityMetricId)?.objectId) ?? view;
   const metricGroupFor = (metric: CalculatedIntensityMetric) => metricObjectMap.get(metric.intensityMetricId)?.unitKind === 'production' ? '生产类用能单元' : '非生产类用能单元';
-  const defaultMonthlyMetric = visibleRows[0];
-  const trendRows = applied.objectType === 'unit' ? rows : visibleRows;
+  const defaultMonthlyMetric = applied.objectType === 'product'
+    ? visibleRows.find((metric) => metric.name === '单位产品综合能耗') ?? visibleRows[0]
+    : visibleRows[0];
+  const trendRows = applied.objectType === 'unit'
+    ? rows
+    : applied.objectType === 'product'
+      ? visibleRows.filter((metric) => metric.name === '单位产品综合能耗')
+      : visibleRows;
   const displayedMonthlyMetric = trendRows.find((metric) => metric.intensityMetricId === trendMetricId) ?? (applied.objectType === 'unit' ? trendRows[0] : defaultMonthlyMetric);
   const comparisonViews = resultViews
     .map((resultView) => ({ ...resultView, metrics: resultView.metrics.filter((metric) => visibleRows.some((item) => item.intensityMetricId === metric.intensityMetricId)) }))
