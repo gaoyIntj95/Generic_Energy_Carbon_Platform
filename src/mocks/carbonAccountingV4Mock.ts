@@ -1,3 +1,5 @@
+import factorLibrarySeed from './carbonFactorLibrarySeed.json';
+
 export type CarbonFactorEvidenceFile = {
   evidenceFileId: string;
   fileName: string;
@@ -31,6 +33,8 @@ export type CarbonFactor = {
   value: string;
   unit: string;
   source: string;
+  standard?: string;
+  applicability?: string;
   version: string;
   geo: string;
   industry: string;
@@ -55,6 +59,23 @@ export type CarbonFactor = {
   effectiveTo?: string;
   catalogCategory?: string;
   enterpriseId?: string;
+  /** Fields from the public factor-library seed; kept separate from accounting fields. */
+  libraryCategoryCode?: string;
+  libraryCategoryName?: string;
+  libraryCategoryChildName?: string;
+  libraryCalculationMode?: 'COMPOSITE' | 'DIRECT' | 'CONSTANT' | 'LOOKUP' | 'PENDING';
+  libraryDisplayValue?: string;
+  libraryEffectiveYear?: string | number;
+  libraryScopeType?: string;
+  libraryScopeName?: string;
+  libraryFacilityType?: string;
+  libraryMedium?: string;
+  libraryApplicableCondition?: string;
+  libraryRemarks?: string;
+  libraryLifetimeYears?: number;
+  libraryLookupKey?: 'saturatedSteamEnthalpy' | 'superheatedSteamEnthalpy';
+  librarySourceId?: string;
+  librarySourceLocation?: string;
 };
 
 const fuelParameters = (kind: 'gas' | 'diesel' | 'coal' | 'rdf'): CarbonFactorParameter[] => [
@@ -258,7 +279,52 @@ export const supportBasicV4 = [
   { group: '质量保证', item: '碳排放管理制度', activity: '核算数据收集与复核制度', origin: '在线上传', materials: 0, state: '待补充' as const },
 ];
 
+export type TenantCustomFactorSourceType = 'ENTERPRISE' | 'SUPPLIER' | 'EXTERNAL_PUBLIC' | 'OTHER';
+export type TenantCustomFactorGreenhouseGas = 'CO2' | 'CH4' | 'N2O' | 'HFCS' | 'PFCS' | 'SF6' | 'NF3' | 'OTHER';
+export type TenantCustomFactorAttachment = {
+  attachmentId: string;
+  fileName: string;
+  fileType: string;
+  size: number;
+};
+export type TenantCustomCarbonFactor = {
+  id: string;
+  libraryCategory: 'TENANT_CUSTOM_FACTOR';
+  factorName: string;
+  greenhouseGas: TenantCustomFactorGreenhouseGas;
+  greenhouseGasLabel?: string;
+  factorValue: number;
+  unit: string;
+  sourceType: TenantCustomFactorSourceType;
+  effectiveYear: number;
+  sourceEvidence: string;
+  attachments: TenantCustomFactorAttachment[];
+  tenantId: string;
+  createdAt: string;
+  createdBy: string;
+  status: 'ACTIVE';
+};
+
 const customCarbonFactorsV4: CarbonFactor[] = [];
+const tenantCustomCarbonFactorsV4: TenantCustomCarbonFactor[] = [{
+  id: 'tenant-factor-demo-special-material',
+  libraryCategory: 'TENANT_CUSTOM_FACTOR',
+  factorName: '特殊原料生产排放因子（示例）',
+  greenhouseGas: 'CO2',
+  factorValue: 1.2345,
+  unit: 'tCO₂/t',
+  sourceType: 'ENTERPRISE',
+  effectiveYear: 2026,
+  sourceEvidence: '企业检测报告2026-01号 / 内部计算说明',
+  attachments: [
+    { attachmentId: 'tenant-factor-demo-report', fileName: '特殊原料检测报告_2026-01.pdf', fileType: 'application/pdf', size: 248000 },
+    { attachmentId: 'tenant-factor-demo-note', fileName: '企业内部计算说明.docx', fileType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', size: 86000 },
+  ],
+  tenantId: 'tenant-current',
+  createdAt: '2026-01-15T09:30:00.000Z',
+  createdBy: '管理员',
+  status: 'ACTIVE',
+}];
 
 export const saveCarbonFactorV4 = (factor: CarbonFactor) => {
   const index = customCarbonFactorsV4.findIndex((item) => item.factorId === factor.factorId);
@@ -272,5 +338,107 @@ export const listCarbonFactorsV4 = () => [
   ...customCarbonFactorsV4.filter((factor) => !carbonFactorsV4.some((item) => item.factorId === factor.factorId)),
 ];
 
+export const saveTenantCustomCarbonFactorV4 = (factor: TenantCustomCarbonFactor) => {
+  const index = tenantCustomCarbonFactorsV4.findIndex((item) => item.id === factor.id);
+  if (index >= 0) tenantCustomCarbonFactorsV4[index] = { ...factor, attachments: factor.attachments.map((attachment) => ({ ...attachment })) };
+  else tenantCustomCarbonFactorsV4.push({ ...factor, attachments: factor.attachments.map((attachment) => ({ ...attachment })) });
+  return { ...factor, attachments: factor.attachments.map((attachment) => ({ ...attachment })) };
+};
+
+export const listTenantCustomCarbonFactorsV4 = () => tenantCustomCarbonFactorsV4.map((factor) => ({ ...factor, attachments: factor.attachments.map((attachment) => ({ ...attachment })) }));
+
 export const getCarbonFactorV4 = (factorId: string) =>
   customCarbonFactorsV4.find((factor) => factor.factorId === factorId) ?? carbonFactorsV4.find((factor) => factor.factorId === factorId);
+
+type FactorLibrarySeedFactor = (typeof factorLibrarySeed.factors)[number];
+
+const factorLibrarySourceMap = new Map(factorLibrarySeed.sources.map((source) => [source.source_id, source.source_name]));
+const libraryCategoryNameByCode: Record<string, string> = {
+  'CAT-01': '化石燃料', 'CAT-02': '碳酸盐', 'CAT-03': '工业废水', 'CAT-04': '购入能源',
+  'CAT-05': '逸散排放', 'CAT-06': '全球变暖潜势', 'CAT-07': '系统常数与热工参数',
+};
+const libraryChildCodeBySeedCategory: Record<string, string> = {
+  'CAT-01-01': 'SOLID_FUEL', 'CAT-01-02': 'LIQUID_FUEL', 'CAT-01-03': 'GASEOUS_FUEL',
+  'CAT-03-01': 'WASTEWATER_BO', 'CAT-03-02': 'WASTEWATER_MCF', 'CAT-04-01': 'PURCHASED_ELECTRICITY',
+  'CAT-04-02': 'PURCHASED_HEAT', 'CAT-05-01': 'REFRIGERANT_FUGITIVE', 'CAT-05-02': 'SF6_FUGITIVE',
+  'CAT-05-03': 'FIRE_SUPPRESSANT_FUGITIVE', 'CAT-07-01': 'SYSTEM_CONSTANT', 'CAT-07-02': 'STEAM_ENTHALPY',
+};
+
+const libraryCalculationType = (mode: FactorLibrarySeedFactor['calculation_mode']): CarbonFactor['calculationType'] => {
+  if (mode === 'COMPOSITE') return 'fuelParameter';
+  if (mode === 'PENDING' || mode === 'CONSTANT' || mode === 'LOOKUP') return 'parameter';
+  return 'direct';
+};
+
+const libraryParameter = (parameter: NonNullable<FactorLibrarySeedFactor['parameters']>[number]): CarbonFactorParameter => ({
+  key: parameter.param_code.toLowerCase(),
+  name: parameter.param_name,
+  value: parameter.storage_value ?? 0,
+  display: parameter.display_value,
+  unit: parameter.display_unit || parameter.storage_unit,
+  sourceType: parameter.default_source_type,
+  source: factorLibrarySourceMap.get(parameter.source_id) ?? parameter.source_id,
+  editable: parameter.enterprise_override_allowed,
+  valueMode: '官方发布值',
+});
+
+const adaptFactorLibraryFactor = (raw: FactorLibrarySeedFactor): CarbonFactor => {
+  const categoryName = libraryCategoryNameByCode[raw.category_code.split('-').slice(0, 2).join('-')] ?? raw.category_l1;
+  const source = factorLibrarySourceMap.get(raw.source_id) ?? raw.source_id;
+  const isFugitive = raw.category_l1 === '逸散排放';
+  const params = raw.parameters?.map(libraryParameter);
+  const fixedSystemConstant = raw.factor_id === 'EF-054' ? { value: '4.18', display: '4.18' } : raw.factor_id === 'EF-055' ? { value: '16', display: '16' } : undefined;
+  return {
+    factorId: raw.factor_id,
+    scope: 'public',
+    name: raw.factor_name,
+    factorObject: raw.display_name,
+    objectType: raw.internal_object_type === '方法学参数型' ? '方法学常数' : raw.internal_object_type === '查表参数型' ? '基础核算参数' : raw.internal_object_type === '参数组合型' ? '参数组/公式模板' : raw.internal_object_type === '综合因子型' ? '综合排放因子' : '基础核算参数',
+    activity: raw.category_l1,
+    gas: raw.ghg_or_medium || '—',
+    value: fixedSystemConstant?.value ?? (raw.factor_value === null ? raw.display_value : String(raw.factor_value)),
+    unit: isFugitive ? '%' : raw.unit,
+    source,
+    standard: raw.default_source_type,
+    applicability: raw.applicable_condition || undefined,
+    version: raw.effective_year ? String(raw.effective_year) : '公共基础因子',
+    geo: raw.scope_name || '全国',
+    industry: '通用工业',
+    validity: '当前有效',
+    raw: `${raw.display_value} ${raw.unit}`,
+    quality: raw.verification_status,
+    effective: raw.effective_year ? `${raw.effective_year}年度` : '长期有效',
+    reference: raw.source_location,
+    formula: raw.calculation_relation,
+    parameters: params,
+    selectable: false,
+    calculationType: libraryCalculationType(raw.calculation_mode),
+    calculationScenario: raw.category_l1 === '购入能源' ? (raw.category_l2 === '电力' ? 'purchasedElectricity' : 'purchasedHeat') : undefined,
+    catalogCategory: categoryName,
+    libraryCategoryCode: raw.category_code,
+    libraryCategoryName: categoryName,
+    libraryCategoryChildName: raw.category_l2,
+    libraryCalculationMode: fixedSystemConstant ? 'CONSTANT' : raw.calculation_mode as CarbonFactor['libraryCalculationMode'],
+    libraryDisplayValue: fixedSystemConstant?.display ?? raw.display_value,
+    libraryEffectiveYear: raw.effective_year,
+    libraryScopeType: raw.scope_type,
+    libraryScopeName: raw.scope_name,
+    libraryFacilityType: raw.facility_type,
+    libraryMedium: raw.ghg_or_medium,
+    libraryApplicableCondition: raw.applicable_condition,
+    libraryRemarks: raw.remarks,
+    libraryLookupKey: raw.factor_id === 'EF-052' ? 'saturatedSteamEnthalpy' : raw.factor_id === 'EF-053' ? 'superheatedSteamEnthalpy' : undefined,
+    librarySourceId: raw.source_id,
+    librarySourceLocation: raw.source_location,
+  };
+};
+
+export const carbonFactorLibrarySeed = factorLibrarySeed;
+export const carbonFactorLibraryCategoryTree = factorLibrarySeed.categoryTree;
+export const carbonFactorLibraryLookupTables = factorLibrarySeed.lookupTables;
+export const carbonFactorLibrarySources = factorLibrarySeed.sources;
+export const carbonFactorLibraryPurchasedEnergy = factorLibrarySeed.purchasedEnergy;
+export const carbonFactorLibraryFugitiveEmission = factorLibrarySeed.fugitiveEmission;
+export const carbonFactorLibraryEnums = factorLibrarySeed.enums;
+export const carbonFactorLibraryChildCode = (seedCode: string) => libraryChildCodeBySeedCategory[seedCode];
+export const listCarbonFactorLibraryV4 = () => factorLibrarySeed.factors.map(adaptFactorLibraryFactor);

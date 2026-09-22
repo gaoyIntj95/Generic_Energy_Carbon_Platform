@@ -112,7 +112,8 @@ describe('minimal energy flow maintenance', () => {
     expect(container.textContent).not.toContain('关联用能单元');
     expect(button('编辑', systemRow('余热发电机组'))).toBeDefined();
     expect(systemRow('余压回收系统').textContent).toContain('数据不完整');
-    expect(button('补充', systemRow('余压回收系统'))).toBeDefined();
+    expect([...systemRow('余压回收系统').querySelectorAll('button')].some((item) => item.textContent === '补充')).toBe(false);
+    expect(button('编辑', systemRow('余压回收系统'))).toBeDefined();
     expect(systemRow('余热发电机组').textContent).not.toContain('历史补录');
     expect(systemRow('余热发电机组').textContent).not.toContain('损失');
     const before = listV11ConversionOutputs();

@@ -34,7 +34,7 @@ describe('产品碳足迹运输活动', () => {
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
-    await act(async () => root.render(<MemoryRouter><ProductCarbonFootprint pathname="/product-carbon-footprint/activity" /><LocationProbe /></MemoryRouter>));
+    await act(async () => root.render(<MemoryRouter><ProductCarbonFootprint pathname="/product-footprint/projects/1/checklist" /><LocationProbe /></MemoryRouter>));
   });
 
   afterEach(async () => {
@@ -88,7 +88,7 @@ describe('产品碳足迹运输活动', () => {
     await click(button('确认选择'));
     await click(button('确认核算清单'));
 
-    await act(async () => root.render(<MemoryRouter><ProductCarbonFootprint pathname="/product-carbon-footprint/results" /></MemoryRouter>));
+    await act(async () => root.render(<MemoryRouter><ProductCarbonFootprint pathname="/product-footprint/projects/1/result" /></MemoryRouter>));
     expect(container.textContent).toContain('工业变频器 VFD-75');
     expect(container.textContent).toContain('98.88');
     expect(container.textContent).toContain('已确认清单快照');
@@ -97,7 +97,7 @@ describe('产品碳足迹运输活动', () => {
     expect(container.querySelector('div[style*="conic-gradient"]')).not.toBeNull();
     expect(container.textContent).not.toContain('生成报告');
 
-    await act(async () => root.render(<MemoryRouter><ProductCarbonFootprint pathname="/product-carbon-footprint/reports" /></MemoryRouter>));
+    await act(async () => root.render(<MemoryRouter><ProductCarbonFootprint pathname="/product-footprint/projects/1/report" /></MemoryRouter>));
     expect(container.textContent).toContain('数据依据已确认核算清单快照');
     expect(container.textContent).toContain('98.88');
     expect(container.textContent).toContain('01 报告摘要');
@@ -105,27 +105,20 @@ describe('产品碳足迹运输活动', () => {
     expect(container.textContent).toContain('06 排放热点与减排建议');
   });
 
-  it('按核算项目切换清单，并将当前项目写入地址栏', async () => {
-    const projectSelect = container.querySelector<HTMLSelectElement>('select[aria-label="核算项目"]')!;
-    expect(projectSelect.value).toBe('1');
+  it('在项目工作台内保持当前项目上下文并切换 Tab', async () => {
+    await act(async () => root.render(<MemoryRouter initialEntries={['/product-footprint/projects/1/checklist']}><ProductCarbonFootprint pathname="/product-footprint/projects/1/checklist" /><LocationProbe /></MemoryRouter>));
     expect(container.textContent).toContain('热轧钢卷');
-
-    await act(async () => {
-      projectSelect.value = '2';
-      projectSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-
-    expect(projectSelect.value).toBe('2');
-    expect(container.textContent).toContain('铝锭');
-    expect(container.textContent).not.toContain('热轧钢卷');
-    expect(container.querySelector('[data-testid="location"]')?.textContent).toBe('/product-carbon-footprint/activity?projectId=2');
+    await click(button('核算结果'));
+    expect(container.querySelector('[data-testid="location"]')?.textContent).toBe('/product-footprint/projects/1/result');
+    expect(container.textContent).toContain('工业变频器 VFD-75');
+    expect(container.textContent).not.toContain('核算项目');
   });
 
   it('从项目链接打开清单时按 projectId 恢复对应项目', async () => {
-    await act(async () => root.render(<MemoryRouter key="project-3" initialEntries={['/product-carbon-footprint/activity?projectId=3']}><ProductCarbonFootprint pathname="/product-carbon-footprint/activity" /><LocationProbe /></MemoryRouter>));
+    await act(async () => root.render(<MemoryRouter key="project-3" initialEntries={['/product-footprint/projects/3/checklist']}><ProductCarbonFootprint pathname="/product-footprint/projects/3/checklist" /><LocationProbe /></MemoryRouter>));
 
-    expect(container.querySelector<HTMLSelectElement>('select[aria-label="核算项目"]')?.value).toBe('3');
     expect(container.textContent).toContain('PCB 线路板');
     expect(container.textContent).not.toContain('热轧钢卷');
+    expect(container.textContent).toContain('电子控制器 EC-20');
   });
 });

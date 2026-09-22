@@ -341,6 +341,8 @@ describe('DataManagementV11 fidelity and data behavior', () => {
 
   it('separates conversion and external records without analysis duplication', async () => {
     await render('/data-management/energy-data?tab=conversion');
+    expect(container.querySelector('[aria-label="前三列字段继承自用能单元管理中的动力中心"]')).toBeTruthy();
+    expect(container.textContent).toContain('用能单元、能源关系、产出能源继承自“用能单元”中的动力中心配置');
     expect([...container.querySelectorAll('section[aria-label="用能单元数据"] th')].map((el) => el.textContent)).toEqual(['用能单元（动力中心）', '能源关系', '产出能源', '年份', '年度能源投入', '年度产出', '年度损失', '操作']);
     expect(container.querySelectorAll('[role="tab"]')).toHaveLength(0);
     expect(container.querySelectorAll('table')).toHaveLength(2);
@@ -352,6 +354,20 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     await click([...row.querySelectorAll('button')].find((el) => el.textContent === '编辑')!);
     expect(container.querySelector('[data-inline-editor], [role="dialog"]')?.textContent).not.toContain('外供');
     expect(container.querySelector('[data-inline-editor], [role="dialog"]')?.textContent).not.toContain('设置数据来源');
+  });
+
+  it('limits external supply sources to configured conversion outputs', async () => {
+    await render('/data-management/energy-data?tab=conversion');
+    await click(button('登记外供'));
+    const source = container.querySelector<HTMLSelectElement>('[aria-label="供能来源"]')!;
+    expect(source.querySelectorAll('optgroup')).toHaveLength(0);
+    expect(source.textContent).not.toContain('企业能源消费');
+    expect(source.textContent).not.toContain('用能单元转换与回收产出');
+    expect(source.textContent).not.toContain('动力中心 /');
+    expect(source.textContent).not.toContain('· 电力');
+    expect(source.textContent).toContain('锅炉系统');
+    expect(source.textContent).toContain('余热发电机组');
+    expect(source.textContent).toContain('余热回收利用系统');
   });
 
   it('opens missing-data entry for an inherited unit without a separate source manager', async () => {

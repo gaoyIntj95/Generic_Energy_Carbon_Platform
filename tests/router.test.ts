@@ -3,13 +3,13 @@ import { allNavItems, navigation, navItemMatches, type NavItem } from '../src/ap
 
 describe('navigation manifest', () => {
   it('contains every confirmed page as a unique route', () => {
-    expect(allNavItems).toHaveLength(26);
-    expect(new Set(allNavItems.map((item) => item.path)).size).toBe(26);
+    expect(allNavItems).toHaveLength(23);
+    expect(new Set(allNavItems.map((item) => item.path)).size).toBe(23);
     expect(navigation.map((group) => group.label)).toEqual([
       '能源监测与分析',
       '企业组织碳管理',
-      '产品与供应链碳管理',
       '能碳资产运营与策略',
+      '产品与供应链碳管理',
       '数据管理',
     ]);
     expect(allNavItems.map((item) => item.label)).toEqual(expect.arrayContaining([
@@ -20,7 +20,7 @@ describe('navigation manifest', () => {
       '能源数据',
       '重点设备',
       '设备产出数据',
-      '碳足迹核算清单',
+      '碳足迹项目',
     ]));
     expect(allNavItems.some((item) => item.label === '能碳数据采集')).toBe(false);
     expect(navigation.find((group) => group.key === 'data-management')?.items.map((item) => item.label)).toEqual([
@@ -41,24 +41,21 @@ describe('navigation manifest', () => {
     ]);
     const productSupplyCarbon = navigation.find((group) => group.key === 'product-supply-carbon')?.display;
     expect(productSupplyCarbon?.map((entry) => entry.label)).toEqual([
-      '供应链碳管理',
       '产品碳足迹',
+      '供应链碳管理',
     ]);
     const supplyChain = productSupplyCarbon?.find((entry) => entry.key === 'supply-chain-carbon');
     expect(supplyChain && 'items' in supplyChain ? supplyChain.items.map((item) => item.label) : []).toEqual([
       '供应商碳数据采集',
-      '碳数据披露',
+      '产品碳足迹披露',
     ]);
     expect(productSupplyCarbon?.filter((entry) => 'items' in entry).map((entry) => entry.key)).toEqual([
-      'supply-chain-carbon',
       'product-carbon-footprint',
+      'supply-chain-carbon',
     ]);
     const productFootprint = productSupplyCarbon?.find((entry) => entry.key === 'product-carbon-footprint');
     expect(productFootprint && 'items' in productFootprint ? productFootprint.items.map((item) => item.label) : []).toEqual([
-      '碳足迹项目管理',
-      '碳足迹核算清单',
-      '碳足迹核算结果',
-      '碳足迹报告管理',
+      '碳足迹项目',
       '碳足迹因子库',
     ]);
   });

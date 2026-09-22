@@ -8,6 +8,8 @@ import { buildDeviceIntensityRows, buildIntensityCalculationView } from '../src/
 import { getBenchmarkTarget } from '../src/mocks/benchmarkTargetStore';
 import { buildFlowAnalysisDataset, selectFlowRelations } from '../src/mocks/energyFlowSelector';
 import { getProduct, saveProduct } from '../src/mocks/productMasterStore';
+import { buildEnergyQueryDataset } from '../src/mocks/energyQuerySelector';
+import { ENERGY_ANALYSIS_CURRENT_YEAR, ENERGY_ANALYSIS_REPORTED_MONTH } from '../src/mocks/energyAnalysisPeriod';
 import { EnergyAnalysisV4 } from '../src/pages/newPrototype/EnergyAnalysisV4';
 
 let container: HTMLDivElement;
@@ -68,26 +70,28 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
 
   it('applies and resets the consumption scope and exposes valuable monthly drilldown', async () => {
     await render('/energy-analysis/consumption-query');
-    expect(container.textContent).toContain('8,330');
+    const latestMonth = buildEnergyQueryDataset({ year: ENERGY_ANALYSIS_CURRENT_YEAR, period: 'month', month: ENERGY_ANALYSIS_REPORTED_MONTH });
+    expect(container.textContent).toContain(Math.round(latestMonth.total).toLocaleString('zh-CN'));
     expect(container.textContent).not.toContain('余热回收');
-    expect(container.textContent).toContain('能源消费趋势（2026年1—6月）');
+    expect(container.textContent).toContain(`能源消费趋势（${ENERGY_ANALYSIS_CURRENT_YEAR}年1—${ENERGY_ANALYSIS_REPORTED_MONTH}月）`);
 
     await setSelect(container.querySelector('select[aria-label="用能单元"]')!, 'prodA');
     await click(button('查询'));
     expect(container.textContent).toContain('综合能耗｜生产车间A');
-    expect(container.textContent).toContain('7,513');
+    const prodAMonth = buildEnergyQueryDataset({ year: ENERGY_ANALYSIS_CURRENT_YEAR, period: 'month', month: ENERGY_ANALYSIS_REPORTED_MONTH, energyUnitId: 'eu-clinker-line-1' });
+    expect(container.textContent).toContain(Math.round(prodAMonth.total).toLocaleString('zh-CN'));
     expect([...container.querySelectorAll('button')].filter((item) => item.textContent?.includes('导出明细台账'))).toHaveLength(1);
 
     const electricityRow = [...container.querySelectorAll('table tbody tr')]
-      .find((row) => row.textContent?.includes('电力8,400,000'))!;
+      .find((row) => row.textContent?.includes('电力'))!;
     await click(electricityRow.querySelector('button')!);
     const dialog = container.querySelector('[role="dialog"]')!;
     expect(dialog.textContent).toContain('月度能源消费明细｜电力');
     expect(dialog.textContent).toContain('日度消费趋势');
     expect(dialog.textContent).toContain('峰值日');
     expect(dialog.querySelectorAll('table[aria-label="月度日明细"] tbody tr')).toHaveLength(30);
-    expect(dialog.textContent).toContain('8,400,000');
-    expect(dialog.textContent).toContain('1,032');
+    expect(dialog.textContent).toContain('10,260,000');
+    expect(dialog.textContent).toContain('1,261');
     await click(button('关闭'));
 
     await click(button('重置'));
@@ -98,16 +102,19 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     await render('/energy-analysis/consumption-query');
     await click(button('年度'));
     await click(button('查询'));
-    await click(button('查看明细'));
+    const annualElectricityRow = [...container.querySelectorAll('table tbody tr')]
+      .find((row) => row.textContent?.includes('电力'))!;
+    await click(annualElectricityRow.querySelector('button')!);
 
     const dialog = container.querySelector('[role="dialog"]')!;
-    expect(dialog.textContent).toContain('年度能源消费明细｜外购电力');
+    expect(dialog.textContent).toContain('年度能源消费明细｜电力');
     expect(dialog.textContent).toContain('月度消费分解');
     expect(dialog.querySelectorAll('table[aria-label="年度月明细"] tbody tr')).toHaveLength(12);
     expect(dialog.textContent).toContain('1月');
     expect(dialog.textContent).toContain('12月');
-    expect(dialog.textContent).toContain('58,900,000');
-    expect(dialog.textContent).toContain('58,900');
+    const annualElectricity = buildEnergyQueryDataset({ year: ENERGY_ANALYSIS_CURRENT_YEAR, period: 'year', month: ENERGY_ANALYSIS_REPORTED_MONTH }).rows.find((row) => row.energyTypeName === '电力')!;
+    expect(dialog.textContent).toContain(annualElectricity.physicalAmount.toLocaleString('zh-CN'));
+    expect(dialog.textContent).toContain(Math.round(annualElectricity.standardCoalAmount).toLocaleString('zh-CN'));
     const annualTotal = dialog.querySelector('table[aria-label="年度月明细"] tfoot');
     expect(annualTotal?.textContent).toContain('合计');
     expect(annualTotal?.textContent).not.toMatch(/合计.*完整/);
@@ -217,7 +224,7 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
 
     await click(button('查看详情'));
     expect(container.textContent).toContain('指标计算详情');
-    expect(container.textContent).toContain('生产车间A综合能耗（tce）×1000 ÷ 关联产品产量');
+    expect(container.textContent).toContain('生产车间A综合能耗（tce）÷ 关联产品产量');
     expect(container.textContent).toContain('分子来源能源数据—生产车间A');
     expect(container.textContent).not.toContain('v11-er-31');
     expect(container.textContent).not.toContain('v11-operation-51');
@@ -510,11 +517,11 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(row).toMatchObject({
       metricCode: 'device-output-energy',
       metricName: '单位产出能耗',
-      metricUnit: 'kWh/kWh',
+      metricUnit: 'tce/kWh',
       resultStatus: '已计算',
-      formula: '设备耗电量 ÷ 发电量',
+      formula: '电力折标综合能耗 ÷ 发电量',
     });
-    expect(row?.value).toBeCloseTo(0.0377, 3);
+    expect(row?.value).toBeCloseTo(0.000004637, 9);
 
     const pendingDevice = buildDeviceIntensityRows(2026).find((item) => item.deviceName === '1#数控加工中心');
     expect(pendingDevice).toMatchObject({ metricName: '单位产出能耗', resultStatus: '待完善', resultReason: '缺少加工件产量' });
@@ -585,7 +592,7 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     const target = container.querySelector('input[aria-label="目标值"]') as HTMLInputElement;
     await setInput(target, '0.330');
     await click(button('保存配置'));
-    expect(container.querySelector('[aria-label="指标摘要"]')?.textContent).toContain('目标值0.330kgce/t');
+    expect(container.querySelector('[aria-label="指标摘要"]')?.textContent).toContain('目标值0.330tce/t');
   });
 
   it('reuses intensity actual values in benchmark rows', () => {

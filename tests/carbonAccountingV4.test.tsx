@@ -313,6 +313,8 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
     await setInput(textInputs[textInputs.length - 1], '检测报告 TEST-001');
     await click(button('保存企业数据'));
     expect(container.textContent).toContain('企业测试排放因子');
+    await click(button('其他'));
+    expect(container.textContent).toContain('企业测试排放因子');
   });
 
   it('shows factor details in a compact dialog without duplicated fields', async () => {
