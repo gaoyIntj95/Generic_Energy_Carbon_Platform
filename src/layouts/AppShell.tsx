@@ -34,6 +34,7 @@ export function AppShell() {
   const pageDescription = isEnergyDataPage
     ? energyDataMeta.description
     : active?.description;
+  const isProductFootprintWorkspace = /^\/product-footprint\/projects\/[^/]+\/(checklist|result|report)$/.test(location.pathname);
   const breadcrumbItems = [
     activeGroup?.label ?? '平台',
     ...(isEnergyDataPage ? ['能源数据'] : []),
@@ -45,11 +46,11 @@ export function AppShell() {
       <div className={styles.main}>
         <Topbar />
         <main className={styles.content}>
-          <div className={styles.pageIntro}>
-            <Breadcrumb items={breadcrumbItems} />
-            <span className={styles.pathSeparator} aria-hidden="true">/</span>
-            <PageHeader title={pageTitle} description={pageDescription} actions={pageHeaderActions} />
-          </div>
+          {!isProductFootprintWorkspace && <div className={styles.pageIntro}>
+              <Breadcrumb items={breadcrumbItems} />
+              <span className={styles.pathSeparator} aria-hidden="true">/</span>
+              <PageHeader title={pageTitle} description={pageDescription} actions={pageHeaderActions} />
+            </div>}
           <section className={styles.pageSurface} aria-label="页面内容">
             <Outlet />
           </section>

@@ -24,6 +24,12 @@ td b,td small { display:inline; } td small { margin-left:4px; }
 .productPreview p { margin:11px 0 0; color:#748094; line-height:1.65; font-size:13px; }
 .productPreview > strong { color:#009b68; font-size:30px; text-align:right; white-space:nowrap; }
 .productPreview > strong small { display:block; margin-top:5px; color:#748094; font-size:13px; font-weight:400; }
+.formGrid input[readonly] { background:#f5f7f8; color:#66757a; cursor:not-allowed; }
+.modal { width:min(920px,calc(100vw - 40px)); max-height:88vh; }
+.modalHead { padding:18px 22px; }
+.modalBody { padding:18px 22px; }
+.modalFoot { padding:12px 22px; }
+.formGrid { gap:14px 22px; }
 @media(max-width:700px){.modal{max-height:100vh;border-radius:0}.productPreview{flex-direction:column}.productPreview > strong{text-align:left}}
 .deleteButton { color:#d14b4b; }
 .deletePrompt { width:min(420px,92vw); }

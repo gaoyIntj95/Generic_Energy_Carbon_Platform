@@ -34,7 +34,7 @@ export function PlatformPage() {
   if (pathname.startsWith('/supply-chain-carbon/')) {
     return <SupplierCarbonManagement />;
   }
-  if (pathname.startsWith('/product-carbon-footprint/')) {
+  if (pathname.startsWith('/product-footprint/')) {
     return <ProductCarbonFootprint pathname={pathname} />;
   }
   return <DataCollectionPage />;

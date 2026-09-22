@@ -2385,6 +2385,10 @@
 .factorEvidenceStatus { color: #648078; font-size: 12px; }
 .factorLocked { color: #9aa7a2; font-size: 12px; }
 .factorUnifiedFormula { padding: 15px; color: #31454e; background: #f6faf9; border: 1px dashed #c7ded5; border-radius: 7px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; line-height: 1.8; }
+.factorValueResult { display: flex; align-items: baseline; gap: 12px; padding: 14px 16px; border: 1px solid #d9e9e3; border-radius: 7px; background: #f8fcfa; }
+.factorValueResult span { color: #82918d; font-size: 13px; }
+.factorValueResult strong { color: #079b70; font-size: 24px; line-height: 1.2; }
+.factorValueResult b { color: #4f625f; font-size: 14px; font-weight: 500; }
 .factorUnifiedSourceGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 18px; }
 .factorUnifiedSourceGrid label { display: grid; gap: 7px; color: #657a73; font-size: 13px; font-weight: 500; }
 .factorUnifiedSourceGrid input, .factorUnifiedSourceGrid select, .factorUnifiedSourceGrid textarea { width: 100%; min-width: 0; padding: 0 12px; color: #31454e; font-size: 14px; border: 1px solid #cfe0d9; border-radius: 8px; background: #fff; }

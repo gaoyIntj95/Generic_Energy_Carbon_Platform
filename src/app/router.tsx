@@ -15,7 +15,8 @@ export type NavGroup = {
 
 export function navItemMatches(item: NavItem, pathname: string, search: string) {
   const [itemPath, itemQuery] = item.path.split('?');
-  if (itemPath !== pathname) return false;
+  const isProductProjectWorkspace = itemPath === '/product-footprint/projects' && pathname.startsWith('/product-footprint/projects/');
+  if (itemPath !== pathname && !isProductProjectWorkspace) return false;
   const currentParams = new URLSearchParams(search);
   if (!itemQuery) return !currentParams.has('tab');
   const expectedParams = new URLSearchParams(itemQuery);
@@ -47,11 +48,8 @@ const carbonAccountingItems: NavItem[] = [
 ];
 
 const productCarbonFootprintItems: NavItem[] = [
-  { label: '碳足迹项目管理', pageTitle: '碳足迹项目管理', path: '/product-carbon-footprint/projects', description: '以产品项目为中心管理生命周期模型、活动数据、核算结果和报告。' },
-  { label: '碳足迹核算清单', pageTitle: '碳足迹核算清单', path: '/product-carbon-footprint/activity', description: '按生命周期过程维护活动数据、排放因子和单位产品排放结果。' },
-  { label: '碳足迹核算结果', pageTitle: '产品碳足迹核算结果', path: '/product-carbon-footprint/results', description: '按产品查看单位碳足迹、生命周期贡献和主要排放来源。' },
-  { label: '碳足迹报告管理', pageTitle: '碳足迹报告管理', path: '/product-carbon-footprint/reports', description: '生成、预览和下载产品碳足迹量化报告。' },
-  { label: '碳足迹因子库', path: '/product-carbon-footprint/factors', description: '维护产品碳足迹核算所用的排放因子与数据来源。' },
+  { label: '碳足迹项目', pageTitle: '碳足迹项目', path: '/product-footprint/projects', description: '以产品项目为中心管理生命周期模型、活动数据、核算结果和报告。' },
+  { label: '碳足迹因子库', path: '/product-footprint/factors', description: '维护产品碳足迹核算所用的排放因子与数据来源。' },
 ];
 
 const supplyChainCarbonItems: NavItem[] = [
@@ -76,6 +74,7 @@ export const navigation: NavGroup[] = [
       ...carbonAccountingItems,
     ],
   },
+  { key: 'asset-strategy', label: '能碳资产运营与策略', items: assetStrategyItems },
   {
     key: 'product-supply-carbon',
     label: '产品与供应链碳管理',
@@ -85,7 +84,6 @@ export const navigation: NavGroup[] = [
       { key: 'supply-chain-carbon', label: '供应链碳管理', items: supplyChainCarbonItems },
     ],
   },
-  { key: 'asset-strategy', label: '能碳资产运营与策略', items: assetStrategyItems },
   {
     key: 'data-management',
     label: '数据管理',
@@ -123,7 +121,9 @@ export const router = createAppRouter([
     children: [
       { index: true, element: <Navigate to={allNavItems[0].path} replace /> },
       ...allNavItems.map((item) => ({ path: item.path.slice(1), element: <PlatformPage /> })),
-      { path: 'product-carbon-footprint/projects/:projectId', element: <PlatformPage /> },
+      { path: 'product-footprint/projects/:projectId/checklist', element: <PlatformPage /> },
+      { path: 'product-footprint/projects/:projectId/result', element: <PlatformPage /> },
+      { path: 'product-footprint/projects/:projectId/report', element: <PlatformPage /> },
       { path: 'data-management/energy-consumption', element: <Navigate to="/data-management/energy-data" replace /> },
       { path: 'data-management/energy-costs', element: <Navigate to="/data-management/energy-data?tab=costs" replace /> },
       { path: 'data-management/energy-relations', element: <Navigate to="/data-management/energy-data?tab=conversion" replace /> },

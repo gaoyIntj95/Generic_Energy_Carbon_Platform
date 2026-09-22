@@ -53,6 +53,7 @@ export type CarbonFactor = {
   publishedYear?: number;
   effectiveFrom?: string;
   effectiveTo?: string;
+  catalogCategory?: string;
   enterpriseId?: string;
 };
 
@@ -91,7 +92,7 @@ const structuredFactorMetadata: Record<string, Pick<CarbonFactor, 'name' | 'fact
   'ef-power': { name: '外购电力—购入电力（企业参数）', factorObject: '外购电力', emissionSourceType: '购入电力', calculationBasis: 'electricity', activityUnit: 'MWh', ghgType: 'CO₂e', publishedYear: 2026, enterpriseId: 'org-xx-tech' },
   'pf-heat': { name: '外购热力—购入热力', factorObject: '外购热力', emissionSourceType: '购入热力', calculationBasis: 'heat', activityUnit: 'GJ', ghgType: 'CO₂', publishedYear: 2026, calculationScenario: 'purchasedHeat' },
   'pf-process': { name: '碳酸盐原料—生产过程（按质量）', factorObject: '碳酸盐原料', emissionSourceType: '生产过程', calculationBasis: 'process', activityUnit: 't', ghgType: 'CO₂', publishedYear: 2026 },
-  'pf-waste': { name: '工业废水—厌氧处理', factorObject: '工业废水', emissionSourceType: '废水厌氧处理', calculationBasis: 'other', activityUnit: 'm³/年', ghgType: 'CH₄', publishedYear: 2026, calculationScenario: 'wastewaterAnaerobic' },
+  'pf-waste': { name: '工业废水—厌氧处理', factorObject: '工业废水', emissionSourceType: '废水厌氧处理', calculationBasis: 'other', activityUnit: 'kg COD', ghgType: 'CH₄', publishedYear: 2026, calculationScenario: 'wastewaterAnaerobic' },
   'pf-r134a': { name: 'R134a—制冷剂逸散（按质量）', factorObject: 'R134a', emissionSourceType: '逸散', calculationBasis: 'mass', activityUnit: 'kg', ghgType: 'CO₂e', publishedYear: 2026 },
   'pf-transport': { name: '公路货运—交通运输（按周转量）', factorObject: '公路货运', emissionSourceType: '交通运输', calculationBasis: 'other', activityUnit: 't·km', ghgType: 'CO₂e', publishedYear: 2026, calculationScenario: 'extension' },
   'pf-ch4-recovery': { name: '甲烷回收与销毁', factorObject: '甲烷回收与销毁', emissionSourceType: '其他边界外排放', calculationBasis: 'other', activityUnit: 'Nm³', ghgType: 'CH₄', publishedYear: 2026, calculationScenario: 'methaneRecovery' },
