@@ -22,13 +22,6 @@ async function click(element: HTMLElement) {
   await act(async () => element.click());
 }
 
-async function setInput(element: HTMLInputElement, value: string) {
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(element, value);
-    element.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-}
-
 describe('产品碳足迹运输活动', () => {
   beforeEach(async () => {
     container = document.createElement('div');
@@ -42,50 +35,49 @@ describe('产品碳足迹运输活动', () => {
     container.remove();
   });
 
-  it('以质量和距离计算入厂运输周转量，并提供运输方式下拉选择', async () => {
+  it('入厂运输复用统一的标准活动数据弹窗', async () => {
     await click(button('入厂运输'));
     await click(button('新增入厂运输'));
 
     const dialog = container.querySelector('form')!;
-    expect(dialog.textContent).toContain('运输重量');
-    expect(dialog.textContent).toContain('运输周转量');
-    const transportLabel = [...dialog.querySelectorAll('label')].find((label) => label.textContent?.includes('运输参数'))!;
-    expect(transportLabel.parentElement?.getAttribute('style')).toContain('grid-column: 1 / -1');
-    const sourceLabel = [...dialog.querySelectorAll('label')].find((label) => label.textContent?.includes('数据来源'))!;
-    expect(sourceLabel.parentElement?.getAttribute('style')).toContain('grid-column: 1 / -1');
+    expect(dialog.textContent).toContain('活动数据');
+    expect(dialog.textContent).toContain('排放因子');
+    expect(dialog.textContent).toContain('证明材料');
+    expect(dialog.textContent).not.toContain('运输重量');
+    expect(dialog.textContent).not.toContain('运输方式');
     const selects = dialog.querySelectorAll('select');
-    expect([...selects[0].options].map((option) => option.textContent)).toEqual(['t', 'kg']);
-    expect([...selects[1].options].map((option) => option.textContent)).toEqual(expect.arrayContaining([
-      '公路货运（柴油货车）', '铁路货运', '沿海及远洋海运', '航空货运',
-    ]));
-
-    const inputs = dialog.querySelectorAll('input');
-    await setInput(inputs[1], '0.35');
-    await setInput(inputs[2], '120');
-    expect(dialog.textContent).toContain('42.0000 t·km');
+    expect([...selects[0].options].map((option) => option.textContent)).toEqual(['t·km', 'kg·km']);
   });
 
-  it('将工艺过程排放录入为生产过程排放，并支持两种排放量获取方式', async () => {
+  it('工艺过程排放统一使用活动数据和因子法', async () => {
     await click(button('工艺过程排放'));
     await click(button('新增工艺过程排放'));
     const dialog = container.querySelector('form')!;
-    expect(dialog.textContent).toContain('新增生产过程排放');
-    expect(dialog.textContent).toContain('排放活动');
-    expect(dialog.textContent).toContain('温室气体');
-    expect(dialog.textContent).toContain('每个排放活动对应固定的排放量获取方式');
-    expect(dialog.textContent).toContain('请选择排放活动');
-    expect(dialog.textContent).toContain('选择排放活动后，系统自动加载对应的数据录入项。');
-    expect(dialog.textContent).not.toContain('计算排放量');
-    const activitySelect = dialog.querySelector('select') as HTMLSelectElement;
-    await act(async () => { activitySelect.value = '碳酸盐分解'; activitySelect.dispatchEvent(new Event('change', { bubbles: true })); });
-    expect(dialog.textContent).toContain('碳酸盐原料消耗量');
-    expect(dialog.textContent).toContain('请选择碳酸盐分解排放因子');
+    expect(dialog.textContent).toContain('新增工艺过程排放');
+    expect(dialog.textContent).toContain('活动数据');
+    expect(dialog.textContent).toContain('排放因子');
+    expect(dialog.textContent).toContain('证明材料');
+    expect([...dialog.querySelectorAll('label')].some((label) => label.textContent?.includes('核算方式'))).toBe(false);
+    expect(dialog.textContent).toContain('选择排放因子');
+    expect(dialog.textContent).not.toContain('排放量获取方式');
+    expect(dialog.textContent).not.toContain('参数计算');
+    expect(dialog.textContent).not.toContain('实测排放量');
+    await click(button('选择排放因子'));
+    expect([...container.querySelectorAll('button')].some((item) => item.textContent?.trim() === '选择')).toBe(false);
+  });
+
+  it('项目列表移除更新时间列', async () => {
+    await act(async () => root.render(<MemoryRouter><ProductCarbonFootprint pathname="/product-footprint/projects" /><LocationProbe /></MemoryRouter>));
+    expect(container.querySelector('table')?.textContent).not.toContain('更新时间');
   });
 
   it('将确认后的核算清单快照传递至核算结果和报告', async () => {
-    await click(button('补充因子'));
+    const editButtons = [...container.querySelectorAll('button')].filter((item) => item.textContent?.trim() === '编辑');
+    await click(editButtons[editButtons.length - 1]);
+    await click(button('选择排放因子'));
     await click(container.querySelector('input[type="radio"]')!);
     await click(button('确认选择'));
+    await click(button('保存'));
     await click(button('确认核算清单'));
 
     await act(async () => root.render(<MemoryRouter><ProductCarbonFootprint pathname="/product-footprint/projects/1/result" /></MemoryRouter>));

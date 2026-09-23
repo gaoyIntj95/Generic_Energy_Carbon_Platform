@@ -345,6 +345,13 @@ export const saveTenantCustomCarbonFactorV4 = (factor: TenantCustomCarbonFactor)
   return { ...factor, attachments: factor.attachments.map((attachment) => ({ ...attachment })) };
 };
 
+export const deleteTenantCustomCarbonFactorV4 = (factorId: string) => {
+  const index = tenantCustomCarbonFactorsV4.findIndex((factor) => factor.id === factorId);
+  if (index < 0) return false;
+  tenantCustomCarbonFactorsV4.splice(index, 1);
+  return true;
+};
+
 export const listTenantCustomCarbonFactorsV4 = () => tenantCustomCarbonFactorsV4.map((factor) => ({ ...factor, attachments: factor.attachments.map((attachment) => ({ ...attachment })) }));
 
 export const getCarbonFactorV4 = (factorId: string) =>

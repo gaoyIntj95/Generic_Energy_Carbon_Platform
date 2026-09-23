@@ -73,3 +73,16 @@
 .page .modal .selectionRules{margin:0;padding:14px 18px 14px 34px;border:1px solid #e0eee7;border-radius:8px;background:#f7fbf9;color:#50635f;font-size:12px;line-height:1.8}
 .page .modal>footer{display:flex;align-items:center;justify-content:flex-end;flex:0 0 auto;gap:10px;min-height:72px;padding:16px 28px;border-top:1px solid #edf2f0;background:#fbfdfc}
 @media(max-width:760px){.overlay{padding:12px}.page .modal{width:calc(100vw - 24px);max-height:calc(100vh - 24px)}.page .modal>header,.page .modal>div,.page .modal>footer{padding-right:18px;padding-left:18px}.page .modal .formGrid{grid-template-columns:1fr}.page .modal .formGrid .fullField,.page .modal .uploadField{grid-column:auto}}
+
+/* 核算清单 v6：统一弹窗的留白、字段密度和因子列表层级 */
+.page .modal>div{padding:26px 30px 30px;background:#fff}
+.page .modal section{margin:0 0 26px}
+.page .modal section:last-child{margin-bottom:0}
+.page .modal h3{margin-bottom:15px;font-size:17px;letter-spacing:.01em}
+.page .modal .formGrid{align-items:start;gap:18px 26px}
+.page .modal .factorCard{min-height:70px;padding:15px 17px;background:linear-gradient(135deg,#fbfdfc,#f6fbf8)}
+.page .modal .factorCard>div{min-width:0}
+.page .modal .factorCard .minor{max-width:620px}
+.page .modal>footer{padding:15px 30px;background:#fbfdfc}
+.page .modal>footer button{font-weight:600}
+@media(max-width:760px){.page .modal>div,.page .modal>footer{padding-right:18px;padding-left:18px}.page .modal .factorCard{align-items:flex-start;flex-direction:column}}

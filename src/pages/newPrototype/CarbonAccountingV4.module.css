@@ -1223,6 +1223,30 @@
   line-height: 1.35;
 }
 
+.factorInlineButton {
+  display: inline-flex;
+  max-width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.factorInlineButton:hover b,
+.factorInlineButton:focus-visible b { color: var(--brand); text-decoration: underline; }
+.factorInlineButton small { margin-bottom: 3px; color: #71827d; font-size: 10px; font-weight: 500; }
+
+.calculationBasisHeading {
+  margin: 14px 0 8px;
+  color: #52656b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .validationMessage { display: block; margin-top: 4px; color: #d1842d; font-size: 11px; }
 
 .actionList { display: grid; gap: 12px; }
@@ -4793,8 +4817,17 @@
 .tenantFactorUploadButton { z-index: 1; padding: 7px 12px; border: 1px solid #dbe6e3; border-radius: 6px; background: #fff; color: #07875c; font-size: 13px; }
 .tenantFactorFileList { display: grid; gap: 7px; margin-top: 10px; }
 .tenantFactorFile { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid #e5ece9; border-radius: 6px; color: #526b6d; font-size: 13px; }
-.tenantFactorFile span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tenantFactorFile button { flex: 0 0 auto; border: 0; background: transparent; color: #d65757; cursor: pointer; }
+.tenantFactorFile > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tenantFactorFileActions { display: flex; flex: 0 0 110px; align-items: center; justify-content: flex-end; gap: 18px; }
+.tenantFactorFileActions small { min-width: 42px; color: #526b6d; text-align: center; }
+.tenantFactorFileActions button { min-width: 36px; padding: 0; border: 0; background: transparent; color: #d65757; cursor: pointer; }
+.tenantFactorPreviewList { display: grid; gap: 8px; }
+.tenantFactorPreviewRow { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 12px; border: 1px solid #e5ece9; border-radius: 6px; }
+.tenantFactorPreviewRow div { min-width: 0; display: grid; gap: 4px; }
+.tenantFactorPreviewRow b { overflow: hidden; color: #172b4d; text-overflow: ellipsis; white-space: nowrap; }
+.tenantFactorPreviewRow small { color: #7b8a8a; }
+.tenantFactorPreviewRow button { flex: 0 0 auto; padding: 0; border: 0; background: transparent; color: #07875c; cursor: pointer; }
+.tenantFactorAttachmentPreview { padding: 28px 20px; border: 1px dashed #cbded8; border-radius: 8px; background: #f7fbfa; color: #71817f; text-align: center; line-height: 1.6; }
 .tenantFactorUploadHelper { margin: 8px 0 0; line-height: 1.5; }
 .tenantFactorError { margin-top: 10px; padding: 9px 12px; border: 1px solid #f0bcbc; border-radius: 6px; background: #fff5f5; color: #c84c4c; font-size: 13px; }
 
