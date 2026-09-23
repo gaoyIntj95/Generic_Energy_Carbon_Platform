@@ -1,0 +1,8 @@
+.dropzone{display:flex;align-items:center;flex-direction:column;justify-content:center;min-height:194px;padding:24px;border:1px dashed #b8d6ca;border-radius:18px;background:#fbfdfc;color:#6a8078;text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
+.dropzone:hover,.dropzone:focus-within{border-color:#2e78e8;background:#f8fbff}
+.input{position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none}
+.icon{margin-bottom:10px;color:#2e78e8;font-size:38px;font-weight:700;line-height:1}
+.dropzone strong{font-size:18px;font-weight:500}
+.dropzone small{margin-top:9px;color:#9aada7;font-size:14px}
+.choose{margin-top:14px;padding:9px 18px;border:1px solid #1f354a;border-radius:10px;background:#fff;color:#253746;font-size:14px}
+.dropzone em{margin-left:4px;color:#e0524d;font-style:normal}

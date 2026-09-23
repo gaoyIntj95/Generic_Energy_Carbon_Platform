@@ -49,7 +49,7 @@ const carbonAccountingItems: NavItem[] = [
 
 const productCarbonFootprintItems: NavItem[] = [
   { label: '碳足迹项目', pageTitle: '碳足迹项目', path: '/product-footprint/projects', description: '以产品项目为中心管理生命周期模型、活动数据、核算结果和报告。' },
-  { label: '碳足迹因子库', path: '/product-footprint/factors', description: '维护产品碳足迹核算所用的排放因子与数据来源。' },
+  { label: '碳足迹因子库', path: '/product-footprint/factors', description: '维护公共与企业专属碳足迹因子，支持企业凭证附件留存。' },
 ];
 
 const supplyChainCarbonItems: NavItem[] = [

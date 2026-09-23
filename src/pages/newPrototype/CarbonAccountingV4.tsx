@@ -1,5 +1,6 @@
 /* eslint-disable no-irregular-whitespace */
 import { Fragment, useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { FileDropzone } from '../../components/FileDropzone';
 import {
   carbonFactorsV4,
   carbonFactorLibraryCategoryTree,
@@ -18,7 +19,6 @@ import {
   type CarbonFactorParameter,
   type TenantCustomCarbonFactor,
   type TenantCustomFactorAttachment,
-  type TenantCustomFactorGreenhouseGas,
   type TenantCustomFactorSourceType,
 } from '../../mocks/carbonAccountingV4Mock';
 import {
@@ -43,6 +43,7 @@ import type { CarbonAccountingTask, EmissionSource } from '../../types/platformD
 import { listV11EnergyRecords, listV11EnergyTypes, listV11KeyDevices, v11EnergyRecordAnnualAmount, v11RecordScopeType, type V11EnergyRecord } from '../../mocks/dataManagementV11Store';
 import { listEnergyUnits } from '../../mocks/energyUnitMockStore';
 import { downloadHtmlReport } from '../../utils/reportDownload';
+import { EVIDENCE_FILE_ACCEPT, filterEvidenceFiles } from '../../utils/evidenceFile';
 import styles from './CarbonAccountingV4.module.css';
 
 type TaskState = 'draft' | 'confirmed' | 'pending';
@@ -1344,7 +1345,7 @@ const formatAttachmentSize = (size: number) => size < 1024 * 1024 ? `${Math.max(
 function TenantFactorAttachmentPreviewDialog({ attachment, close }: { attachment: TenantCustomFactorAttachment; close: () => void }) {
   return <Dialog title={`预览附件：${attachment.fileName}`} className={styles.factorLibraryDialog} onClose={close} footer={<Button onClick={close}>关闭</Button>}>
     <section className={styles.factorLibrarySection}><h3>附件信息</h3><div className={styles.factorLibraryKvGrid}><div><span>文件名称</span><b>{attachment.fileName}</b></div><div><span>文件类型</span><b>{attachment.fileType || '未知类型'}</b></div><div><span>文件大小</span><b>{formatAttachmentSize(attachment.size)}</b></div></div></section>
-    <div className={styles.tenantFactorAttachmentPreview}>当前为原型预览。正式接入文件服务后，此处展示 PDF、图片或 Office 文件内容。</div>
+    <div className={styles.tenantFactorAttachmentPreview}>当前为原型预览。正式接入文件服务后，此处展示 PDF 或图片内容。</div>
   </Dialog>;
 }
 
@@ -1419,8 +1420,6 @@ const tenantFactorSourceOptions: Array<{ value: TenantCustomFactorSourceType; la
 function FactorLibraryAddModal({ initialFactor, onClose, onSubmit }: { initialFactor?: TenantCustomCarbonFactor; onClose: () => void; onSubmit: (factor: TenantCustomCarbonFactor) => void }) {
   const currentYear = new Date().getFullYear();
   const [factorName, setFactorName] = useState(initialFactor?.factorName ?? '');
-  const [greenhouseGas, setGreenhouseGas] = useState<TenantCustomFactorGreenhouseGas | ''>(initialFactor?.greenhouseGas ?? '');
-  const [otherGreenhouseGas, setOtherGreenhouseGas] = useState(initialFactor?.greenhouseGasLabel ?? '');
   const [factorValue, setFactorValue] = useState(initialFactor ? String(initialFactor.factorValue) : '');
   const [unit, setUnit] = useState(initialFactor?.unit ?? '');
   const [sourceType, setSourceType] = useState<TenantCustomFactorSourceType>(initialFactor?.sourceType ?? 'ENTERPRISE');
@@ -1435,21 +1434,11 @@ function FactorLibraryAddModal({ initialFactor, onClose, onSubmit }: { initialFa
     EXTERNAL_PUBLIC: { placeholder: '例如：《XX标准》第5.2条 / XX数据库记录 / 研究报告表3', title: '上传参考文件（可选）', helper: '公开标准、指南、报告或数据库可直接在“来源依据”中填写完整出处，附件可选。' },
     OTHER: { placeholder: '例如：集团内部规则《XX规则》第3条', title: '上传证据材料', helper: '其他来源建议上传能够证明因子取值依据的文件。' },
   };
-  const gasOptions: Array<{ value: TenantCustomFactorGreenhouseGas | ''; label: string }> = [
-    { value: '', label: '请选择（可选）' }, { value: 'CO2', label: 'CO₂' }, { value: 'CH4', label: 'CH₄' }, { value: 'N2O', label: 'N₂O' },
-    { value: 'HFCS', label: 'HFCs' }, { value: 'PFCS', label: 'PFCs' }, { value: 'SF6', label: 'SF₆' }, { value: 'NF3', label: 'NF₃' }, { value: 'OTHER', label: '其他' },
-  ];
-  const addFiles = (event: FormEvent<HTMLInputElement>) => {
-    const selectedFiles = event.currentTarget.files;
-    if (selectedFiles?.length) setFiles((current) => [...current, ...Array.from(selectedFiles)]);
-    event.currentTarget.value = '';
-  };
   const submit = () => {
     const numericValue = Number(factorValue);
     if (!factorName.trim()) return setError('请填写因子名称。');
     if (!factorValue.trim() || !Number.isFinite(numericValue)) return setError('请填写有效的因子值。');
     if (!unit.trim()) return setError('请填写单位。');
-    if (greenhouseGas === 'OTHER' && !otherGreenhouseGas.trim()) return setError('请填写其他温室气体。');
     if (!effectiveYear) return setError('请选择适用年度。');
     if (!sourceEvidence.trim()) return setError('请填写来源依据。');
     if (sourceType !== 'EXTERNAL_PUBLIC' && existingAttachments.length + files.length === 0) return setError('当前数据来源请至少上传一份证据材料。');
@@ -1463,8 +1452,8 @@ function FactorLibraryAddModal({ initialFactor, onClose, onSubmit }: { initialFa
       id: initialFactor?.id ?? 'tenant-factor-' + Date.now(),
       libraryCategory: 'TENANT_CUSTOM_FACTOR',
       factorName: factorName.trim(),
-      greenhouseGas: greenhouseGas || 'OTHER',
-      greenhouseGasLabel: greenhouseGas === 'OTHER' ? otherGreenhouseGas.trim() : undefined,
+      greenhouseGas: 'CO2',
+      greenhouseGasLabel: undefined,
       factorValue: numericValue,
       unit: unit.trim(),
       sourceType,
@@ -1482,8 +1471,6 @@ function FactorLibraryAddModal({ initialFactor, onClose, onSubmit }: { initialFa
     <div className={styles.tenantFactorNotice}>公共基础因子保持只读；企业新增的特殊因子需保留来源和证据材料，便于后续核查追溯。</div>
     <section className={styles.factorLibrarySection}><h3>1. 基础信息</h3><div className={styles.factorLibraryFormGrid}>
       <label className={styles.factorLibraryField + ' ' + styles.factorLibraryFieldFull}><span>因子名称 <i>*</i></span><input value={factorName} onChange={(event) => setFactorName(event.target.value)} placeholder="例如：某特殊原料生产排放因子" /></label>
-      <label className={styles.factorLibraryField}><span>温室气体</span><select value={greenhouseGas} onChange={(event) => setGreenhouseGas(event.target.value as TenantCustomFactorGreenhouseGas | '')}>{gasOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-      {greenhouseGas === 'OTHER' && <label className={styles.factorLibraryField}><span>其他温室气体</span><input value={otherGreenhouseGas} onChange={(event) => setOtherGreenhouseGas(event.target.value)} placeholder="请输入温室气体名称" /></label>}
       <label className={styles.factorLibraryField}><span>因子值 <i>*</i></span><input type="number" step="any" value={factorValue} onChange={(event) => setFactorValue(event.target.value)} placeholder="请输入" /></label>
       <label className={styles.factorLibraryField}><span>单位 <i>*</i></span><input value={unit} onChange={(event) => setUnit(event.target.value)} placeholder="例如：tCO₂/t、kgCO₂e/kg" /></label>
     </div></section>
@@ -1493,7 +1480,7 @@ function FactorLibraryAddModal({ initialFactor, onClose, onSubmit }: { initialFa
       <label className={styles.factorLibraryField + ' ' + styles.factorLibraryFieldFull}><span>来源依据 <i>*</i></span><input value={sourceEvidence} onChange={(event) => setSourceEvidence(event.target.value)} placeholder={sourceConfig[sourceType].placeholder} /></label>
     </div></section>
     <section className={styles.factorLibrarySection}><h3>3. 证据材料</h3>
-      <label className={styles.tenantFactorUpload}><input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.txt,.csv" onChange={addFiles} /><span className={styles.tenantFactorUploadIcon}>↑</span><span className={styles.tenantFactorUploadText}><b>{sourceConfig[sourceType].title}</b><small>支持 PDF、Word、Excel、图片等常见格式</small></span><span className={styles.tenantFactorUploadButton}>选择文件</span></label>
+      <FileDropzone title={sourceConfig[sourceType].title} hint="仅支持 PDF 或图片，可一次上传多个文件" accept={EVIDENCE_FILE_ACCEPT} multiple onFiles={(selectedFiles) => { const validFiles = filterEvidenceFiles(selectedFiles); if (validFiles.length) setFiles((current) => [...current, ...validFiles]); }} />
       <div className={styles.tenantFactorFileList}>{existingAttachments.map((file) => <div className={styles.tenantFactorFile} key={file.attachmentId}><span>{file.fileName}</span><div className={styles.tenantFactorFileActions}><small>已上传</small><button type="button" onClick={() => setExistingAttachments((current) => current.filter((item) => item.attachmentId !== file.attachmentId))}>删除</button></div></div>)}{files.map((file, index) => <div className={styles.tenantFactorFile} key={file.name + '-' + index}><span>{file.name}</span><div className={styles.tenantFactorFileActions}><small>待上传</small><button type="button" onClick={() => setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}>删除</button></div></div>)}</div>
       <p className={styles.tenantFactorUploadHelper}>{sourceConfig[sourceType].helper}</p>
     </section>
@@ -2499,8 +2486,9 @@ function ParameterEvidenceDialog({ parameter, mode, close, save, change }: { par
   const [dragging, setDragging] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ kind: 'file'; file: CarbonFactorEvidenceFile } | { kind: 'all' }>();
   const addFiles = (selectedFiles: File[]) => {
-    if (!selectedFiles.length) return;
-    setFiles((items) => [...items, ...selectedFiles.map((file, index) => ({ evidenceFileId: `factor-${Date.now()}-${index}`, fileName: file.name, fileType: factorEvidenceFileType(file.name) }))]);
+    const acceptedFiles = filterEvidenceFiles(selectedFiles);
+    if (!acceptedFiles.length) return;
+    setFiles((items) => [...items, ...acceptedFiles.map((file, index) => ({ evidenceFileId: `factor-${Date.now()}-${index}`, fileName: file.name, fileType: factorEvidenceFileType(file.name) }))]);
   };
   const downloadFile = (file: CarbonFactorEvidenceFile) => { const url = URL.createObjectURL(new Blob([`证明材料：${file.fileName}`], { type: 'text/plain;charset=utf-8' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = file.fileName; anchor.click(); URL.revokeObjectURL(url); };
   const requestDelete = (pending: { kind: 'file'; file: CarbonFactorEvidenceFile } | { kind: 'all' }) => setPendingDelete(pending);
@@ -2513,7 +2501,7 @@ function ParameterEvidenceDialog({ parameter, mode, close, save, change }: { par
   };
   const fileCountLabel = files.length ? `${files.length} 份材料` : '暂无已上传材料';
   return <div className={styles.factorEvidenceMask} role="dialog" aria-modal="true" aria-label={`${parameter.name} · 证明材料`}>
-    <section className={styles.factorEvidenceDialog}><header><h3>{parameter.name} · 证明材料</h3><button type="button" onClick={close}>×</button></header><div className={styles.factorEvidenceBody}><p>{mode === 'view' ? '查看该参数已关联的检测报告、供应商证明、监测台账或适用方法学证明材料。' : '上传该参数对应的检测报告、供应商证明、监测台账或适用方法学证明材料。'}</p><div className={styles.factorEvidenceUpload}><div className={styles.factorEvidenceListHeading}><span>证明材料（{fileCountLabel}）</span>{files.length > 0 && <button type="button" className={styles.factorEvidenceDeleteAll} onClick={() => requestDelete({ kind: 'all' })}>删除全部材料</button>}</div>{mode === 'edit' && <div className={`${styles.factorEvidenceDropzone} ${dragging ? styles.factorEvidenceDropzoneActive : ''}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); addFiles(Array.from(event.dataTransfer.files)); }}><strong>↑</strong><span>点击或拖拽文件到此处上传</span><small>支持一次上传多个证明材料文件</small><label><input type="file" multiple onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />选择文件</label></div>}{files.length ? <div className={styles.factorEvidenceFileList}>{files.map((file) => <div className={styles.factorEvidenceFile} key={file.evidenceFileId}><span>{file.fileType ?? factorEvidenceFileType(file.fileName)}</span><b title={file.fileName}>{file.fileName}</b><button type="button" className={styles.factorEvidenceDownload} onClick={() => downloadFile(file)}>下载材料</button><button type="button" onClick={() => requestDelete({ kind: 'file', file })}>删除</button></div>)}</div> : <div className={styles.factorEvidenceEmpty}>暂无已上传材料</div>}</div></div><footer><Button onClick={close}>{mode === 'view' ? '关闭' : '取消'}</Button>{mode === 'edit' && <Button primary onClick={() => save(files)}>保存材料</Button>}</footer></section>
+    <section className={styles.factorEvidenceDialog}><header><h3>{parameter.name} · 证明材料</h3><button type="button" onClick={close}>×</button></header><div className={styles.factorEvidenceBody}><p>{mode === 'view' ? '查看该参数已关联的检测报告、供应商证明、监测台账或适用方法学证明材料。' : '上传该参数对应的检测报告、供应商证明、监测台账或适用方法学证明材料。'}</p><div className={styles.factorEvidenceUpload}><div className={styles.factorEvidenceListHeading}><span>证明材料（{fileCountLabel}）</span>{files.length > 0 && <button type="button" className={styles.factorEvidenceDeleteAll} onClick={() => requestDelete({ kind: 'all' })}>删除全部材料</button>}</div>{mode === 'edit' && <div className={`${styles.factorEvidenceDropzone} ${dragging ? styles.factorEvidenceDropzoneActive : ''}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); addFiles(Array.from(event.dataTransfer.files)); }}><strong>↑</strong><span>点击或拖拽文件到此处上传</span><small>仅支持 PDF 或图片，可一次上传多个文件</small><label><input type="file" multiple accept={EVIDENCE_FILE_ACCEPT} onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />选择文件</label></div>}{files.length ? <div className={styles.factorEvidenceFileList}>{files.map((file) => <div className={styles.factorEvidenceFile} key={file.evidenceFileId}><span>{file.fileType ?? factorEvidenceFileType(file.fileName)}</span><b title={file.fileName}>{file.fileName}</b><button type="button" className={styles.factorEvidenceDownload} onClick={() => downloadFile(file)}>下载材料</button><button type="button" onClick={() => requestDelete({ kind: 'file', file })}>删除</button></div>)}</div> : <div className={styles.factorEvidenceEmpty}>暂无已上传材料</div>}</div></div><footer><Button onClick={close}>{mode === 'view' ? '关闭' : '取消'}</Button>{mode === 'edit' && <Button primary onClick={() => save(files)}>保存材料</Button>}</footer></section>
     {pendingDelete && <Dialog title="删除证明材料" onClose={() => setPendingDelete(undefined)} footer={<><Button onClick={() => setPendingDelete(undefined)}>取消</Button><Button danger onClick={confirmDelete}>确认删除</Button></>}><div className={styles.confirmBox}>{pendingDelete.kind === 'all' ? `确认删除“${parameter.name}”的全部证明材料吗？删除后该参数将不再保留任何已上传材料。` : `确认删除文件“${pendingDelete.file.fileName}”吗？删除后该文件将从该参数的证明材料中移除。`}</div></Dialog>}
   </div>;
 }
@@ -2606,7 +2594,7 @@ function SupportViewDialog({ item, close, openDialog }: { item: SupportItem; clo
     <div className={styles.viewMaterialLabel}>文件列表</div>
     {files.length ? <div className={styles.materialFileTable}><div className={styles.materialFileHeader}><b>文件名称</b><b>文件类型</b><b>操作</b></div>{files.map((file) => <div className={styles.materialFileRow} key={file.evidenceFileId}><span>{file.fileName}</span><span>{materialType(file.fileName)}</span><div className={styles.materialFileActions}><button type="button" className={styles.downloadButton} onClick={() => setPreviewFile(file)}>预览</button><button type="button" className={styles.fileDeleteButton} onClick={() => openDialog({ kind: 'deleteSupportFile', item, file })}>删除</button></div></div>)}</div> : <div className={styles.emptyMaterialPanel}>暂无证明材料</div>}
     </Dialog>
-    {previewFile && <Dialog title={`预览材料：${previewFile.fileName}`} onClose={() => setPreviewFile(undefined)} footer={<Button onClick={() => setPreviewFile(undefined)}>关闭</Button>}><div className={styles.confirmBox}>当前为原型预览。正式接入文件服务后，此处展示 PDF、图片或 Office 文件内容。</div><div className={styles.viewMaterialMeta}><div><span>文件名称</span><b>{previewFile.fileName}</b></div><div><span>文件类型</span><b>{materialType(previewFile.fileName)}</b></div></div></Dialog>}
+    {previewFile && <Dialog title={`预览材料：${previewFile.fileName}`} onClose={() => setPreviewFile(undefined)} footer={<Button onClick={() => setPreviewFile(undefined)}>关闭</Button>}><div className={styles.confirmBox}>当前为原型预览。正式接入文件服务后，此处展示 PDF 或图片内容。</div><div className={styles.viewMaterialMeta}><div><span>文件名称</span><b>{previewFile.fileName}</b></div><div><span>文件类型</span><b>{materialType(previewFile.fileName)}</b></div></div></Dialog>}
   </>;
 }
 
@@ -2621,8 +2609,9 @@ function SupportUploadDrawer({ state, close, save }: { state: Extract<DrawerStat
   const [dragging, setDragging] = useState(false);
   const inputId = `support-upload-dialog-${item.id ?? item.item}`;
   const addFiles = (selectedFiles: File[]) => {
-    if (!selectedFiles.length) return;
-    setFiles((items) => [...items, ...selectedFiles.map((file, index) => ({ evidenceFileId: `upload-${Date.now()}-${index}`, fileName: file.name, activityDataSource: item.activityDataSources }))]);
+    const acceptedFiles = filterEvidenceFiles(selectedFiles);
+    if (!acceptedFiles.length) return;
+    setFiles((items) => [...items, ...acceptedFiles.map((file, index) => ({ evidenceFileId: `upload-${Date.now()}-${index}`, fileName: file.name, activityDataSource: item.activityDataSources }))]);
   };
   const submit = () => {
     if (!files.length) return;
@@ -2636,9 +2625,9 @@ function SupportUploadDrawer({ state, close, save }: { state: Extract<DrawerStat
       <div className={styles.uploadFormRow}><span>材料类别</span><b>{item.emission ? '排放源证明材料' : '核算基础材料'}</b></div>
       <div className={styles.uploadFormRow}><span>材料说明</span><b>{item.item}</b></div>
       <div className={styles.uploadFormLabel}>上传文件</div>
-      <input id={inputId} className={styles.hiddenFileInput} type="file" multiple onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
+      <input id={inputId} className={styles.hiddenFileInput} type="file" multiple accept={EVIDENCE_FILE_ACCEPT} onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
       <div className={`${styles.uploadDropzone} ${styles.uploadDropzoneLarge} ${dragging ? styles.uploadDropzoneActive : ''}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); addFiles(Array.from(event.dataTransfer.files)); }}>
-        <strong>↑</strong><span>点击或拖拽文件到此处上传</span><small>支持一次上传多个文件</small><label className={styles.uploadButton} htmlFor={inputId}>选择文件</label>
+        <strong>↑</strong><span>点击或拖拽文件到此处上传</span><small>仅支持 PDF 或图片，可一次上传多个文件</small><label className={styles.uploadButton} htmlFor={inputId}>选择文件</label>
       </div>
       {!!files.length && <div className={styles.uploadQueue}>{files.map((file) => <div className={styles.uploadQueueItem} key={file.evidenceFileId}><span>{file.fileName}</span><small>待上传</small></div>)}</div>}
     </div>
@@ -2658,11 +2647,12 @@ function SupportDetailDrawer({ state, close, manage, save }: { state: Extract<Dr
     ? save({ ...item, emission: { ...source, evidenceFiles: files, evidenceStatus: files.length ? '已完成' : '待补充', supportRemark: remark } })
     : save({ ...item, evidenceFiles: files, materials: files.length, state: files.length ? '已完成' : '待补充', supportRemark: remark });
   const addFiles = (selectedFiles: File[]) => {
-    if (!selectedFiles.length) return;
-    setFiles((items) => [...items, ...selectedFiles.map((file, index) => ({ evidenceFileId: `ev-${Date.now()}-${index}`, fileName: file.name, activityDataSource: item.activityDataSources }))]);
+    const acceptedFiles = filterEvidenceFiles(selectedFiles);
+    if (!acceptedFiles.length) return;
+    setFiles((items) => [...items, ...acceptedFiles.map((file, index) => ({ evidenceFileId: `ev-${Date.now()}-${index}`, fileName: file.name, activityDataSource: item.activityDataSources }))]);
   };
-  const fileSection = <DetailBlock title="证明材料和备注">{files.map((file) => <div className={styles.fileRow} key={file.evidenceFileId}><i>FILE</i><span><b>{file.fileName}</b><small>关联来源：{file.activityDataSource}</small></span><button type="button" className={styles.downloadButton} onClick={() => setPreviewFile(file)}>预览</button>{state.manage && <button type="button" className={`${styles.textButton} ${styles.fileDeleteButton}`} onClick={() => setPendingDelete({ evidenceFileId: file.evidenceFileId, fileName: file.fileName })}>删除</button>}</div>)}{state.manage && <><input id={uploadInputId} className={styles.hiddenFileInput} type="file" multiple onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} /><div className={`${styles.uploadDropzone} ${dragging ? styles.uploadDropzoneActive : ''}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); addFiles(Array.from(event.dataTransfer.files)); }}><span>将文件拖到此处，或</span><label className={styles.uploadButton} htmlFor={uploadInputId}>选择文件</label><small>支持多文件上传</small></div></>}<textarea className={styles.textarea} value={remark} onChange={(event) => setRemark(event.target.value)} placeholder="填写数据口径、年度汇总方法、缺失月份处理或来源差异说明" readOnly={!state.manage} />{state.manage && source && <Button primary onClick={submit}>保存证明材料</Button>}</DetailBlock>;
-  const previewDialog = previewFile && <Dialog title={`预览材料：${previewFile.fileName}`} onClose={() => setPreviewFile(undefined)} footer={<Button onClick={() => setPreviewFile(undefined)}>关闭</Button>}><div className={styles.confirmBox}>当前为原型预览。正式接入文件服务后，此处展示 PDF、图片或 Office 文件内容。</div><div className={styles.viewMaterialMeta}><div><span>文件名称</span><b>{previewFile.fileName}</b></div><div><span>文件类型</span><b>{materialType(previewFile.fileName)}</b></div><div><span>关联来源</span><b>{previewFile.activityDataSource}</b></div></div></Dialog>;
+  const fileSection = <DetailBlock title="证明材料和备注">{files.map((file) => <div className={styles.fileRow} key={file.evidenceFileId}><i>FILE</i><span><b>{file.fileName}</b><small>关联来源：{file.activityDataSource}</small></span><button type="button" className={styles.downloadButton} onClick={() => setPreviewFile(file)}>预览</button>{state.manage && <button type="button" className={`${styles.textButton} ${styles.fileDeleteButton}`} onClick={() => setPendingDelete({ evidenceFileId: file.evidenceFileId, fileName: file.fileName })}>删除</button>}</div>)}{state.manage && <><input id={uploadInputId} className={styles.hiddenFileInput} type="file" multiple accept={EVIDENCE_FILE_ACCEPT} onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} /><div className={`${styles.uploadDropzone} ${dragging ? styles.uploadDropzoneActive : ''}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); addFiles(Array.from(event.dataTransfer.files)); }}><span>将文件拖到此处，或</span><label className={styles.uploadButton} htmlFor={uploadInputId}>选择文件</label><small>仅支持 PDF 或图片，可一次上传多个文件</small></div></>}<textarea className={styles.textarea} value={remark} onChange={(event) => setRemark(event.target.value)} placeholder="填写数据口径、年度汇总方法、缺失月份处理或来源差异说明" readOnly={!state.manage} />{state.manage && source && <Button primary onClick={submit}>保存证明材料</Button>}</DetailBlock>;
+  const previewDialog = previewFile && <Dialog title={`预览材料：${previewFile.fileName}`} onClose={() => setPreviewFile(undefined)} footer={<Button onClick={() => setPreviewFile(undefined)}>关闭</Button>}><div className={styles.confirmBox}>当前为原型预览。正式接入文件服务后，此处展示 PDF 或图片内容。</div><div className={styles.viewMaterialMeta}><div><span>文件名称</span><b>{previewFile.fileName}</b></div><div><span>文件类型</span><b>{materialType(previewFile.fileName)}</b></div><div><span>关联来源</span><b>{previewFile.activityDataSource}</b></div></div></Dialog>;
   const deleteDialog = pendingDelete && <Dialog title="删除证明材料" onClose={() => setPendingDelete(undefined)} footer={<><Button onClick={() => setPendingDelete(undefined)}>取消</Button><Button danger onClick={() => { setFiles((items) => items.filter((file) => file.evidenceFileId !== pendingDelete.evidenceFileId)); setPendingDelete(undefined); }}>确认删除</Button></>}><div className={styles.confirmBox}>确认删除文件“{pendingDelete.fileName}”吗？删除后请点击“保存证明材料”使修改生效。</div></Dialog>;
   if (!source) return <><Drawer title={state.upload ? '上传基础材料' : '基础材料详情'} onClose={close} footer={<><Button onClick={close}>关闭</Button>{state.manage ? <Button primary onClick={submit}>保存上传材料</Button> : <Button outline onClick={manage}>上传</Button>}</>}><DetailBlock title={item.item}><div className={styles.kv}><span>核查事项</span><span>{item.group}</span><span>材料数量</span><b>{files.length} 份</b></div></DetailBlock>{fileSection}</Drawer>{previewDialog}{deleteDialog}</>;
   const scope = emissionScopeDictionary.find((entry) => entry.categories.some((category) => category === source.emissionCategory))?.label;

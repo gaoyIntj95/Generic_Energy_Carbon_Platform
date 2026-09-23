@@ -113,4 +113,23 @@ describe('产品碳足迹运输活动', () => {
     expect(container.textContent).not.toContain('热轧钢卷');
     expect(container.textContent).toContain('电子控制器 EC-20');
   });
+
+  it('按目标详情字段展示公共碳足迹因子', async () => {
+    await act(async () => root.render(<MemoryRouter><ProductCarbonFootprint pathname="/product-footprint/factors" /><LocationProbe /></MemoryRouter>));
+    await click(button('查看'));
+
+    const dialog = container.querySelector('[role="dialog"]')!;
+    expect(dialog.textContent).not.toContain('数据质量综合评估');
+    expect(dialog.textContent).not.toContain('数据点击量');
+    expect(dialog.textContent).toContain('功能单元');
+    expect(dialog.textContent).toContain('核算边界');
+    expect(dialog.textContent).toContain('技术代表性');
+    expect(dialog.textContent).toContain('地域代表性');
+    expect(dialog.textContent).toContain('数据来源');
+    expect(dialog.textContent).toContain('数据时间');
+    expect(dialog.textContent).toContain('产品描述');
+    expect(dialog.textContent).toContain('生命周期各阶段碳足迹');
+    expect(dialog.textContent).not.toContain('原始数据编号');
+    expect(dialog.textContent).not.toContain('数据说明');
+  });
 });

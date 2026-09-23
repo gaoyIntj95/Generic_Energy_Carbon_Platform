@@ -85,4 +85,7 @@
 .page .modal .factorCard .minor{max-width:620px}
 .page .modal>footer{padding:15px 30px;background:#fbfdfc}
 .page .modal>footer button{font-weight:600}
+.modalTopGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 26px}
+.modalTopGrid>section{min-width:0}
 @media(max-width:760px){.page .modal>div,.page .modal>footer{padding-right:18px;padding-left:18px}.page .modal .factorCard{align-items:flex-start;flex-direction:column}}
+@media(max-width:760px){.modalTopGrid{grid-template-columns:1fr;gap:0}}
