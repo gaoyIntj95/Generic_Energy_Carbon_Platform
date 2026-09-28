@@ -2814,6 +2814,16 @@
   gap: 18px;
 }
 
+.budgetAnnualTarget {
+  max-width: 320px;
+}
+
+.budgetTargetMeta {
+  color: #526272;
+  font-size: 13px;
+  font-weight: 500;
+}
+
 .budgetTargetGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;

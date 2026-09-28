@@ -1245,13 +1245,13 @@ function BudgetDialog({ type, energyUnitId, scopeName, onClose, onSaved }: { typ
   };
   return <Modal
     title={`${scopeName}｜目标预算配置`}
-    description={`2026年 · ${scopeName} · ${type === 'energy' ? '能源消费预算' : '碳排放预算'} · 单位：${type === 'energy' ? 'tce' : 'tCO₂e'}`}
+    description={<span className={styles.budgetTargetMeta}>2026年 · {scopeName} · {type === 'energy' ? '能源消费预算' : '碳排放预算'} · 单位：{type === 'energy' ? 'tce' : 'tCO₂e'}</span>}
     width={860}
     onClose={onClose}
     footer={<><Button onClick={onClose}>取消</Button><Button primary onClick={save}>保存配置</Button></>}
   >
     <div className={styles.budgetTargetForm}>
-      <Field label="年度目标" required><input aria-label="年度目标" type="number" min="0" value={target} onInput={(event) => setTarget(event.currentTarget.value)} onChange={(event) => setTarget(event.target.value)} /></Field>
+      <div className={styles.budgetAnnualTarget}><Field label="年度目标" required><input aria-label="年度目标" type="number" min="0" value={target} onInput={(event) => setTarget(event.currentTarget.value)} onChange={(event) => setTarget(event.target.value)} /></Field></div>
       <section className={styles.monthlyBudgetPanel}><div className={styles.monthlyBudgetHead}><strong>▼ 配置月度目标（可选）</strong></div><div className={styles.monthlyBudgetIntro}><span>月度目标用于趋势图和月度执行状态；未配置时默认按年度目标平均分配。</span><button type="button" className={styles.monthlyFillButton} onClick={fillMonthlyTargets}>按年度目标填充</button></div><div className={styles.monthlyBudgetGrid}>{monthlyTargets.map((value, index) => <Field key={months[index]} label={months[index]}><input aria-label={`${months[index]}目标`} type="number" min="0" value={Number.isFinite(value) ? value : ''} onChange={(event) => setMonthlyTargets((values) => values.map((item, itemIndex) => itemIndex === index ? Number(event.target.value) : item))} /></Field>)}</div></section>
       <div className={styles.budgetTargetNote}>年度目标用于年度结果判断；月度趋势默认以年度目标绘制水平参考线，配置月度目标后将优先展示月度目标线。</div>
       <Field label="调整说明"><textarea aria-label="调整说明" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="填写预算制定或调整说明" /></Field>
