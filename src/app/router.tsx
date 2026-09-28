@@ -132,4 +132,6 @@ export const router = createAppRouter([
       { path: '*', element: <Navigate to={allNavItems[0].path} replace /> },
     ],
   },
-]);
+], {
+  basename: import.meta.env.DEV ? import.meta.env.BASE_URL : undefined,
+});
