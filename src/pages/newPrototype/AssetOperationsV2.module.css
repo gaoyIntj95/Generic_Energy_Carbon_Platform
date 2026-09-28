@@ -2814,14 +2814,17 @@
   gap: 18px;
 }
 
-.budgetAnnualTarget {
-  max-width: 320px;
+.budgetAnnualTargetFields {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) repeat(2, minmax(120px, 160px));
+  gap: 16px;
+  align-items: end;
 }
 
-.budgetTargetMeta {
-  color: #526272;
-  font-size: 13px;
-  font-weight: 500;
+.budgetReadonlyInput {
+  color: #526272 !important;
+  background: #f4f7f6 !important;
+  cursor: default;
 }
 
 .budgetTargetGrid {
@@ -2899,6 +2902,14 @@
 }
 
 @media (max-width: 760px) {
+  .budgetAnnualTargetFields {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .budgetAnnualTargetFields > :first-child {
+    grid-column: 1 / -1;
+  }
+
   .budgetTargetGrid,
   .monthlyBudgetGrid {
     grid-template-columns: 1fr 1fr;
