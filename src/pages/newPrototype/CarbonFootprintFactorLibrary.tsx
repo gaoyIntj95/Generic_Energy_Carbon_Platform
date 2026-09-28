@@ -62,7 +62,6 @@ type FactorForm = Omit<Factor, 'id' | 'lib' | 'source'>;
 export function CarbonFootprintFactorLibrary({ addModal, onCloseAddModal }: { addModal: boolean; onCloseAddModal: () => void }) {
   const [library, setLibrary] = useState<Library>('public');
   const [category, setCategory] = useState('');
-  const [sideSearch, setSideSearch] = useState('');
   const [keyword, setKeyword] = useState('');
   const [region, setRegion] = useState('');
   const [year, setYear] = useState('');
@@ -70,7 +69,6 @@ export function CarbonFootprintFactorLibrary({ addModal, onCloseAddModal }: { ad
   const [selected, setSelected] = useState<Factor | null>(null);
   const [editing, setEditing] = useState<Factor | null>(null);
   const [deleting, setDeleting] = useState<Factor | null>(null);
-  const visibleCategories = publicCategories.filter((item) => item.toLowerCase().includes(sideSearch.trim().toLowerCase()));
   const rows = useMemo(() => factors.filter((factor) => {
     if (factor.lib !== library) return false;
     if (keyword && !`${factor.name} ${factor.sourceCategory ?? ''} ${factor.originalId ?? ''} ${factor.standardSource ?? ''}`.toLowerCase().includes(keyword.toLowerCase())) return false;
@@ -83,7 +81,6 @@ export function CarbonFootprintFactorLibrary({ addModal, onCloseAddModal }: { ad
   const selectEnterprise = () => {
     setLibrary('enterprise');
     setCategory('企业专属因子');
-    setSideSearch('');
   };
   const selectPublicCategory = (item: string) => {
     setLibrary('public');
@@ -110,10 +107,9 @@ export function CarbonFootprintFactorLibrary({ addModal, onCloseAddModal }: { ad
     <main className={styles.layout}>
       <aside className={styles.sidebar}>
         <div className={styles.sideTitle}><span>CPCD 分类</span><small>公共分类</small></div>
-        <input className={styles.sideSearch} value={sideSearch} onChange={(event) => setSideSearch(event.target.value)} placeholder="搜索分类" />
         <div className={styles.tree}>
           <button type="button" className={`${styles.treeItem} ${library === 'enterprise' ? styles.treeItemActive : ''}`} onClick={selectEnterprise}><span className={styles.treeDot} />企业专属因子</button>
-          {visibleCategories.map((item) => <button type="button" className={`${styles.treeItem} ${library === 'public' && category === item ? styles.treeItemActive : ''}`} key={item} onClick={() => selectPublicCategory(item)}><span className={styles.treeDot} />{item}</button>)}
+          {publicCategories.map((item) => <button type="button" className={`${styles.treeItem} ${library === 'public' && category === item ? styles.treeItemActive : ''}`} key={item} onClick={() => selectPublicCategory(item)}><span className={styles.treeDot} />{item}</button>)}
         </div>
       </aside>
       <section className={styles.main}>
