@@ -2111,9 +2111,9 @@
 }
 
 /* 报告列表侧栏按参考页面保留年份、生成、搜索和按时间分组。 */
-.reportWorkbench { grid-template-columns: 380px minmax(0, 1fr); }
+.reportWorkbench { grid-template-columns: 300px minmax(0, 1fr); }
 .reportSidebar { padding: 22px 24px; }
-.reportYearField { display: grid; grid-template-columns: 1fr 242px; align-items: center; gap: 16px; margin-bottom: 24px; }
+.reportYearField { display: grid; grid-template-columns: 1fr 160px; align-items: center; gap: 16px; margin-bottom: 24px; }
 .reportYearField > span:first-child { font-size: 18px; font-weight: 400; }
 .reportYearInput { position: relative; display: block; }
 .reportYearInput input { width: 100%; height: 50px; box-sizing: border-box; padding: 0 42px 0 16px; font-size: 18px; border: 1px solid #dbe5e2; border-radius: 8px; }
@@ -2133,68 +2133,105 @@
   position: relative;
   min-width: 0;
   max-height: calc(100vh - 170px);
-  padding: 14px;
+  padding: 0 18px 24px;
   overflow: auto;
-  background: #fbfcfc;
+  background: #f5f7f6;
 }
 
 .reportPreviewActions {
-  position: absolute;
+  position: sticky;
   z-index: 2;
-  top: 18px;
-  right: 18px;
+  top: 0;
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 -18px 20px;
+  padding: 12px 18px;
+  border-bottom: 1px solid #e5ebe8;
+  background: #fff;
 }
 
 .carbonReportPaper {
-  width: min(1120px, calc(100% - 24px));
+  width: min(980px, 100%);
   max-width: 100%;
-  min-height: 1260px;
   box-sizing: border-box;
   margin: 0 auto;
-  padding: 64px 48px 80px;
-  border: 1px solid #f1f1f1;
+  border: 1px solid #e4e9e7;
   background: #fff;
-  box-shadow: 0 3px 16px rgb(20 50 42 / 6%);
+  box-shadow: 0 8px 28px rgb(20 50 42 / 6%);
   color: #171717;
   font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
-  font-size: 16px;
-  line-height: 1.95;
+  font-size: 15px;
+  line-height: 1.8;
 }
 
-.carbonReportPaper header {
-  margin-bottom: 30px;
+.reportCover {
+  display: flex;
+  min-height: 660px;
+  box-sizing: border-box;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 132px 56px 68px;
+  border-bottom: 1px solid #edf0ee;
+  text-align: center;
 }
 
-.carbonReportPaper header h1 {
-  margin: 0 0 14px;
-  color: #111;
-  font-size: 31px;
+.reportCoverTitle h1 {
+  margin: 0 0 30px;
+  font-size: 30px;
+  font-weight: 600;
+}
+
+.reportCoverTitle h2 {
+  margin: 0 0 18px;
+  font-size: 34px;
   font-weight: 700;
-  text-align: center;
+  letter-spacing: .04em;
 }
 
-.carbonReportPaper header p {
-  margin: 7px 0;
+.reportCoverTitle p { margin: 0; font-size: 20px; }
+.reportCoverMeta p { margin: 8px 0; color: #4f5d58; font-size: 15px; }
+
+.reportToc {
+  border-bottom: 1px solid #edf0ee;
+  background: #fbfcfc;
 }
 
-.carbonReportPaper header p:first-of-type {
-  margin-bottom: 10px;
-  text-align: center;
+.reportToc summary {
+  padding: 20px 48px;
+  color: #243b33;
+  font-size: 19px;
+  font-weight: 700;
+  cursor: pointer;
 }
+
+.reportTocGrid { padding: 0 48px 28px; columns: 2; column-gap: 36px; }
+.reportTocItem { break-inside: avoid; padding: 5px 0; border-bottom: 1px dotted #dce4e0; font-size: 13px; }
+.reportTocChapter { margin-top: 12px; color: #28483c; font-weight: 700; }
+.reportTocSubsection { padding-left: 18px; color: #5d6c65; }
+
+.reportBody { padding: 52px 48px 76px; }
+.reportBody h2:first-child { margin-top: 0; }
+.reportBody > p { margin: 10px 0; text-align: justify; text-indent: 2em; }
+.reportBody h4 { margin: 18px 0 8px; font-size: 16px; }
 
 .carbonReportPaper h2 {
-  margin: 30px 0 12px;
+  margin: 34px 0 14px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid #e4ebe7;
   font-size: 23px;
 }
 
-.carbonReportPaper h3 {
-  margin: 22px 0 10px;
-  font-size: 18px;
+.carbonReportPaper .reportCoverTitle h2 {
+  padding-bottom: 0;
+  border-bottom: 0;
+  margin: 0 0 18px;
+  font-size: 34px;
 }
 
-.carbonReportPaper > p {
-  margin: 10px 0;
-  text-align: justify;
+.carbonReportPaper h3 {
+  margin: 26px 0 10px;
+  font-size: 18px;
 }
 
 .carbonReportPaper ol {
@@ -2204,57 +2241,42 @@
 
 .carbonReportPaper li { padding-left: 4px; }
 
-.reportFormula {
-  margin: 16px 0 !important;
-  font-family: "Times New Roman", "Songti SC", SimSun, serif;
-  letter-spacing: .04em;
-}
-
-.reportSignature { margin-top: 22px !important; }
-
 .carbonReportPaper table {
   width: 100%;
   max-width: 100%;
   min-width: 0;
+  margin: 14px 0 24px;
   border-collapse: collapse;
   table-layout: fixed;
 }
 
 .carbonReportPaper th,
 .carbonReportPaper td {
-  padding: 7px 9px;
-  border: 1px solid #222;
+  padding: 9px 10px;
+  border: 1px solid #dce4e0;
   box-sizing: border-box;
   font-weight: 400;
-  text-align: center;
+  text-align: left;
+  white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
+  line-height: 1.5;
+  font-size: 13px;
 }
 
 .carbonReportPaper th {
+  background: #f0f5f3;
   font-weight: 700;
 }
 
-.carbonReportPaper .reportWideTable th,
-.carbonReportPaper .reportWideTable td { font-size: 14px; }
-
-.carbonReportPaper th:first-child,
-.carbonReportPaper td:first-child {
-  width: 38%;
-}
+.carbonReportPaper .reportInfoTable th:first-child,
+.carbonReportPaper .reportInfoTable td:first-child { width: 34%; }
+.carbonReportPaper .reportDataTable th:first-child,
+.carbonReportPaper .reportDataTable td:first-child { width: 21%; }
 
 .carbonReportPaper .reportTotalRow td {
   background: #f4f8f6;
   font-weight: 700;
-}
-
-.reportDocumentFoot {
-  margin-top: 18px !important;
-  padding-top: 10px;
-  border-top: 1px solid #e0e5e3;
-  color: #6e7a76;
-  font-family: "Microsoft YaHei", sans-serif;
-  font-size: 12px;
 }
 
 .reportDocumentEmpty {
@@ -2305,10 +2327,16 @@
     grid-template-columns: 210px minmax(0, 1fr);
   }
 
+  .reportYearField { grid-template-columns: 1fr; }
+
   .carbonReportPaper {
-    width: calc(100% - 20px);
-    padding: 48px 32px;
+    width: 100%;
   }
+
+  .reportCover { min-height: 570px; padding: 108px 30px 54px; }
+  .reportBody { padding: 38px 30px 56px; }
+  .reportToc summary { padding: 18px 30px; }
+  .reportTocGrid { padding: 0 30px 24px; columns: 1; }
 }
 
 .overlay {
@@ -2448,11 +2476,41 @@
 .factorEvidenceFile .factorEvidenceDownload { color: #0b8a66; }
 .factorEvidenceFile .factorEvidenceDownload:hover { text-decoration: underline; }
 .factorEvidenceDialog footer { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 28px 20px; border-top: 1px solid var(--line); }
-.reportInfoDialog { width: min(760px, calc(100vw - 32px)); }
-.reportInfoDialog .modalBody { padding: 18px 20px; }
-.reportInfoHint { margin-bottom: 16px; padding: 10px 12px; color: #536b63; background: #f4faf7; border: 1px solid #d9eee5; border-radius: 7px; font-size: 13px; line-height: 1.6; }
+.reportInfoDialog { width: min(1000px, calc(100vw - 48px)); max-height: 94vh; }
+.reportInfoDialog > header { min-height: 70px; padding: 0 30px; }
+.reportInfoDialog > header h2 { font-size: 20px; }
+.reportInfoDialog .modalBody { padding: 4px 30px 18px; }
+.reportInfoDialog > footer { min-height: 72px; padding: 0 30px; }
+.reportInfoSection { padding: 20px 0 22px; }
+.reportInfoSection + .reportInfoSection { border-top: 1px solid #e8eeeb; }
+.reportInfoSection h3 { margin: 0 0 16px; padding-left: 12px; color: #263a34; border-left: 4px solid #119768; font-size: 18px; line-height: 1.25; }
+.reportInfoGrid { display: grid; gap: 16px 18px; }
+.reportInfoGridEnterprise { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.reportInfoGridEnterprise .field:nth-child(1),
+.reportInfoGridEnterprise .field:nth-child(2) { grid-column: span 3; }
+.reportInfoGridEnterprise .field:nth-child(3) { grid-column: span 2; }
+.reportInfoGridEnterprise .field:nth-child(4) { grid-column: span 4; }
+.reportInfoGridEnterprise .field:nth-child(5) { grid-column: 1 / -1; }
+.reportInfoGridTwo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.reportInfoGridContact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.reportInfoGridContact .fieldFull { grid-column: 1 / -1; }
+.reportInfoDialog .field { min-width: 0; gap: 8px; }
+.reportInfoDialog .field > span { color: #263640; font-size: 14px; }
+.reportInfoDialog .field input { min-height: 48px; box-sizing: border-box; padding: 10px 14px; border-radius: 8px; font-size: 15px; }
+.reportInfoDialog .field textarea { min-height: 86px; box-sizing: border-box; padding: 12px 14px; border-radius: 8px; font-size: 15px; }
 .reportInfoDialog input::placeholder,
 .reportInfoDialog textarea::placeholder { color: #9aa6a1; opacity: 1; }
+@media (max-width: 700px) {
+  .reportInfoDialog > header { padding: 0 18px; }
+  .reportInfoDialog .modalBody { padding: 2px 18px 14px; }
+  .reportInfoDialog > footer { padding: 0 18px; }
+  .reportInfoGridTwo,
+  .reportInfoGridEnterprise,
+  .reportInfoGridContact { grid-template-columns: 1fr; }
+  .reportInfoGridEnterprise .field,
+  .reportInfoGridContact .field,
+  .reportInfoGrid .fieldFull { grid-column: 1; }
+}
 .tableWrap {
   max-height: 360px;
   margin-top: 14px;

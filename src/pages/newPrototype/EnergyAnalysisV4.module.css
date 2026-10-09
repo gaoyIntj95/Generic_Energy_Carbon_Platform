@@ -2411,7 +2411,6 @@
 .flowReadingItem .available { background: #00a870; }
 .flowReadingItem .external { background: #8547ff; }
 .flowReadingItem .unallocated { background: #98a2b3; }
-.flowReadingItem .overAllocated { background: #e5484d; }
 .flowReadingItem .conversion { background: #7f56d9; }
 
 .flowCalculationDetails {
@@ -2837,14 +2836,6 @@
 
 .balancePending span {
   background: #fff4dd;
-}
-
-.balanceExcess {
-  color: #c7473b;
-}
-
-.balanceExcess span {
-  background: #fff0ec;
 }
 
 .balanceMatched strong,

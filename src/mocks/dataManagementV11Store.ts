@@ -226,7 +226,7 @@ const seedEnergyRecords: V11EnergyRecord[] = [
   { energyRecordId: 'v11-er-device-74', year: 2026, scopeLevel: '二级用能单元', scopeType: 'device', scopeId: 'v11-device-74', energyUnitId: 'eu-production-processing', energyRole: '能源消费', energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [126000,123000,130000,133000,136000,138000,142000,140000,137000,134000,139000,141000] },
   { energyRecordId: 'v11-er-device-78', year: 2026, scopeLevel: '一级用能单元', scopeType: 'device', scopeId: 'v11-device-78', energyUnitId: 'eu-utilities', energyRole: '能源消费', energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [72000,70000,73500,75000,77000,78500,80000,79200,77500,76000,78000,81000] },
   { energyRecordId: 'v11-er-device-79', year: 2026, scopeLevel: '二级用能单元', scopeType: 'device', scopeId: 'v11-device-79', energyUnitId: 'eu-compressed-air', energyRole: '能源消费', energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [106000,103000,110000,112000,115000,118000,120000,119000,116000,114000,0,0], monthlyReportedMonths: [true,true,true,true,true,true,true,true,true,true,false,false] },
-  { energyRecordId: 'v11-er-device-81', year: 2026, scopeLevel: '二级用能单元', scopeType: 'device', scopeId: 'v11-device-81', energyUnitId: 'eu-waste-heat-power', energyRole: '能源消费', energyTypeId: 'v11-energy-electricity', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [54000,52000,56000,57000,58000,59000,60000,59500,58000,57000,59000,61000] },
+  { energyRecordId: 'v11-er-device-81', year: 2026, scopeLevel: '二级用能单元', scopeType: 'device', scopeId: 'v11-device-81', energyUnitId: 'eu-waste-heat-power', energyRole: '能源消费', energyTypeId: 'v11-energy-waste-heat', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [6500,6200,7000,7200,7400,7600,7800,7600,7200,7000,7600,5900] },
   { energyRecordId: 'v11-er-device-82', year: 2026, scopeLevel: '二级用能单元', scopeType: 'device', scopeId: 'v11-device-82', energyUnitId: 'eu-gas-boiler', energyRole: '能源消费', energyTypeId: 'v11-energy-natural-gas', entryMode: 'monthly', annualAmount: 0, monthlyAmounts: [78000,75000,81000,83500,86000,88000,90000,89500,87000,85000,88000,93000] },
 ];
 
@@ -373,7 +373,7 @@ const industrialDeviceDictionary: V11KeyDevice[] = [
   { deviceId: 'v11-device-78', deviceName: '冷却水循环泵组', deviceType: '泵类', energyUnitId: 'eu-utilities', mainEnergyTypeId: 'v11-energy-electricity', outputBasis: '循环水量', remark: '直属动力中心的公辅循环设备' },
   { deviceId: 'v11-device-62', deviceName: '1#螺杆空压机', deviceType: '空压设备', energyUnitId: 'eu-compressed-air', mainEnergyTypeId: 'v11-energy-electricity', outputBasis: '供气量', remark: '额定排气量 20m³/min' },
   { deviceId: 'v11-device-79', deviceName: '2#螺杆空压机', deviceType: '空压设备', energyUnitId: 'eu-compressed-air', mainEnergyTypeId: 'v11-energy-electricity', outputBasis: '供气量', remark: '备用及调峰空压设备' },
-  { deviceId: 'v11-device-81', deviceName: '余热发电机组', deviceType: '能源转换设备', energyUnitId: 'eu-waste-heat-power', mainEnergyTypeId: 'v11-energy-electricity', outputBasis: '发电量', remark: '余热回收发电辅助用电设备' },
+  { deviceId: 'v11-device-81', deviceName: '余热发电机组', deviceType: '能源转换设备', energyUnitId: 'eu-waste-heat-power', mainEnergyTypeId: 'v11-energy-waste-heat', outputBasis: '发电量', remark: '按余热投入统计，用于发电转换效率分析' },
   { deviceId: 'v11-device-82', deviceName: '2t/h天然气蒸汽锅炉', deviceType: '加热/锅炉设备', energyUnitId: 'eu-gas-boiler', mainEnergyTypeId: 'v11-energy-natural-gas', outputBasis: '蒸汽产量', remark: '公辅蒸汽供应设备' },
   { deviceId: 'v11-device-83', deviceName: '自备燃料发电机组', deviceType: '能源转换设备', energyUnitId: 'eu-captive-power', mainEnergyTypeId: 'v11-energy-coal', outputBasis: '发电量', remark: '企业自备电源，燃料投入转换为厂内电力' },
   { deviceId: 'v11-device-84', deviceName: '余压透平回收机组', deviceType: '能源转换设备', energyUnitId: 'eu-pressure-recovery', mainEnergyTypeId: 'v11-energy-waste-pressure', outputBasis: '回收压缩空气量', remark: '动力中心余压回收利用设备' },
@@ -641,6 +641,15 @@ export function listV11OperationMetrics() { return operations.map(cloneOperation
 export function listV11KeyDevices(year = 2026) {
   const devices = annualDevices.get(year); return devices.map((item) => ({ ...item })); }
 
+/** Returns the single input energy for a functional level-two subsystem. */
+export function v11FunctionalSubsystemInputEnergyTypeId(energyUnitId: string | null | undefined, year = 2026) {
+  if (!energyUnitId) return undefined;
+  const unit = listEnergyUnits(year).find((item) => item.energyUnitId === energyUnitId);
+  if (unit?.unitLevel !== 'level2' || unit.unitType !== '能源转换子系统') return undefined;
+  const inputEnergyTypeIds = [...new Set((unit.energyRelations ?? []).map((relation) => relation.inputEnergyTypeId))];
+  return inputEnergyTypeIds.length === 1 ? inputEnergyTypeIds[0] : null;
+}
+
 export function v11RecordScopeType(record: V11EnergyRecord): EnergyRecordScopeType {
   return record.scopeType
     ?? (record.scopeLevel === '企业' ? 'enterprise' : 'energyUnit');
@@ -653,6 +662,78 @@ export function v11RecordScopeType(record: V11EnergyRecord): EnergyRecordScopeTy
 export function v11EnergyRecordAnnualAmount(record: V11EnergyRecord) {
   const monthlyTotal = record.monthlyAmounts.reduce((sum, value, i) => sum + (record.monthlyReportedMonths?.[i] === false ? 0 : value), 0);
   return record.annualAmount > 0 ? record.annualAmount : monthlyTotal;
+}
+
+function reportedMonthAmount(record: V11EnergyRecord, month: number) {
+  const amount = record.monthlyAmounts[month] ?? 0;
+  const reported = record.monthlyReportedMonths?.[month] ?? amount > 0;
+  return reported ? amount : null;
+}
+
+function completeAnnualAmount(record: V11EnergyRecord) {
+  const monthsComplete = Array.from({ length: 12 }, (_, month) => reportedMonthAmount(record, month) !== null).every(Boolean);
+  return record.annualAmount > 0 || monthsComplete ? v11EnergyRecordAnnualAmount(record) : null;
+}
+
+/** Validate reported consumption totals against their parent scope before saving. */
+export function validateV11EnergyRecordHierarchy(input: Omit<V11EnergyRecord, 'energyRecordId'>, id?: string) {
+  if (input.energyRole !== '能源消费') return null;
+  const scopeType = input.scopeType ?? (input.scopeLevel === '企业' ? 'enterprise' : 'energyUnit');
+  if (scopeType === 'device') return null;
+
+  const record: V11EnergyRecord = {
+    ...input,
+    energyRecordId: id ?? '__pending_energy_record__',
+    scopeType,
+    scopeId: input.scopeId ?? (scopeType === 'enterprise' ? null : input.energyUnitId),
+  };
+  const records = [
+    ...energyRecords.filter((item) => item.energyRecordId !== id),
+    record,
+  ].filter((item) => item.year === input.year && item.energyRole === input.energyRole && item.energyTypeId === input.energyTypeId
+    && (item.scopeType ?? (item.scopeLevel === '企业' ? 'enterprise' : 'energyUnit')) !== 'device');
+  const enterprise = records.find((item) => item.scopeLevel === '企业');
+  const levelOne = records.filter((item) => item.scopeLevel === '一级用能单元');
+  const levelTwo = records.filter((item) => item.scopeLevel === '二级用能单元');
+  const units = listEnergyUnits(input.year);
+
+  const annualLimitError = (parent: V11EnergyRecord, children: V11EnergyRecord[], description: string) => {
+    const parentAmount = completeAnnualAmount(parent);
+    if (parentAmount === null) return null;
+    const childTotal = children.reduce((total, child) => total + (completeAnnualAmount(child) ?? 0), 0);
+    return childTotal > parentAmount + 1e-8
+      ? `${description}年度汇总不能超过上级年度值（${parentAmount}）。`
+      : null;
+  };
+
+  const monthLimitError = (parent: V11EnergyRecord, children: V11EnergyRecord[], description: string) => {
+    for (let month = 0; month < 12; month += 1) {
+      const parentAmount = reportedMonthAmount(parent, month);
+      const childAmounts = children.map((child) => reportedMonthAmount(child, month));
+      if (parentAmount === null) continue;
+      const childTotal = childAmounts.reduce<number>((total, amount) => total + (amount ?? 0), 0);
+      if (childTotal > parentAmount + 1e-8) return `${description}${month + 1}月汇总不能超过上级月度值（${parentAmount}）。`;
+    }
+    return null;
+  };
+
+  if (enterprise && levelOne.length) {
+    const annualError = annualLimitError(enterprise, levelOne, '一级用能单元');
+    if (annualError) return annualError;
+    const monthError = monthLimitError(enterprise, levelOne, '一级用能单元');
+    if (monthError) return monthError;
+  }
+
+  for (const parent of levelOne) {
+    const children = levelTwo.filter((child) => units.find((unit) => unit.energyUnitId === child.energyUnitId)?.parentEnergyUnitId === parent.energyUnitId);
+    if (!children.length) continue;
+    const parentName = units.find((unit) => unit.energyUnitId === parent.energyUnitId)?.energyUnitName ?? parent.energyUnitId ?? '一级用能单元';
+    const annualError = annualLimitError(parent, children, `${parentName}下二级用能单元`);
+    if (annualError) return annualError;
+    const monthError = monthLimitError(parent, children, `${parentName}下二级用能单元`);
+    if (monthError) return monthError;
+  }
+  return null;
 }
 
 export function saveV11EnergyType(input: Omit<V11EnergyType, 'energyTypeId'>, id?: string, year = 2026) {
@@ -689,7 +770,21 @@ export function saveV11EnergyRecord(input: Omit<V11EnergyRecord, 'energyRecordId
   if (id && energyRecords.some((item) => item.energyRecordId === id && item.year !== input.year)) return { ok: false as const, error: '不能跨年度修改记录，请切换到记录所属年度。' };
   if (!listV11EnergyTypes(input.year).some((type) => type.energyTypeId === input.energyTypeId)) return { ok: false as const, error: '请选择本年度的能源品种。' };
   if (input.energyUnitId && !listEnergyUnits(input.year).some((unit) => unit.energyUnitId === input.energyUnitId)) return { ok: false as const, error: '请选择本年度的用能单元。' };
-  if (input.scopeType === 'device' && !listV11KeyDevices(input.year).some((device) => device.deviceId === input.scopeId)) return { ok: false as const, error: '请选择本年度的重点设备。' };
+  const scopeDevice = input.scopeType === 'device'
+    ? listV11KeyDevices(input.year).find((device) => device.deviceId === input.scopeId)
+    : undefined;
+  if (input.scopeType === 'device' && !scopeDevice) return { ok: false as const, error: '请选择本年度的重点设备。' };
+  if (scopeDevice && input.energyRole === '能源消费' && input.energyTypeId !== scopeDevice.mainEnergyTypeId) {
+    return { ok: false as const, error: '设备能源消费品种必须与设备档案中的主要能源品种一致。' };
+  }
+  if (input.energyRole === '能源消费' && input.scopeLevel === '二级用能单元') {
+    const energyUnitId = scopeDevice?.energyUnitId ?? input.energyUnitId;
+    const subsystemInputEnergyTypeId = v11FunctionalSubsystemInputEnergyTypeId(energyUnitId, input.year);
+    if (subsystemInputEnergyTypeId === null) return { ok: false as const, error: '请先为供能子系统配置唯一的投入能源品种。' };
+    if (subsystemInputEnergyTypeId && input.energyTypeId !== subsystemInputEnergyTypeId) {
+      return { ok: false as const, error: '供能子系统及其设备的能源消费品种必须与子系统投入能源品种一致。' };
+    }
+  }
   const scopeType = input.scopeType
     ?? (input.scopeLevel === '企业' ? 'enterprise' : 'energyUnit');
   const scopeId = input.scopeId ?? (scopeType === 'enterprise' ? null : input.energyUnitId);
@@ -701,6 +796,8 @@ export function saveV11EnergyRecord(input: Omit<V11EnergyRecord, 'energyRecordId
   if (input.annualAmount > 0 && input.annualAmount < monthlyTotal) {
     return { ok: false as const, error: '年度总量不能小于已填报月份合计。' };
   }
+  const hierarchyError = validateV11EnergyRecordHierarchy(input, id);
+  if (hierarchyError) return { ok: false as const, error: hierarchyError };
   const normalized = {
     ...input,
     entryMode: hasReportedMonth ? 'monthly' as const : 'annual' as const,
@@ -1114,6 +1211,16 @@ export function saveV11KeyDevice(input: Omit<V11KeyDevice, 'deviceId'>, id?: str
   if (!listEnergyUnits(year).some((unit) => unit.energyUnitId === input.energyUnitId)) return { ok: false as const, error: '请选择本年度的用能单元。' };
   if (!listV11EnergyTypes(year).some((type) => type.energyTypeId === input.mainEnergyTypeId)) return { ok: false as const, error: '请选择本年度的能源品种。' };
   const devices = annualDevices.get(year);
+  const existing = id ? devices.find((item) => item.deviceId === id) : undefined;
+  if (existing && existing.mainEnergyTypeId !== input.mainEnergyTypeId
+    && energyRecords.some((record) => record.year === year && record.scopeType === 'device' && record.scopeId === id && record.energyRole === '能源消费')) {
+    return { ok: false as const, error: '该设备已有能源消费记录，不能直接更改主要能源品种；请先处理设备能源数据。' };
+  }
+  const subsystemInputEnergyTypeId = v11FunctionalSubsystemInputEnergyTypeId(input.energyUnitId, year);
+  if (subsystemInputEnergyTypeId === null) return { ok: false as const, error: '请先为供能子系统配置唯一的投入能源品种。' };
+  if (subsystemInputEnergyTypeId && input.mainEnergyTypeId !== subsystemInputEnergyTypeId) {
+    return { ok: false as const, error: '供能子系统下的设备主要能源品种必须与子系统投入能源品种一致。' };
+  }
   if (devices.some((item) => item.deviceId !== id && item.deviceName.trim() === input.deviceName.trim())) return { ok: false as const, error: '重点设备名称不能重复。' };
   if (id) {
     const index = devices.findIndex((item) => item.deviceId === id);

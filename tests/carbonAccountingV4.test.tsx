@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { resetPlatformMockStore } from '../src/mocks/platformMockStore';
+import { resetCarbonReportMocks } from '../src/mocks/carbonReportMock';
 import { CarbonAccountingV4 } from '../src/pages/newPrototype/CarbonAccountingV4';
 
 let container: HTMLDivElement;
@@ -40,6 +41,7 @@ async function render(pathname: string) {
 describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
   beforeEach(() => {
     resetPlatformMockStore();
+    resetCarbonReportMocks();
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -129,19 +131,39 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
     expect([...rankTable.querySelectorAll('tbody tr')].every((row) => row.querySelectorAll('td').length === 4)).toBe(true);
   });
 
-  it('renders generated carbon reports and opens the verification package export dialog', async () => {
+  it('uses the marked Word report template and collects fields absent from the formal snapshot', async () => {
     await render('/carbon-accounting/report');
     expect(container.textContent).toContain('选择年份');
     expect(container.textContent).toContain('生成报告');
-    expect(container.textContent).toContain('7天内');
-    expect(container.textContent).toContain('企业温室气体排放报告');
-    expect(container.textContent).toContain('报告主体基本信息');
-    expect(container.textContent).toContain('温室气体排放汇总');
+    expect(container.textContent).toContain('温室气体排放核算报告书');
+    expect(container.textContent).toContain('第3章 温室气体量化');
+    expect(container.textContent).toContain('表2 温室气体排放核算清单');
     expect(container.textContent).toContain('12,980.53');
-    expect(container.textContent).not.toContain('一期暂不展开报告编制页面');
+    expect(container.querySelector('details')).not.toBeNull();
+    expect(container.textContent).not.toContain('正式汇总与清单明细相差');
+    expect(container.textContent).not.toContain('核对差异');
 
     await click(button('生成报告'));
-    expect(container.textContent).toContain('已基于当前正式核算清单生成排放报告');
+    const dialog = container.querySelector('[role="dialog"]')!;
+    expect(dialog.textContent).toContain('企业信息');
+    expect(dialog.textContent).toContain('报告信息');
+    expect(dialog.textContent).toContain('内部查证');
+    expect(dialog.textContent).toContain('联系信息');
+    expect(dialog.textContent).toContain('内部查证牵头部门');
+    expect(dialog.textContent).not.toContain('请补充 Word 模板中无法从系统取得的信息');
+    const field = dialog.querySelector<HTMLInputElement>('input[aria-label="报告编制人"]')!;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(field, '测试补录信息');
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await click(button('生成报告', dialog));
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.textContent).toContain('测试补录信息');
+    expect(container.textContent).not.toContain('{{输入:企业名称}}');
+    await render('/carbon-accounting/preview');
+    await render('/carbon-accounting/report');
+    expect(container.textContent).toContain('测试补录信息');
   });
 
   it('filters, creates and deletes inventory records with real mock-state changes', async () => {
@@ -203,14 +225,12 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
     expect(sourceNameField?.className).not.toContain('fieldFull');
     const scopeSelect = sourceDialog.querySelector('select[aria-label="排放范围"]') as HTMLSelectElement;
     const categorySelect = sourceDialog.querySelector('select[aria-label="排放类别"]') as HTMLSelectElement;
-    expect([...scopeSelect.options].map((option) => option.textContent)).toEqual(['范围一：直接排放', '范围二：间接排放', '范围三：其他间接排放', '其他排放', '特殊排放']);
+    expect([...scopeSelect.options].map((option) => option.textContent)).toEqual(['范围一：直接排放', '范围二：间接排放', '范围三：其他间接排放', '特殊排放']);
 
     await setSelect(scopeSelect, 'scope-2');
     expect([...categorySelect.options].map((option) => option.textContent)).toEqual(['购入的电力与热力产生的排放']);
     await setSelect(scopeSelect, 'scope-3');
-    expect([...categorySelect.options].map((option) => option.textContent)).toEqual(['交通运输产生的排放', '所使用的产品和服务隐含的排放', '所生产的产品和服务的排放']);
-    await setSelect(scopeSelect, 'other');
-    expect([...categorySelect.options].map((option) => option.textContent)).toEqual(['其他排放']);
+    expect([...categorySelect.options].map((option) => option.textContent)).toEqual(['交通运输产生的排放', '所使用的产品和服务隐含的排放', '所生产的产品和服务的排放', '其他排放']);
     await setSelect(scopeSelect, 'special');
     expect([...categorySelect.options].map((option) => option.textContent)).toEqual(['特殊排放']);
   });

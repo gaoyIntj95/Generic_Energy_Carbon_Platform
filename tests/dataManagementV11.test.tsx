@@ -244,13 +244,96 @@ describe('DataManagementV11 fidelity and data behavior', () => {
     expect(container.querySelector('form')).toBeNull();
   });
 
-  it('opens an existing device energy record directly in the edit dialog', async () => {
+  it('locks a functional subsystem device to its subsystem input energy', async () => {
+    await render('/data-management/devices');
+    const row = [...container.querySelectorAll('tr')].find((item) => item.textContent?.includes('余热发电机组')
+      && [...item.querySelectorAll('button')].some((buttonItem) => buttonItem.textContent === '编辑'))!;
+    await click([...row.querySelectorAll('button')].find((item) => item.textContent === '编辑')!);
+
+    const form = [...container.querySelectorAll('form')].find((item) => item.textContent?.includes('编辑重点设备档案'))!;
+    const energySelect = form.querySelectorAll('select')[1] as HTMLSelectElement;
+    expect(energySelect.disabled).toBe(true);
+    expect(energySelect.value).toBe('v11-energy-waste-heat');
+    expect(form.textContent).toContain('继承该子系统的投入能源');
+  });
+
+  it('locks device energy entry to the selected device primary energy', async () => {
     await render('/data-management/energy-data?scope=device&deviceId=v11-device-79&year=2026&energyTypeId=v11-energy-electricity&recordId=v11-er-device-79');
 
-    expect(container.textContent).toContain('编辑能源数据');
-    const dialog = [...container.querySelectorAll('form')].find((form) => form.textContent?.includes('编辑能源数据'));
+    const dialog = [...container.querySelectorAll('form')].find((form) => form.textContent?.includes('设备能源品种按设备档案'));
     expect(dialog).toBeDefined();
-    expect((dialog?.querySelector('[aria-label="归属对象类型"]') as HTMLInputElement).value).toBe('重点设备');
+    const energyTypeSelect = dialog?.querySelectorAll('select')[1] as HTMLSelectElement;
+    expect(energyTypeSelect.disabled).toBe(true);
+    expect(energyTypeSelect.value).toBe('v11-energy-electricity');
+    expect(dialog?.textContent).toContain('不汇总至所属用能单元');
+  });
+
+  it('shows a configured recovery input in the locked subsystem energy field', async () => {
+    await render('/data-management/energy-data?scopeLevel=二级用能单元&unitId=eu-waste-heat-power&new=1');
+    const dialog = [...container.querySelectorAll('form')].find((form) => form.textContent?.includes('固定为该子系统的投入能源'));
+    const energySelect = dialog?.querySelector('select') as HTMLSelectElement;
+    expect(energySelect.disabled).toBe(true);
+    expect(energySelect.value).toBe('v11-energy-waste-heat');
+    expect([...energySelect.options].map((option) => option.value)).toEqual(['', 'v11-energy-waste-heat']);
+  });
+
+  it('shows a configured recovery input in the locked device energy field', async () => {
+    await render('/data-management/energy-data?scope=device&deviceId=v11-device-81&new=1');
+    const dialog = [...container.querySelectorAll('form')].find((form) => form.textContent?.includes('设备能源品种按设备档案'));
+    const energySelect = dialog?.querySelectorAll('select')[1] as HTMLSelectElement;
+    expect(energySelect.disabled).toBe(true);
+    expect(energySelect.value).toBe('v11-energy-waste-heat');
+    expect([...energySelect.options].map((option) => option.value)).toEqual(['', 'v11-energy-waste-heat']);
+  });
+
+  it('locks a supply system direct device to its archive energy in consumption', async () => {
+    await render('/data-management/energy-data?scope=device&deviceId=v11-device-78&new=1');
+    const dialog = [...container.querySelectorAll('form')].find((form) => form.textContent?.includes('设备能源品种按设备档案'));
+    const energySelect = dialog?.querySelectorAll('select')[1] as HTMLSelectElement;
+    expect(energySelect.disabled).toBe(true);
+    expect(energySelect.value).toBe('v11-energy-electricity');
+    expect([...energySelect.options].map((option) => option.value)).toEqual(['', 'v11-energy-electricity']);
+  });
+
+  it('restricts device consumption to its primary energy type at the save boundary', () => {
+    const record = listV11EnergyRecords().find((item) => item.energyRecordId === 'v11-er-device-79')!;
+    const invalidRecord = saveV11EnergyRecord({ ...record, energyTypeId: 'v11-energy-natural-gas' }, record.energyRecordId);
+    expect(invalidRecord).toMatchObject({ ok: false });
+    if (!invalidRecord.ok) expect(invalidRecord.error).toContain('主要能源品种一致');
+    expect(listV11EnergyRecords().find((item) => item.energyRecordId === record.energyRecordId)?.energyTypeId).toBe('v11-energy-electricity');
+
+    const device = listV11KeyDevices().find((item) => item.deviceId === 'v11-device-79')!;
+    const invalidDeviceUpdate = saveV11KeyDevice({ ...device, mainEnergyTypeId: 'v11-energy-natural-gas' }, device.deviceId);
+    expect(invalidDeviceUpdate).toMatchObject({ ok: false });
+    if (!invalidDeviceUpdate.ok) expect(invalidDeviceUpdate.error).toContain('不能直接更改主要能源品种');
+  });
+
+  it('inherits functional subsystem input energy for its consumption and devices', () => {
+    const unitRecord = listV11EnergyRecords().find((item) => item.energyRecordId === 'v11-er-51')!;
+    const invalidUnitRecord = saveV11EnergyRecord({ ...unitRecord, energyTypeId: 'v11-energy-natural-gas' }, unitRecord.energyRecordId);
+    expect(invalidUnitRecord).toMatchObject({ ok: false });
+    if (!invalidUnitRecord.ok) expect(invalidUnitRecord.error).toContain('投入能源品种一致');
+
+    const invalidDevice = saveV11KeyDevice({
+      deviceName: '能源品种校验设备',
+      deviceType: '加工设备',
+      energyUnitId: 'eu-compressed-air',
+      mainEnergyTypeId: 'v11-energy-natural-gas',
+      outputBasis: '产量',
+      remark: '',
+    });
+    expect(invalidDevice).toMatchObject({ ok: false });
+    if (!invalidDevice.ok) expect(invalidDevice.error).toContain('投入能源品种一致');
+
+    const matchingDevice = saveV11KeyDevice({
+      deviceName: '空压系统新设备',
+      deviceType: '空压设备',
+      energyUnitId: 'eu-compressed-air',
+      mainEnergyTypeId: 'v11-energy-electricity',
+      outputBasis: '供气量',
+      remark: '',
+    });
+    expect(matchingDevice.ok).toBe(true);
   });
 
   it('keeps device energy, targets and renames linked by stable device id', () => {

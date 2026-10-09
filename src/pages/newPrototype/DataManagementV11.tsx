@@ -26,6 +26,8 @@ import {
   listV11OperationMetrics,
   saveV11EnergyCost,
   saveV11EnergyRecord,
+  validateV11EnergyRecordHierarchy,
+  v11FunctionalSubsystemInputEnergyTypeId,
   saveV11EnergyType,
   saveV11KeyDevice,
   saveV11OperationMetric,
@@ -533,7 +535,7 @@ function EnergyRecordDialog({ item, dataYear, energyRole = '能源消费', locke
   const [maintenanceYear] = useDataYear();
   const units = listEnergyUnits(Number(maintenanceYear));
   const types = listV11EnergyTypes(Number(maintenanceYear));
-  const selectableTypes = types.filter((type) => {
+  const roleSelectableTypes = types.filter((type) => {
     const matchesRole = energyRole === '回收能源' ? type.analysisCategory === '回收能源' : type.analysisCategory !== '回收能源';
     return matchesRole && (type.energyTypeId === item?.energyTypeId || isV11EnergyTypeEnabled(type.energyTypeId, Number(maintenanceYear)));
   });
@@ -554,7 +556,9 @@ function EnergyRecordDialog({ item, dataYear, energyRole = '能源消费', locke
   const parentUnitId = units.find((unit) => unit.energyUnitId === unitId)?.parentEnergyUnitId ?? '';
   const [deviceId, setDeviceId] = useState(item?.scopeType === 'device' ? item.scopeId ?? '' : initialDeviceId);
   const initialDevice = devices.find((device) => device.deviceId === (item?.scopeType === 'device' ? item.scopeId : initialDeviceId));
-  const [typeId, setTypeId] = useState(item?.energyTypeId ?? initialDevice?.mainEnergyTypeId ?? (initialEnergyTypeId || (energyRole === '回收能源' ? fixedRecoveryTypeId : '')));
+  const [typeId, setTypeId] = useState(item && v11RecordScopeType(item) === 'device'
+    ? initialDevice?.mainEnergyTypeId ?? item.energyTypeId
+    : item?.energyTypeId ?? initialDevice?.mainEnergyTypeId ?? (initialEnergyTypeId || (energyRole === '回收能源' ? fixedRecoveryTypeId : '')));
   const initialReportedMonths = item ? reportedMonths(item) : Array(12).fill(false);
   const [reported, setReported] = useState<boolean[]>(initialReportedMonths);
   const [values, setValues] = useState<string[]>(Array.from({ length: 12 }, (_, index) => initialReportedMonths[index] ? String(item?.monthlyAmounts[index] ?? '') : ''));
@@ -568,6 +572,18 @@ function EnergyRecordDialog({ item, dataYear, energyRole = '能源消费', locke
   const resolvedRecoveryUnitId = item?.energyUnitId ?? selectedSourceOption?.unitId ?? legacyRecoveryUnitId;
   const effectiveUnitId = level === '企业' ? null : level === '重点设备' ? device?.energyUnitId ?? null : energyRole === '回收能源' && !unitInput ? resolvedRecoveryUnitId : unitId;
   const selectedUnit = units.find((unit) => unit.energyUnitId === effectiveUnitId);
+  const functionalSubsystem = level === '二级用能单元' && energyRole === '能源消费' && selectedUnit?.unitType === '能源转换子系统';
+  const functionalSubsystemInputEnergyTypeId = functionalSubsystem
+    ? v11FunctionalSubsystemInputEnergyTypeId(effectiveUnitId, Number(maintenanceYear))
+    : undefined;
+  useEffect(() => {
+    if (typeof functionalSubsystemInputEnergyTypeId === 'string') setTypeId(functionalSubsystemInputEnergyTypeId);
+  }, [functionalSubsystemInputEnergyTypeId]);
+  const selectableTypes = level === '重点设备' && energyRole === '能源消费'
+    ? types.filter((value) => value.energyTypeId === device?.mainEnergyTypeId)
+    : functionalSubsystem
+      ? types.filter((value) => value.energyTypeId === functionalSubsystemInputEnergyTypeId)
+      : roleSelectableTypes;
   const recoveryScopeLevel: ScopeLevel = selectedUnit?.unitLevel === 'level1' ? '一级用能单元' : '二级用能单元';
   const recoveryParentUnit = selectedUnit?.unitLevel === 'level2' ? units.find((unit) => unit.energyUnitId === selectedUnit.parentEnergyUnitId) : selectedUnit;
   const persistedScopeLevel: ScopeLevel = energyRole === '回收能源' && selectedUnit
@@ -575,7 +591,7 @@ function EnergyRecordDialog({ item, dataYear, energyRole = '能源消费', locke
     : level === '重点设备'
       ? deviceUnit?.unitLevel === 'level1' ? '一级用能单元' : '二级用能单元'
       : level;
-  const scopeType = level === '企业' ? 'enterprise' : level === '重点设备' ? 'device' : 'energyUnit';
+  const scopeType: V11EnergyRecord['scopeType'] = level === '企业' ? 'enterprise' : level === '重点设备' ? 'device' : 'energyUnit';
   const scopeId = scopeType === 'enterprise' ? null : scopeType === 'device' ? deviceId : effectiveUnitId;
   const monthNumbers = values.map((value) => Number(value || 0));
   const monthlyTotal = monthNumbers.reduce((sum, value) => sum + value, 0);
@@ -587,7 +603,10 @@ function EnergyRecordDialog({ item, dataYear, energyRole = '能源消费', locke
     const reportedAnnual = monthlyComplete ? 0 : Number(annualValue || 0);
     if (!reportedCount && !(reportedAnnual > 0)) return setError('请至少填写一个月度数据，或补录年度总量。');
     if (reportedAnnual > 0 && reportedAnnual < monthlyTotal) return setError('年度总量不能小于已录月份之和。');
-    const result = saveV11EnergyRecord({ ...item, year: dataYear, energyRole, scopeLevel: persistedScopeLevel, scopeType, scopeId, energyUnitId: effectiveUnitId, energyTypeId: typeId, entryMode: reportedCount ? 'monthly' : 'annual', monthlyAmounts: monthNumbers, monthlyReportedMonths: reported, annualAmount: reportedAnnual, sourceDeviceId: energyRole === '回收能源' ? unitInput ? item?.sourceDeviceId : selectedSourceOption?.deviceId : undefined, sourceProcess: energyRole === '回收能源' ? sourceProcess.trim() || undefined : undefined }, item?.energyRecordId);
+    const nextRecord = { ...item, year: dataYear, energyRole, scopeLevel: persistedScopeLevel, scopeType, scopeId, energyUnitId: effectiveUnitId, energyTypeId: typeId, entryMode: reportedCount ? 'monthly' as const : 'annual' as const, monthlyAmounts: monthNumbers, monthlyReportedMonths: reported, annualAmount: reportedAnnual, sourceDeviceId: energyRole === '回收能源' ? unitInput ? item?.sourceDeviceId : selectedSourceOption?.deviceId : undefined, sourceProcess: energyRole === '回收能源' ? sourceProcess.trim() || undefined : undefined };
+    const hierarchyError = validateV11EnergyRecordHierarchy(nextRecord, item?.energyRecordId);
+    if (hierarchyError) return setError(hierarchyError);
+    const result = saveV11EnergyRecord(nextRecord, item?.energyRecordId);
     if (!result.ok) return setError(result.error);
     if (conversionInput) {
       const saved = listV11EnergyRecords().find((record) => record.year === dataYear && record.energyRole === energyRole && record.energyUnitId === effectiveUnitId && record.energyTypeId === typeId && v11RecordScopeType(record) === scopeType)!;
@@ -604,8 +623,10 @@ function EnergyRecordDialog({ item, dataYear, energyRole = '能源消费', locke
     {energyRole === '回收能源' && level !== '重点设备' && !unitInput && <div className={styles.compactGrid}><Field label="余热产生设备" required>{item ? <div className={styles.readonlyField}>{sourceDeviceName}</div> : <select value={sourceOptionId} onChange={(event) => setSourceOptionId(event.target.value)}><option value="">{legacyRecoveryUnitId ? '历史来源未细化设备，可选择设备补充' : '请选择余热产生设备'}</option>{recoverySourceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>}</Field><Field label="余热产生部位（选填）"><input value={sourceProcess} readOnly={readOnly} placeholder="如冷却系统、烘干段、排烟" onChange={(event) => setSourceProcess(event.target.value)} /></Field></div>}
     {level === '重点设备' ? <div className={styles.deviceEnergySelectors}>
       <Field label="重点设备" required><select disabled={Boolean(initialMonth)} value={deviceId} onChange={(event) => { const id = event.target.value; const nextDevice = devices.find((value) => value.deviceId === id); setDeviceId(id); setTypeId(nextDevice?.mainEnergyTypeId ?? ''); }}><option value="">请选择重点设备</option>{devices.map((value) => <option key={value.deviceId} value={value.deviceId}>{value.deviceName}</option>)}</select></Field>
-      <Field label="能源品种" required><select disabled={Boolean(initialMonth)} value={typeId} onChange={(event) => setTypeId(event.target.value)}><option value="">请选择能源品种</option>{selectableTypes.map((value) => <option key={value.energyTypeId} value={value.energyTypeId}>{value.energyTypeName}</option>)}</select></Field>
-    </div> : energyRole === '回收能源' && !unitInput ? null : <div className={styles.full}><Field label="能源品种" required><select disabled={Boolean(initialMonth)} value={typeId} onChange={(event) => setTypeId(event.target.value)}><option value="">请选择能源品种</option>{selectableTypes.map((value) => <option key={value.energyTypeId} value={value.energyTypeId}>{value.energyTypeName}</option>)}</select></Field></div>}
+      <Field label="能源品种" required><select disabled={Boolean(initialMonth) || level === '重点设备'} value={typeId} onChange={(event) => setTypeId(event.target.value)}><option value="">请选择能源品种</option>{selectableTypes.map((value) => <option key={value.energyTypeId} value={value.energyTypeId}>{value.energyTypeName}</option>)}</select></Field>
+    </div> : energyRole === '回收能源' && !unitInput ? null : <div className={styles.full}><Field label="能源品种" required><select disabled={Boolean(initialMonth) || Boolean(functionalSubsystem)} value={typeId} onChange={(event) => setTypeId(event.target.value)}><option value="">请选择能源品种</option>{selectableTypes.map((value) => <option key={value.energyTypeId} value={value.energyTypeId}>{value.energyTypeName}</option>)}</select></Field></div>}
+    {functionalSubsystem && <div className={`${styles.full} ${styles.helpText}`}>{typeof functionalSubsystemInputEnergyTypeId === 'string' ? '供能子系统及其设备的能源消费品种固定为该子系统的投入能源；转换产出能源单独维护。' : '请先在用能单元档案中配置唯一的投入能源品种。'}</div>}
+    {level === '重点设备' && energyRole === '能源消费' && <div className={`${styles.full} ${styles.helpText}`}>设备能源品种按设备档案的主要能源品种固定；设备数据用于设备分析，不汇总至所属用能单元。</div>}
     <div className={`${styles.full} ${styles.helpText}`}>{energyRole === '回收能源' ? `按实际已取得月份填报（单位：${type?.measurementUnit ?? '—'}）；月度数据不完整时可补录年度总量，系统不会自动分摊缺失月份。` : '按实际已取得月份填报；月度数据不完整时可补录年度总量，系统不会自动分摊缺失月份。'}</div>
     <div className={`${styles.monthGrid} ${styles.full}`}>{months.map((month, index) => <Field key={month} label={month}><input aria-label={`${month}能源数量`} autoFocus={initialMonth === index + 1} type="number" min="0" step="any" value={values[index]} readOnly={readOnly} onChange={(event) => { const value = event.target.value; setValues((current) => current.map((item, i) => i === index ? value : item)); setReported((current) => current.map((item, i) => i === index ? value !== '' : item)); }} /></Field>)}</div>
     {<div className={styles.full}><Field label={`${monthlyComplete ? '年度合计' : '年度总量补录'}${type ? `（${type.measurementUnit}）` : ''}`}><input type="number" min="0" step="any" value={monthlyComplete ? String(monthlyTotal) : annualValue} readOnly={readOnly || monthlyComplete} placeholder={monthlyComplete ? '' : '月度不完整或仅有年度台账时填写'} onChange={(event) => setAnnualValue(event.target.value)} /></Field></div>}
@@ -1109,7 +1130,11 @@ function DeviceDialog({ item, dialogPreset, onClose, onSaved }: { item?: V11KeyD
   const [maintenanceYear] = useDataYear();
   const units = listEnergyUnits(Number(maintenanceYear));
   const types = listV11EnergyTypes(Number(maintenanceYear));
-  const selectableTypes = types.filter((type) => type.energyTypeId === item?.mainEnergyTypeId || isV11EnergyTypeEnabled(type.energyTypeId, Number(maintenanceYear)));
+  const hasEnergyConsumptionRecords = Boolean(item && listV11EnergyRecords().some((record) =>
+    record.year === Number(maintenanceYear)
+    && record.scopeType === 'device'
+    && record.scopeId === item.deviceId
+    && record.energyRole === '能源消费'));
   const initialUnit = units.find((unit) => unit.energyUnitId === item?.energyUnitId);
   const initialPreset = deviceTypePresets.includes(item?.deviceType ?? '') ? item?.deviceType ?? '' : item ? '其他（自定义）' : '';
   const presetRootUnit = units.find((unit) => unit.energyUnitId === dialogPreset?.rootUnitId);
@@ -1132,6 +1157,16 @@ function DeviceDialog({ item, dialogPreset, onClose, onSaved }: { item?: V11KeyD
   const selectedUnit = units.find((unit) => unit.energyUnitId === unitId);
   const selectedParentUnit = units.find((unit) => unit.energyUnitId === parentUnitId);
   const hasRootContext = Boolean(dialogPreset);
+  const functionalSubsystem = selectedUnit?.unitLevel === 'level2' && selectedUnit.unitType === '能源转换子系统';
+  const functionalSubsystemInputEnergyTypeId = functionalSubsystem
+    ? v11FunctionalSubsystemInputEnergyTypeId(selectedUnit.energyUnitId, Number(maintenanceYear))
+    : undefined;
+  useEffect(() => {
+    if (typeof functionalSubsystemInputEnergyTypeId === 'string') setTypeId(functionalSubsystemInputEnergyTypeId);
+  }, [functionalSubsystemInputEnergyTypeId]);
+  const selectableTypes = types.filter((type) => (
+    type.energyTypeId === item?.mainEnergyTypeId || isV11EnergyTypeEnabled(type.energyTypeId, Number(maintenanceYear))
+  ) && (!functionalSubsystem || type.energyTypeId === functionalSubsystemInputEnergyTypeId));
   return <Modal title={`${item ? '编辑重点设备档案' : '新增重点设备'}（${maintenanceYear}年度）`} width={720} submitText="保存设备" onClose={onClose} onSubmit={() => {
     const deviceType = preset === '其他（自定义）' ? customType.trim() : preset;
     const resolvedUnitId = hasRootContext ? (presetRootIsLevelOne ? parentUnitId : unitId) : unitId;
@@ -1156,7 +1191,9 @@ function DeviceDialog({ item, dialogPreset, onClose, onSaved }: { item?: V11KeyD
         <Field label="设备名称" required><input value={name} onChange={(event) => setName(event.target.value)} placeholder="请输入设备名称" /></Field>
         <Field label="设备类型" required><select value={preset} onChange={(event) => { setPreset(event.target.value); if (event.target.value !== '其他（自定义）') setCustomType(''); }}><option value="">请选择设备类型</option>{deviceTypePresets.map((value) => <option key={value}>{value}</option>)}</select></Field>
         {preset === '其他（自定义）' && <Field label="自定义设备类型" required><input value={customType} onChange={(event) => setCustomType(event.target.value)} placeholder="请输入具体设备类型" /></Field>}
-        <Field label="主要能源品种" required><select value={typeId} onChange={(event) => setTypeId(event.target.value)}><option value="">请选择主要能源品种</option>{selectableTypes.map((type) => <option key={type.energyTypeId} value={type.energyTypeId}>{type.energyTypeName}</option>)}</select></Field>
+        <Field label="主要能源品种" required><select disabled={hasEnergyConsumptionRecords || functionalSubsystem} value={typeId} onChange={(event) => setTypeId(event.target.value)}><option value="">请选择主要能源品种</option>{selectableTypes.map((type) => <option key={type.energyTypeId} value={type.energyTypeId}>{type.energyTypeName}</option>)}</select></Field>
+        {functionalSubsystem && <div className={`${styles.full} ${styles.helpText}`}>{typeof functionalSubsystemInputEnergyTypeId === 'string' ? '供能子系统下的设备能源品种继承该子系统的投入能源。' : '请先在用能单元档案中配置唯一的投入能源品种。'}</div>}
+        {hasEnergyConsumptionRecords && <div className={`${styles.full} ${styles.helpText}`}>该设备已有能源消费记录；如需更改主要能源品种，请先处理设备能源数据。</div>}
         <Field label="设备产出口径" required><input value={outputBasis} onChange={(event) => setOutputBasis(event.target.value)} placeholder="例如：供气量、发电量、产品产量" /></Field>
       </div>
     </section>
@@ -1167,7 +1204,7 @@ function DeviceDialog({ item, dialogPreset, onClose, onSaved }: { item?: V11KeyD
         {hasRootContext && <Field label="归属方式" required><select aria-label="重点设备归属层级" value={scopeLevel} onChange={(event) => { setScopeLevel(event.target.value as '一级用能单元' | '二级用能单元'); setUnitId(''); }}><option value="一级用能单元">一级单元直属设备</option><option value="二级用能单元">二级用能单元设备</option></select></Field>}
         {!hasRootContext && scopeLevel === '二级用能单元' && <Field label="所属一级用能单元" required><select aria-label="重点设备所属一级用能单元" value={parentUnitId} onChange={(event) => { setParentUnitId(event.target.value); setUnitId(''); }}><option value="">请选择所属一级用能单元</option>{levelOneUnits.map((unit) => <option key={unit.energyUnitId} value={unit.energyUnitId}>{unit.energyUnitName}</option>)}</select></Field>}
         {hasRootContext && scopeLevel === '一级用能单元' && <div className={styles.readonlyInfo}><span>归属单元</span><strong>{selectedParentUnit?.energyUnitName ?? '—'}（直属设备）</strong></div>}
-        {(!hasRootContext || scopeLevel === '二级用能单元') && <Field label={hasRootContext ? '所属二级用能单元' : '所属用能单元'} required><select aria-label={hasRootContext ? '所属二级用能单元' : '重点设备所属用能单元'} disabled={scopeLevel === '二级用能单元' && !parentUnitId} value={unitId} onChange={(event) => setUnitId(event.target.value)}><option value="">{scopeLevel === '二级用能单元' && !parentUnitId ? '请先选择所属一级用能单元' : hasRootContext ? '请选择所属二级用能单元' : '请选择所属用能单元'}</option>{availableUnits.map((unit) => <option key={unit.energyUnitId} value={unit.energyUnitId}>{unit.energyUnitName}</option>)}</select></Field>}
+        {(!hasRootContext || scopeLevel === '二级用能单元') && <Field label={hasRootContext ? '所属二级用能单元' : '所属用能单元'} required><select aria-label={hasRootContext ? '所属二级用能单元' : '重点设备所属用能单元'} disabled={scopeLevel === '二级用能单元' && !parentUnitId} value={unitId} onChange={(event) => { const nextUnitId = event.target.value; setUnitId(nextUnitId); const nextEnergyTypeId = v11FunctionalSubsystemInputEnergyTypeId(nextUnitId, Number(maintenanceYear)); if (nextEnergyTypeId) setTypeId(nextEnergyTypeId); }}><option value="">{scopeLevel === '二级用能单元' && !parentUnitId ? '请先选择所属一级用能单元' : hasRootContext ? '请选择所属二级用能单元' : '请选择所属用能单元'}</option>{availableUnits.map((unit) => <option key={unit.energyUnitId} value={unit.energyUnitId}>{unit.energyUnitName}</option>)}</select></Field>}
       </div>
     </section>}
     <section className={styles.deviceFormSection}>
