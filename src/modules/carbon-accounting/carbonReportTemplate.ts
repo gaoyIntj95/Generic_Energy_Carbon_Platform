@@ -16,6 +16,7 @@ export const reportSupplementFields: { key: keyof CarbonReportBasicInfo; label: 
   { key: 'businessScope', label: '企业经营范围', section: 'enterprise', multiline: true },
   { key: 'preparer', label: '报告编制人', section: 'report' },
   { key: 'reportDepartment', label: '报告编制部门', section: 'report' },
+  { key: 'preparationDate', label: '编制日期', section: 'report' },
   { key: 'boundaryDescription', label: '报告边界', section: 'report', multiline: true },
   { key: 'internalVerificationDate', label: '内部查证日期', section: 'verification' },
   { key: 'internalVerificationLead', label: '内部查证牵头部门', section: 'verification' },
@@ -108,7 +109,7 @@ export function buildCarbonReportContent(report: CarbonReportRecord, snapshot: C
     const selected = rows.filter((row) => row.emissionCategory.includes(keyword));
     return selected.length ? `${number(sum(selected))} tCO₂e` : '未纳入本次核算';
   };
-  const date = report.generatedAt.slice(0, 10).split('-');
+  const date = (info.preparationDate?.trim() || report.generatedAt.slice(0, 10)).split('-');
   const values: Record<string, string> = {
     '输入:企业名称': info.organizationName,
     '输入：企业名称': info.organizationName,
@@ -116,6 +117,7 @@ export function buildCarbonReportContent(report: CarbonReportRecord, snapshot: C
     '输入:报告年度': String(report.year),
     '系统:报告年度': String(report.year),
     '输入：编制人': info.preparer,
+    '编制日期': info.preparationDate,
     '输入:总经理姓名': info.generalManager,
     'current_year': date[0] || '',
     'current_month': date[1] || '',

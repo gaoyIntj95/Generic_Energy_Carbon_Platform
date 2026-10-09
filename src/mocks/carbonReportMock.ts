@@ -4,6 +4,7 @@ export interface CarbonReportBasicInfo {
   industryCategory: string;
   businessScope: string;
   preparer: string;
+  preparationDate: string;
   generalManager: string;
   boundaryDescription: string;
   internalVerificationDate: string;

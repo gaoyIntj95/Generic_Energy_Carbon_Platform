@@ -15,9 +15,11 @@ it('fills the marked Word template with the bound formal inventory and every sup
   report.factorTexts = captureReportFactorTexts(snapshot);
   expect(Object.keys(report.factorTexts)).toHaveLength(snapshot.sourceItems.length);
   reportSupplementFields.forEach(({ key }) => { info[key] = key === 'organizationName' ? '报告测试企业' : `${key}测试值`; });
+  info.preparationDate = '2026-08-09';
   const preview = buildCarbonReportContent(report, snapshot, info);
   expect(JSON.stringify(preview.blocks)).not.toContain('{{');
   expect(preview.blocks.some((block) => block.kind === 'paragraph' && block.text.includes('报告测试企业在2026年度核算边界内总排放量为12,980.53 tCO₂e'))).toBe(true);
+  expect(preview.blocks.some((block) => block.kind === 'paragraph' && block.text.includes('编制日期：2026 年 08 月 09 日'))).toBe(true);
   const tocEntries = preview.blocks.filter((block) => block.kind === 'paragraph' && block.style.startsWith('toc ')).map((block) => block.text.split('\t')[0]);
   expect(tocEntries).toContain('3.1 温室气体排放核算结果');
   expect(tocEntries).toContain('3.5 特殊排放');

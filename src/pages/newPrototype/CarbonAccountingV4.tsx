@@ -82,6 +82,22 @@ type DrawerState =
 const format = (value: number, digits = 2) =>
   value.toLocaleString('zh-CN', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
+const reportDateKey = (value: string) => {
+  const match = value.match(/(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})/);
+  if (!match) return value.slice(0, 10);
+  return `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+};
+
+const reportDateLabel = (dateKey: string) => {
+  const match = dateKey.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[1]}年${match[2]}月${match[3]}日` : dateKey;
+};
+
+const reportTimeLabel = (value: string) => {
+  const match = value.match(/(?:^|\s|T)(\d{1,2}):(\d{2})/);
+  return match ? `${match[1].padStart(2, '0')}:${match[2]}` : '—';
+};
+
 const createTarBlob = (files: Array<{ name: string; content: string }>) => {
   const encoder = new TextEncoder();
   const blocks: Uint8Array[] = [];
@@ -584,6 +600,7 @@ function ReportInfoDialog({
     businessScope: '请输入企业经营范围',
     preparer: '请输入报告编制人',
     reportDepartment: '请输入报告编制部门',
+    preparationDate: '请选择编制日期',
     boundaryDescription: '请输入本次报告的核算边界',
     internalVerificationLead: '请输入牵头部门',
     internalVerificationParticipants: '请输入参与部门，多个部门以顿号分隔',
@@ -599,7 +616,7 @@ function ReportInfoDialog({
         {reportSupplementFields.filter((field) => field.section === section).map(({ key, label, multiline }) => <Field key={key} label={label} full={multiline || key === 'contactAddress' || key === 'internalVerificationParticipants'}>
           {multiline
             ? <textarea aria-label={label} placeholder={placeholders[key]} value={info[key]} onChange={(event) => update(key, event.target.value)} />
-            : <input aria-label={label} type={key === 'internalVerificationDate' ? 'date' : 'text'} placeholder={placeholders[key]} value={info[key]} onChange={(event) => update(key, event.target.value)} />}
+            : <input aria-label={label} type={key === 'internalVerificationDate' || key === 'preparationDate' ? 'date' : 'text'} placeholder={placeholders[key]} value={info[key]} onChange={(event) => update(key, event.target.value)} />}
         </Field>)}
       </div>
     </section>)}
@@ -1636,6 +1653,14 @@ function CarbonReportPage({
   const snapshots = listCarbonSnapshots();
   const visibleReports = reports.filter((report) =>
     report.year === year && report.reportName.includes(keyword.trim()));
+  const reportGroups = [...new Set(visibleReports.map((report) => reportDateKey(report.generatedAt)))]
+    .sort((left, right) => right.localeCompare(left))
+    .map((dateKey) => ({
+      dateKey,
+      reports: visibleReports
+        .filter((report) => reportDateKey(report.generatedAt) === dateKey)
+        .sort((left, right) => right.generatedAt.localeCompare(left.generatedAt)),
+    }));
   const selectedReport = reports.find((report) => report.carbonReportId === selectedId)
     ?? visibleReports[0]
     ?? reports[0];
@@ -1738,11 +1763,9 @@ function CarbonReportPage({
           <span>⌕</span>
         </div>
         <div className={styles.reportList}>
-          {([['7天内', '今天'], ['30天内', '更早']] as const).map(([group, label]) => {
-            const groupReports = visibleReports.filter((report) => report.recentGroup === group);
-            if (!groupReports.length) return null;
-            return <section key={group}>
-              <h3><span>⌁</span>{label}</h3>
+          {reportGroups.map(({ dateKey, reports: groupReports }) =>
+            <section key={dateKey}>
+              <h3><span>⌁</span>{reportDateLabel(dateKey)}</h3>
               {groupReports.map((report) =>
                 <button
                   type="button"
@@ -1752,9 +1775,9 @@ function CarbonReportPage({
                   title={report.reportName}
                 >
                   <b>{report.reportName}</b>
+                  <small>生成时间 {reportTimeLabel(report.generatedAt)}</small>
                 </button>)}
-            </section>;
-          })}
+            </section>)}
           {!visibleReports.length && <div className={styles.reportListEmpty}>未找到匹配的报告</div>}
         </div>
       </aside>

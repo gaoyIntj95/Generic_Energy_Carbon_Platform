@@ -2060,7 +2060,12 @@
 }
 
 .reportList h3 span {
-  color: #27a77c;
+  display: block;
+  width: 4px;
+  height: 24px;
+  border-radius: 2px;
+  background: #27a77c;
+  font-size: 0;
 }
 
 .reportList button {
@@ -2123,10 +2128,10 @@
 .reportSearch input { height: 50px; padding-left: 16px; font-size: 17px; border-radius: 8px; }
 .reportSearch span { top: 12px; right: 14px; font-size: 22px; }
 .reportList section { padding: 16px 6px 22px; }
-.reportList h3 { margin: 0 0 12px; font-size: 22px; }
-.reportList button { padding: 14px 18px; font-size: 18px; border-radius: 14px; }
-.reportList button b { font-size: 18px; font-weight: 400; }
-.reportList button small { display: none; }
+.reportList h3 { margin: 0 0 12px; font-size: 17px; }
+.reportList button { padding: 11px 18px; font-size: 16px; border-radius: 14px; }
+.reportList button b { font-size: 16px; font-weight: 400; }
+.reportList button small { display: block; margin-top: 5px; font-size: 13px; }
 .reportList .reportListActive { color: #111; background: #edf7fb; }
 
 .reportPreviewPane {

@@ -139,6 +139,12 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
     expect(container.textContent).toContain('第3章 温室气体量化');
     expect(container.textContent).toContain('表2 温室气体排放核算清单');
     expect(container.textContent).toContain('12,980.53');
+    expect(container.textContent).toContain('2026年07月06日');
+    expect(container.textContent).toContain('2026年07月04日');
+    expect(container.textContent).toContain('2026年06月29日');
+    expect(container.textContent).toContain('生成时间 18:00');
+    expect(container.textContent).not.toContain('今天');
+    expect(container.textContent).not.toContain('更早');
     expect(container.querySelector('details')).not.toBeNull();
     expect(container.textContent).not.toContain('正式汇总与清单明细相差');
     expect(container.textContent).not.toContain('核对差异');
@@ -150,6 +156,7 @@ describe('CarbonAccountingV4 prototype fidelity and interactions', () => {
     expect(dialog.textContent).toContain('内部查证');
     expect(dialog.textContent).toContain('联系信息');
     expect(dialog.textContent).toContain('内部查证牵头部门');
+    expect(dialog.querySelector('input[aria-label="编制日期"]')?.getAttribute('type')).toBe('date');
     expect(dialog.textContent).not.toContain('请补充 Word 模板中无法从系统取得的信息');
     const field = dialog.querySelector<HTMLInputElement>('input[aria-label="报告编制人"]')!;
     await act(async () => {
