@@ -42,7 +42,7 @@ import {
 import type { CarbonAccountingTask, EmissionSource } from '../../types/platformDomain';
 import { listV11EnergyRecords, listV11EnergyTypes, listV11KeyDevices, v11EnergyRecordAnnualAmount, v11RecordScopeType, type V11EnergyRecord } from '../../mocks/dataManagementV11Store';
 import { listEnergyUnits } from '../../mocks/energyUnitMockStore';
-import { downloadHtmlReport } from '../../utils/reportDownload';
+import { buildCarbonReportContent, captureReportFactorTexts, createCarbonReportDocx, emptyReportInfo, reportSupplementFields } from '../../modules/carbon-accounting/carbonReportTemplate';
 import { EVIDENCE_FILE_ACCEPT, filterEvidenceFiles } from '../../utils/evidenceFile';
 import styles from './CarbonAccountingV4.module.css';
 
@@ -81,6 +81,22 @@ type DrawerState =
 
 const format = (value: number, digits = 2) =>
   value.toLocaleString('zh-CN', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+
+const reportDateKey = (value: string) => {
+  const match = value.match(/(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})/);
+  if (!match) return value.slice(0, 10);
+  return `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+};
+
+const reportDateLabel = (dateKey: string) => {
+  const match = dateKey.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[1]}年${match[2]}月${match[3]}日` : dateKey;
+};
+
+const reportTimeLabel = (value: string) => {
+  const match = value.match(/(?:^|\s|T)(\d{1,2}):(\d{2})/);
+  return match ? `${match[1].padStart(2, '0')}:${match[2]}` : '—';
+};
 
 const createTarBlob = (files: Array<{ name: string; content: string }>) => {
   const encoder = new TextEncoder();
@@ -128,8 +144,7 @@ const emissionCategoryDictionary = ['化石燃料燃烧排放', '生产过程排
 const emissionScopeDictionary = [
   { id: 'scope-1', label: '范围一：直接排放', categories: ['化石燃料燃烧排放', '生产过程排放', '废弃物处理处置排放', '逸散排放'] },
   { id: 'scope-2', label: '范围二：间接排放', categories: ['购入的电力与热力产生的排放'] },
-  { id: 'scope-3', label: '范围三：其他间接排放', categories: ['交通运输产生的排放', '所使用的产品和服务隐含的排放', '所生产的产品和服务的排放'] },
-  { id: 'other', label: '其他排放', categories: ['其他排放'] },
+  { id: 'scope-3', label: '范围三：其他间接排放', categories: ['交通运输产生的排放', '所使用的产品和服务隐含的排放', '所生产的产品和服务的排放', '其他排放'] },
   { id: 'special', label: '特殊排放', categories: ['特殊排放'] },
 ] as const;
 
@@ -572,21 +587,39 @@ function ReportInfoDialog({
   setInfo: (info: CarbonReportBasicInfo) => void;
 }) {
   const update = (key: keyof CarbonReportBasicInfo, value: string) => setInfo({ ...info, [key]: value });
-  return <Dialog title="确认报告基础信息" className={styles.reportInfoDialog} onClose={close} footer={<><Button onClick={close}>取消</Button><Button primary onClick={confirm}>确认并生成报告</Button></>}>
-    <div className={styles.reportInfoHint}>请确认本次报告中的企业主体、联系人及责任人信息。确认后将生成当前正式核算版本的报告。</div>
-    <div className={styles.formGrid}>
-      <Field label="企业名称"><input value={info.organizationName} onChange={(event) => update('organizationName', event.target.value)} /></Field>
-      <Field label="统一社会信用代码"><input value={info.unifiedSocialCreditCode} onChange={(event) => update('unifiedSocialCreditCode', event.target.value)} /></Field>
-      <Field label="注册地址" full><input value={info.registeredAddress} onChange={(event) => update('registeredAddress', event.target.value)} placeholder="请输入注册地址" /></Field>
-      <Field label="公司法人"><input value={info.legalRepresentative} onChange={(event) => update('legalRepresentative', event.target.value)} placeholder="示例：张三" /></Field>
-      <Field label="行业类别（国民经济行业分类（GB/T 4754-2017））"><input value={info.industryCategory} onChange={(event) => update('industryCategory', event.target.value)} placeholder="示例：M7590 其他科技推广服务业" /></Field>
-      <Field label="组织经营范围" full><textarea value={info.businessScope} onChange={(event) => update('businessScope', event.target.value)} placeholder="示例：一般项目：计算机软硬件、网络、电信专业领域内的技术服务、技术咨询、技术开发、技术转让；商务信息咨询；计算机软硬件销售（除依法须经批准的项目外，凭营业执照依法自主开展经营活动）。" /></Field>
-      <Field label="报告编制人"><input value={info.preparer} onChange={(event) => update('preparer', event.target.value)} placeholder="示例：王五" /></Field>
-      <Field label="部门"><input value={info.preparerDepartment} onChange={(event) => update('preparerDepartment', event.target.value)} placeholder="示例：碳排放管理部" /></Field>
-      <Field label="联系电话"><input value={info.preparerPhone} onChange={(event) => update('preparerPhone', event.target.value)} placeholder="示例：13800000000" /></Field>
-      <Field label="报告审核人"><input value={info.reviewer} onChange={(event) => update('reviewer', event.target.value)} placeholder="示例：李四" /></Field>
-      <Field label="组织边界说明" full><textarea value={info.boundaryDescription} onChange={(event) => update('boundaryDescription', event.target.value)} placeholder="示例：本公司按照营运控制的方式对XX有限公司的盘查地址（XX省XX市XX区XX路451号）内的所有设施作为组织边界，对组织边界内的排放源及排放量给予盘查和报告。" /></Field>
-    </div>
+  const sections = [
+    { key: 'enterprise', title: '企业信息', className: styles.reportInfoGridEnterprise },
+    { key: 'report', title: '报告信息', className: styles.reportInfoGridTwo },
+    { key: 'verification', title: '内部查证', className: styles.reportInfoGridTwo },
+    { key: 'contact', title: '联系信息', className: styles.reportInfoGridContact },
+  ] as const;
+  const placeholders: Partial<Record<keyof CarbonReportBasicInfo, string>> = {
+    industryCategory: '请输入所属行业及行业代码',
+    generalManager: '请输入总经理姓名',
+    registeredAddress: '请输入企业地址',
+    businessScope: '请输入企业经营范围',
+    preparer: '请输入报告编制人',
+    reportDepartment: '请输入报告编制部门',
+    preparationDate: '请选择编制日期',
+    boundaryDescription: '请输入本次报告的核算边界',
+    internalVerificationLead: '请输入牵头部门',
+    internalVerificationParticipants: '请输入参与部门，多个部门以顿号分隔',
+    contactName: '请输入联系人',
+    contactDepartment: '请输入联系部门',
+    contactPhone: '请输入联系电话',
+    contactAddress: '请输入联系地址',
+  };
+  return <Dialog title="补充报告信息" className={styles.reportInfoDialog} onClose={close} footer={<><Button onClick={close}>取消</Button><Button primary onClick={confirm}>生成报告</Button></>}>
+    {sections.map(({ key: section, title, className }) => <section className={styles.reportInfoSection} key={section}>
+      <h3>{title}</h3>
+      <div className={`${styles.reportInfoGrid} ${className}`}>
+        {reportSupplementFields.filter((field) => field.section === section).map(({ key, label, multiline }) => <Field key={key} label={label} full={multiline || key === 'contactAddress' || key === 'internalVerificationParticipants'}>
+          {multiline
+            ? <textarea aria-label={label} placeholder={placeholders[key]} value={info[key]} onChange={(event) => update(key, event.target.value)} />
+            : <input aria-label={label} type={key === 'internalVerificationDate' || key === 'preparationDate' ? 'date' : 'text'} placeholder={placeholders[key]} value={info[key]} onChange={(event) => update(key, event.target.value)} />}
+        </Field>)}
+      </div>
+    </section>)}
   </Dialog>;
 }
 
@@ -1610,91 +1643,40 @@ function CarbonReportPage({
   notify: (message: string) => void;
 }) {
   const [reports, setReports] = useState<CarbonReportRecord[]>(() => listCarbonReportMocks());
-  const [year, setYear] = useState(2026);
+  const [year, setYear] = useState(() => listCarbonReportMocks()[0]?.year ?? 2026);
   const [keyword, setKeyword] = useState('');
   const [selectedId, setSelectedId] = useState(() => listCarbonReportMocks()[0]?.carbonReportId ?? '');
-  const [selectedTaskId, setSelectedTaskId] = useState('ct-2026');
-  const [selectedVersion, setSelectedVersion] = useState(1);
+  const [selectedTaskId, setSelectedTaskId] = useState(() => listCarbonReportMocks()[0]?.carbonTaskId ?? 'ct-2026');
+  const [selectedVersion, setSelectedVersion] = useState(() => listCarbonReportMocks()[0]?.version ?? 1);
   const [reportInfoOpen, setReportInfoOpen] = useState(false);
-  const [reportInfo, setReportInfo] = useState<CarbonReportBasicInfo>(() => ({
-    organizationName: listCarbonReportMocks()[0]?.organizationName ?? 'XX科技有限公司',
-    unifiedSocialCreditCode: '9132XXXXXXXXXXXXXX',
-    registeredAddress: '',
-    industryCategory: '',
-    businessScope: '',
-    legalRepresentative: '',
-    preparerPhone: '',
-    preparer: '',
-    preparerDepartment: '',
-    reviewer: '',
-    boundaryDescription: '',
-  }));
+  const [reportInfo, setReportInfo] = useState<CarbonReportBasicInfo>(() => emptyReportInfo(listCarbonReportMocks()[0]?.organizationName));
   const snapshots = listCarbonSnapshots();
   const visibleReports = reports.filter((report) =>
     report.year === year && report.reportName.includes(keyword.trim()));
+  const reportGroups = [...new Set(visibleReports.map((report) => reportDateKey(report.generatedAt)))]
+    .sort((left, right) => right.localeCompare(left))
+    .map((dateKey) => ({
+      dateKey,
+      reports: visibleReports
+        .filter((report) => reportDateKey(report.generatedAt) === dateKey)
+        .sort((left, right) => right.generatedAt.localeCompare(left.generatedAt)),
+    }));
   const selectedReport = reports.find((report) => report.carbonReportId === selectedId)
     ?? visibleReports[0]
     ?? reports[0];
-  const reportDateParts = selectedReport?.generatedAt.slice(0, 10).split('-') ?? [];
-  const reportDate = reportDateParts.length === 3
-    ? `${reportDateParts[0]} 年 ${reportDateParts[1]} 月 ${reportDateParts[2]} 日`
-    : selectedReport?.generatedAt.slice(0, 10) ?? '—';
   const selectedSnapshot = snapshots.find((snapshot) =>
-    snapshot.carbonSnapshotId === selectedReport?.carbonSnapshotId)
-    ?? snapshots.find((snapshot) =>
-      snapshot.year === selectedReport?.year && snapshot.version === selectedReport?.version);
+    snapshot.carbonSnapshotId === selectedReport?.carbonSnapshotId);
   const reportInventory = selectedSnapshot?.sourceItems ?? [];
   const totalEmission = selectedSnapshot?.totalEmission ?? 0;
-  const defaultReportInfo = (report?: CarbonReportRecord): CarbonReportBasicInfo => ({
-    organizationName: report?.organizationName ?? 'XX科技有限公司',
-    unifiedSocialCreditCode: '9132XXXXXXXXXXXXXX',
-    registeredAddress: '',
-    industryCategory: '',
-    businessScope: '',
-    legalRepresentative: '',
-    preparerPhone: '',
-    preparer: '',
-    preparerDepartment: '',
-    reviewer: '',
-    boundaryDescription: '',
-  });
+  const defaultReportInfo = (report?: CarbonReportRecord) => emptyReportInfo(report?.organizationName);
   const selectedBasicInfo = selectedReport?.basicInfo ?? reportInfo;
-  const categoryRows = [...new Set(reportInventory.map((row) => row.emissionCategory))].map((category) => {
-    const rows = reportInventory.filter((row) => row.emissionCategory === category);
-    return {
-      category,
-      count: rows.length,
-      amount: rows.reduce((total, row) => total + row.emissionAmount, 0),
-    };
-  });
-  const amountFor = (keyword: string) => categoryRows.find((row) => row.category.includes(keyword))?.amount ?? 0;
-  const inventoryRowsFor = (keyword: string, activity?: string) => reportInventory.filter((row) => row.emissionCategory.includes(keyword) && (!activity || getCarbonFactorV4(row.emissionFactorId)?.activity === activity));
-  const reportGasFor = (keyword: string, fallback: string, activity?: string) => {
-    const gases = [...new Set(inventoryRowsFor(keyword, activity).map((row) => getCarbonFactorV4(row.emissionFactorId)?.ghgType ?? getCarbonFactorV4(row.emissionFactorId)?.gas ?? row.greenhouseGasSpecies[0]).filter(Boolean))];
-    return gases.length ? gases.join('、') : fallback;
-  };
-  const reportGwpFor = (keyword: string, fallback: string, activity?: string) => {
-    const values = [...new Set(inventoryRowsFor(keyword, activity).flatMap((row) => {
-      const factor = getCarbonFactorV4(row.emissionFactorId);
-      const parameter = factor?.parameters?.find((item) => item.key === 'gwp');
-      if (parameter) return [parameter.display];
-      if (factor?.objectType === 'GWP值') {
-        const value = Number(factor.value);
-        return Number.isFinite(value) ? [String(factor.unit.includes('/kg') ? value * 1000 : value)] : [];
-      }
-      return factor && ['CO₂', 'CO₂e'].includes(factorGasForRow(factor)) ? ['1'] : [];
-    }))];
-    return values.length ? values.join('、') : fallback;
-  };
-  const reportSourceRows = [
-    { source: '化石燃料燃烧', scope: '范围一', gas: reportGasFor('化石燃料', 'CO₂'), gwp: reportGwpFor('化石燃料', '1'), amount: amountFor('化石燃料') },
-    { source: '生产过程排放', scope: '范围一', gas: reportGasFor('生产过程', 'CO₂'), gwp: reportGwpFor('生产过程', '1'), amount: amountFor('生产过程') },
-    { source: '废弃物处理处置排放', scope: '范围一', gas: reportGasFor('废弃物', 'CH₄'), gwp: reportGwpFor('废弃物', '—'), amount: amountFor('废弃物') },
-    { source: '逸散排放', scope: '范围一', gas: reportGasFor('逸散', '—'), gwp: reportGwpFor('逸散', '—'), amount: amountFor('逸散') },
-    { source: '购入电力', scope: '范围二', gas: reportGasFor('购入的电力', 'CO₂', '购入电力'), gwp: reportGwpFor('购入的电力', '1', '购入电力'), amount: amountFor('购入的电力') },
-    { source: '购入热力', scope: '范围二', gas: reportGasFor('购入的电力', 'CO₂', '购入热力'), gwp: reportGwpFor('购入的电力', '1', '购入热力'), amount: amountFor('购入的电力') },
-    { source: '其他排放源', scope: '范围三', gas: '—', gwp: '—', amount: 0 },
-  ];
+  const reportContent = selectedReport && selectedSnapshot
+    ? buildCarbonReportContent(selectedReport, selectedSnapshot, selectedBasicInfo)
+    : null;
+  const reportBlocks = reportContent?.blocks ?? [];
+  const firstChapter = reportBlocks.findIndex((block) => block.kind === 'paragraph' && block.style === 'Heading 1');
+  const bodyStart = firstChapter >= 0 ? firstChapter : 6;
+  const coverText = (index: number) => reportBlocks[index]?.kind === 'paragraph' ? reportBlocks[index].text : '';
   const selectYear = (nextYear: number) => {
     setYear(nextYear);
     const next = reports.find((report) => report.year === nextYear);
@@ -1731,25 +1713,39 @@ function CarbonReportPage({
       version: snapshot.version,
       generatedAt,
       basicInfo: reportInfo,
+      factorTexts: captureReportFactorTexts(snapshot),
     });
-    setReports((items) => [report, ...items]);
+    setReports(listCarbonReportMocks());
     setSelectedId(report.carbonReportId);
     setReportInfoOpen(false);
-    notify('已基于所选正式核算版本生成排放报告');
   };
-  const generateReport = () => setReportInfoOpen(true);
+  const generateReport = () => {
+    const snapshot = snapshots.find((item) => item.carbonTaskId === selectedTaskId && item.version === selectedVersion);
+    if (!snapshot) {
+      notify('所选核算任务没有对应正式版本，无法生成报告');
+      return;
+    }
+    const task = tasks.find((item) => item.carbonTaskId === selectedTaskId);
+    setReportInfo((current) => ({ ...current, organizationName: task?.organizationName ?? current.organizationName }));
+    setReportInfoOpen(true);
+  };
   const selectReport = (report: CarbonReportRecord) => {
     setSelectedId(report.carbonReportId);
     setReportInfo(report.basicInfo ?? defaultReportInfo(report));
   };
-  const exportReport = () => {
-    if (!selectedReport) return;
-    downloadHtmlReport({
-      filename: `${selectedReport.reportName}.html`,
-      title: selectedReport.reportName,
-      content: `<p>报告名称：${selectedReport.reportName}</p><p>核算年度：${selectedReport.year}年　核算主体：${selectedReport.organizationName}</p><p>核算任务：${selectedReport.taskName}　正式版本：V${selectedReport.version}　生成时间：${selectedReport.generatedAt}</p><h2>排放报告</h2><p>排放总量：${format(totalEmission)} tCO₂e</p><table><thead><tr><th>排放类别</th><th>排放源数量</th><th>排放量（tCO₂e）</th></tr></thead><tbody>${categoryRows.map((row) => `<tr><td>${row.category}</td><td>${row.count}</td><td>${format(row.amount)}</td></tr>`).join('')}</tbody></table>`,
-    });
-    notify('报告已下载');
+  const exportReport = async () => {
+    if (!selectedReport || !selectedSnapshot) return;
+    try {
+      const blob = await createCarbonReportDocx(selectedReport, selectedSnapshot, selectedBasicInfo);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${selectedReport.reportName}.docx`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : '报告下载失败');
+    }
   };
 
   return <div className={`${styles.page} ${styles.reportPage}`}>
@@ -1767,11 +1763,9 @@ function CarbonReportPage({
           <span>⌕</span>
         </div>
         <div className={styles.reportList}>
-          {([['7天内', '今天'], ['30天内', '更早']] as const).map(([group, label]) => {
-            const groupReports = visibleReports.filter((report) => report.recentGroup === group);
-            if (!groupReports.length) return null;
-            return <section key={group}>
-              <h3><span>⌁</span>{label}</h3>
+          {reportGroups.map(({ dateKey, reports: groupReports }) =>
+            <section key={dateKey}>
+              <h3><span>⌁</span>{reportDateLabel(dateKey)}</h3>
               {groupReports.map((report) =>
                 <button
                   type="button"
@@ -1781,9 +1775,9 @@ function CarbonReportPage({
                   title={report.reportName}
                 >
                   <b>{report.reportName}</b>
+                  <small>生成时间 {reportTimeLabel(report.generatedAt)}</small>
                 </button>)}
-            </section>;
-          })}
+            </section>)}
           {!visibleReports.length && <div className={styles.reportListEmpty}>未找到匹配的报告</div>}
         </div>
       </aside>
@@ -1791,91 +1785,31 @@ function CarbonReportPage({
         <div className={styles.reportPreviewActions}>
           <Button primary compact onClick={exportReport}>⇩ 下载报告</Button>
         </div>
-        {selectedReport ? <article className={styles.carbonReportPaper}>
-          <header>
-            <h1>企业温室气体排放报告</h1>
-            <p>（{selectedReport.templateName}）</p>
-            <p>依据《{selectedReport.standardName}》及《工业其他行业企业温室气体排放核算方法与报告指南（试行）》编制</p>
-            <p>报告主体：{selectedBasicInfo.organizationName}</p>
-            <p>报告年度：{selectedReport.year} 年</p>
-            <p>编制日期：{reportDate}</p>
-          </header>
-          <h2>一、企业基本情况</h2>
-          <h3>1.1 报告主体基本信息</h3>
-          <table><thead><tr><th>项目</th><th>内容</th></tr></thead><tbody>
-            <tr><td>报告主体名称</td><td>{selectedBasicInfo.organizationName}</td></tr>
-            <tr><td>统一社会信用代码</td><td>{selectedBasicInfo.unifiedSocialCreditCode || '—'}</td></tr>
-            <tr><td>注册地址</td><td>{selectedBasicInfo.registeredAddress || '—'}</td></tr>
-            <tr><td>公司法人</td><td>{selectedBasicInfo.legalRepresentative || '—'}</td></tr>
-            <tr><td>行业类别（国民经济行业分类（GB/T 4754-2017））</td><td>{selectedBasicInfo.industryCategory || '—'}</td></tr>
-            <tr><td>组织经营范围</td><td>{selectedBasicInfo.businessScope || '—'}</td></tr>
-            <tr><td>报告编制人</td><td>{selectedBasicInfo.preparer || '—'}</td></tr>
-            <tr><td>部门</td><td>{selectedBasicInfo.preparerDepartment || '—'}</td></tr>
-            <tr><td>联系电话</td><td>{selectedBasicInfo.preparerPhone || '—'}</td></tr>
-            <tr><td>报告审核人</td><td>{selectedBasicInfo.reviewer || '—'}</td></tr>
-            <tr><td>组织边界说明</td><td>{selectedBasicInfo.boundaryDescription || '—'}</td></tr>
-            <tr><td>报告年度</td><td>{selectedReport.year}</td></tr>
-            <tr><td>核算标准</td><td>{selectedReport.standardName}</td></tr>
-            <tr><td>核算任务</td><td>{selectedReport.taskName}</td></tr>
-            <tr><td>正式版本</td><td>V{selectedReport.version}</td></tr>
-          </tbody></table>
-          <h3>1.2 核算边界说明</h3>
-          <p>{selectedBasicInfo.boundaryDescription || '—'}</p>
-          <p>排放源、活动数据和排放因子均读取已确认的正式核算清单，报告生成后不随编辑副本实时变化。报告期内组织边界未发生变化。</p>
-
-          <h2>二、核算依据与规范性引用文件</h2>
-          <p>本报告依据以下文件编制：</p>
-          <ol><li>{selectedReport.standardName}《工业企业温室气体排放核算和报告通则》；</li><li>《工业其他行业企业温室气体排放核算方法与报告指南（试行）》；</li><li>《碳排放权交易管理办法（试行）》及相关行业标准；</li><li>与燃料热值、天然气计量和碳含量测定相关的国家标准。</li></ol>
-
-          <h2>三、温室气体排放源识别</h2>
-          <p>根据企业实际从事的产业活动和设施类型，识别本次核算范围内的排放源和温室气体种类。本报告核算的温室气体包括二氧化碳（CO₂）、甲烷（CH₄）及其他适用温室气体。</p>
-          <h3>3.1 排放源识别结果</h3>
-          <p>本企业报告边界内的排放源清单如下：</p>
-          <table className={styles.reportWideTable}><thead><tr><th>排放源类别</th><th>所属范围</th><th>是否核算</th><th>排放量（t）</th><th>备注</th></tr></thead><tbody>
-            {reportSourceRows.map((row) => <tr key={row.source}><td>{row.source}</td><td>{row.scope}</td><td>☑ 是　□ 不涉及</td><td>{format(row.amount)}</td><td>{row.amount ? '纳入正式核算清单' : '本企业不涉及此排放源'}</td></tr>)}
-          </tbody></table>
-
-          <h2>四、温室气体排放量核算</h2>
-          <h3>4.1 范围一：直接排放核算</h3>
-          <p>化石燃料燃烧、生产过程、废弃物处理及逸散排放按照正式核算清单中的活动数据与排放因子计算。</p>
-          <p className={styles.reportFormula}>排放量 = 活动数据 × 排放因子 × GWP</p>
-          {reportInventory.filter((row) => row.emissionCategory !== '购入的电力与热力产生的排放').map((row) => <p key={row.emissionSourceId}>本企业{row.sourceName}排放量：{format(row.emissionAmount)} tCO₂e。</p>)}
-          <h3>4.2 范围二：间接排放核算</h3>
-          <p>范围二包括企业净购入的电力和热力隐含的 CO₂ 排放。</p>
-          <p className={styles.reportFormula}>购入电力排放量 = 净购入电量 × 电力排放因子</p>
-          <p>本企业范围二排放量：{format(amountFor('购入的电力'))} tCO₂e。</p>
-          <h3>4.3 排放总量汇总</h3>
-          <p>本企业报告年度温室气体排放总量汇总如下：</p>
-          <table><thead><tr><th>排放源</th><th>范围</th><th>气体</th><th>GWP</th><th>排放量（吨）</th><th>折算 CO₂e（吨）</th></tr></thead><tbody>
-            {reportSourceRows.map((row) => <tr key={`${row.source}-summary`}><td>{row.source}</td><td>{row.scope}</td><td>{row.gas}</td><td>{row.gwp}</td><td>{row.amount ? format(row.amount) : '—'}</td><td>{row.amount ? format(row.amount) : '—'}</td></tr>)}
-            <tr className={styles.reportTotalRow}><td>范围一+范围二合计</td><td>—</td><td>—</td><td>—</td><td>—</td><td>{format(totalEmission)}</td></tr>
-          </tbody></table>
-          <p className={styles.reportFormula}>排放总量 = 范围一排放 + 范围二排放 + 范围三排放（如适用）</p>
-
-          <h2>五、活动水平数据及来源说明</h2>
-          <p>本企业各排放源活动水平数据及来源说明如下：</p>
-          <ol>{reportInventory.map((row) => <li key={`${row.emissionSourceId}-activity`}><strong>{row.sourceName}：</strong>{row.activityData}；数据来源：{row.activityDataSource}。</li>)}</ol>
-
-          <h2>六、排放因子数据及来源说明</h2>
-          <ol>{reportInventory.map((row) => <li key={`${row.emissionSourceId}-factor`}><strong>{factorNameForRow(row)}：</strong>{factorSummary(row, row.emissionFactorId)}；来源：{row.sourceModule || '碳排放因子库'}。</li>)}</ol>
-
-          <h2>七、声明与签字盖章</h2>
-          <p>本单位郑重承诺：本报告所填写的全部数据和信息真实、完整、准确，核算方法符合国家相关标准和指南要求。如报告中的信息与实际情况不符，本企业将承担相应的法律责任。</p>
-          <p className={styles.reportSignature}>法人（签字）：____________________</p>
-          <p className={styles.reportSignature}>日期：________ 年 ____ 月 ____ 日</p>
-          <p className={styles.reportSignature}>单位盖章：</p>
-
-          <h2>附表</h2>
-          <h3>附表1 报告主体 {selectedReport.year} 年温室气体排放汇总表</h3>
-          <table><thead><tr><th>源类别</th><th>排放量（单位：吨）</th><th>温室气体排放量（单位：吨 CO₂e）</th></tr></thead><tbody>
-            {reportSourceRows.map((row) => <tr key={`${row.source}-appendix`}><td>{row.source}</td><td>{row.amount ? format(row.amount) : '—'}</td><td>{row.amount ? format(row.amount) : '—'}</td></tr>)}
-            <tr className={styles.reportTotalRow}><td>企业温室气体排放总量</td><td>—</td><td>{format(totalEmission)}</td></tr>
-          </tbody></table>
-          <h3>附表2 排放源活动水平和排放因子数据一览表</h3>
-          <table><thead><tr><th>排放源</th><th>活动数据</th><th>单位</th><th>排放因子</th><th>来源</th></tr></thead><tbody>
-            {reportInventory.map((row) => <tr key={`${row.emissionSourceId}-appendix-factor`}><td>{row.sourceName}</td><td>{row.activityValue}</td><td>{row.activityUnit}</td><td>{factorSummary(row, row.emissionFactorId)}</td><td>{row.sourceModule || '碳排放因子库'}</td></tr>)}
-          </tbody></table>
-          <p className={styles.reportDocumentFoot}>数据来源：{selectedReport.taskName} · 正式版本 V{selectedReport.version}　报告生成时间：{selectedReport.generatedAt}</p>
+        {reportContent ? <article className={styles.carbonReportPaper}>
+          <section className={styles.reportCover}>
+            <div className={styles.reportCoverTitle}>
+              <h1>{coverText(0)}</h1>
+              <h2>{coverText(1)}</h2>
+              <p>{coverText(2)}</p>
+            </div>
+            <div className={styles.reportCoverMeta}><p>{coverText(3)}</p><p>{coverText(4)}</p></div>
+          </section>
+          <details className={styles.reportToc}>
+            <summary>目录</summary>
+            <div className={styles.reportTocGrid}>{reportBlocks.slice(6, bodyStart).map((block, index) => block.kind === 'paragraph' && block.style.startsWith('toc ')
+              ? <div className={`${styles.reportTocItem} ${block.style === 'toc 1' ? styles.reportTocChapter : block.style === 'toc 3' ? styles.reportTocSubsection : ''}`} key={index}>{block.text.split('\t')[0]}</div>
+              : null)}</div>
+          </details>
+          <div className={styles.reportBody}>{reportBlocks.slice(bodyStart).map((block, index) => {
+            if (block.kind === 'table') return <table className={block.index === 0 ? styles.reportInfoTable : styles.reportDataTable} key={index}>
+              <thead><tr>{block.rows[0].map((cell, cellIndex) => <th key={cellIndex}>{cell}</th>)}</tr></thead>
+              <tbody>{block.rows.slice(1).map((row, rowIndex) => <tr className={row[0] === '合计' ? styles.reportTotalRow : ''} key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell}</td>)}</tr>)}</tbody>
+            </table>;
+            if (block.style === 'Heading 1') return <h2 key={index}>{block.text}</h2>;
+            if (block.style === 'Heading 2') return <h3 key={index}>{block.text}</h3>;
+            if (block.style === 'Heading 3') return <h4 key={index}>{block.text}</h4>;
+            return <p key={index}>{block.text}</p>;
+          })}</div>
         </article> : <div className={styles.reportDocumentEmpty}>请选择或生成报告</div>}
       </main>
     </section>

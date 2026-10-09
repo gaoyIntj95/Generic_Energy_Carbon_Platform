@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react()],
-  base: '/Generic_Energy_Carbon_Platform/',  // ← 加上这一行
+  base: command === 'serve' ? '/Generic_Energy_Carbon_Platform/' : './',
   server: { port: 5173 },
   preview: { port: 4173 },
-});
+}));

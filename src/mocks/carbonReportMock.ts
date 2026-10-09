@@ -1,15 +1,20 @@
 export interface CarbonReportBasicInfo {
   organizationName: string;
-  unifiedSocialCreditCode: string;
   registeredAddress: string;
   industryCategory: string;
   businessScope: string;
-  legalRepresentative: string;
-  preparerPhone: string;
   preparer: string;
-  preparerDepartment: string;
-  reviewer: string;
+  preparationDate: string;
+  generalManager: string;
   boundaryDescription: string;
+  internalVerificationDate: string;
+  internalVerificationLead: string;
+  internalVerificationParticipants: string;
+  contactName: string;
+  contactDepartment: string;
+  contactPhone: string;
+  contactAddress: string;
+  reportDepartment: string;
 }
 
 export interface CarbonReportRecord {
@@ -26,6 +31,7 @@ export interface CarbonReportRecord {
   templateName: string;
   standardName: string;
   basicInfo?: CarbonReportBasicInfo;
+  factorTexts?: Record<string, string>;
 }
 
 const seedCarbonReports: CarbonReportRecord[] = [
@@ -87,8 +93,14 @@ const seedCarbonReports: CarbonReportRecord[] = [
   },
 ];
 
+let carbonReports = seedCarbonReports.map((report) => ({ ...report }));
+
 export function listCarbonReportMocks() {
-  return seedCarbonReports.map((report) => ({ ...report }));
+  return carbonReports.map((report) => ({ ...report, basicInfo: report.basicInfo ? { ...report.basicInfo } : undefined, factorTexts: report.factorTexts ? { ...report.factorTexts } : undefined }));
+}
+
+export function resetCarbonReportMocks() {
+  carbonReports = seedCarbonReports.map((report) => ({ ...report }));
 }
 
 export function createCarbonReportMock(input: {
@@ -99,9 +111,10 @@ export function createCarbonReportMock(input: {
   version: number;
   generatedAt: string;
   basicInfo?: CarbonReportBasicInfo;
+  factorTexts?: Record<string, string>;
 }) {
   const compactTime = input.generatedAt.replace(/\D/g, '').slice(0, 12);
-  return {
+  const report = {
     carbonReportId: `carbon-report-${input.year}-${compactTime}`,
     carbonTaskId: input.carbonTaskId,
     taskName: input.taskName,
@@ -111,9 +124,12 @@ export function createCarbonReportMock(input: {
     reportName: `企业温室气体排放报告${compactTime}`,
     generatedAt: input.generatedAt,
     recentGroup: '7天内',
-    organizationName: 'XX科技有限公司',
+    organizationName: input.basicInfo?.organizationName ?? 'XX科技有限公司',
     templateName: '通用工业企业模板',
     standardName: 'GB/T 32150—2025',
-    basicInfo: input.basicInfo,
+    basicInfo: input.basicInfo ? { ...input.basicInfo } : undefined,
+    factorTexts: input.factorTexts ? { ...input.factorTexts } : undefined,
   } satisfies CarbonReportRecord;
+  carbonReports = [report, ...carbonReports];
+  return report;
 }

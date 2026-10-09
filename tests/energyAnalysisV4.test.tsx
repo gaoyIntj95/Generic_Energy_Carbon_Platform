@@ -271,6 +271,22 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(container.textContent).toContain('单位产出能耗');
   });
 
+  it('removes month-on-month change from annual intensity result tables only', async () => {
+    await render('/energy-analysis/intensity');
+    expect(container.querySelector('[aria-label="全厂指标摘要"] thead')?.textContent).not.toContain('环比变化');
+    await click(button('查看明细'));
+    expect(container.querySelector('[aria-label="月度指标明细：单位产品综合能耗"] table thead')?.textContent).toContain('环比');
+
+    await click(button('用能单元'));
+    expect(container.querySelector('table thead')?.textContent).not.toContain('环比变化');
+
+    await click(button('产品'));
+    expect(container.querySelector('table thead')?.textContent).not.toContain('环比变化');
+
+    await click(button('设备'));
+    expect(container.querySelector('table thead')?.textContent).not.toContain('环比变化');
+  });
+
   it('uses the same action semantics across factory, product, and key-device metrics', async () => {
     await render('/energy-analysis/intensity');
     expect([...container.querySelectorAll('button')].map((item) => item.textContent)).toEqual(expect.arrayContaining(['查看详情', '补充运营数据']));
@@ -512,16 +528,16 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(location).toContain('category=产量指标');
   });
 
-  it('calculates waste heat generator unit electricity consumption from conversion output records', () => {
+  it('calculates waste heat generator intensity from its subsystem input energy', () => {
     const row = buildDeviceIntensityRows(2026).find((item) => item.deviceName === '余热发电机组');
     expect(row).toMatchObject({
       metricCode: 'device-output-energy',
       metricName: '单位产出能耗',
       metricUnit: 'tce/kWh',
       resultStatus: '已计算',
-      formula: '电力折标综合能耗 ÷ 发电量',
+      formula: '余热折标综合能耗 ÷ 发电量',
     });
-    expect(row?.value).toBeCloseTo(0.000004637, 9);
+    expect(row?.value).toBeCloseTo(0.000158388, 9);
 
     const pendingDevice = buildDeviceIntensityRows(2026).find((item) => item.deviceName === '1#数控加工中心');
     expect(pendingDevice).toMatchObject({ metricName: '单位产出能耗', resultStatus: '待完善', resultReason: '缺少加工件产量' });
@@ -708,7 +724,7 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(container.textContent).toContain('转换投入');
     expect(container.textContent).toContain('来源合计');
     expect(container.textContent).toContain('用能单元消耗');
-    expect(container.textContent).toContain('待分配');
+    expect(container.textContent).toContain('待更正填报');
     expect(container.textContent).toContain('收支差额');
     const balance = container.querySelector('table[aria-label="全厂能源平衡表"]')!;
     const steamRow = [...balance.querySelectorAll('tbody tr')].find((row) => row.querySelector('th')?.textContent === '蒸汽')!;
@@ -718,6 +734,7 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(balance.querySelectorAll('[class*="balanceExcess"]')).toHaveLength(0);
     expect(container.textContent).not.toContain('自产 / 回收能源');
     expect(container.textContent).not.toContain('超分配 0.00');
+    expect(container.textContent).not.toContain('超分配');
     expect(container.textContent).not.toContain('待细分');
     expect(container.textContent).not.toContain('上下级数据仅作层级核对');
 
@@ -804,7 +821,7 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
     expect(levelTwo.differenceMetricLabel).toBe('待分解量');
   });
 
-  it('marks over-allocated level-two energy without creating a negative pending flow', () => {
+  it('rejects level-two energy records that exceed their parent allocation', () => {
     const saved = saveV11EnergyRecord({
       year: 2026,
       scopeLevel: '二级用能单元',
@@ -817,17 +834,7 @@ describe('EnergyAnalysisV4 prototype fidelity and interactions', () => {
       annualAmount: 0,
       monthlyAmounts: Array.from({ length: 12 }, () => 20_000_000),
     });
-    expect(saved.ok).toBe(true);
-
-    const result = buildFlowAnalysisDataset({ year: 2026, grain: 'month', month: 6 }, 'level2');
-    const row = result.levelTwoBalanceRows.find((item) =>
-      item.level1EnergyUnitId === 'eu-clinker-line-1'
-      && item.energyTypeId === 'v11-energy-electricity');
-
-    expect(row?.status).toBe('层级异常');
-    expect(row?.pendingStandardAmount).toBe(0);
-    expect(row?.overAllocatedStandardAmount).toBeGreaterThan(0);
-    expect(result.links.every((link) => link.standardCoalAmount >= 0)).toBe(true);
-    expect(result.dataNotice).toContain('层级勾稽异常');
+    expect(saved.ok).toBe(false);
+    if (!saved.ok) expect(saved.error).toContain('不能超过上级');
   });
 });

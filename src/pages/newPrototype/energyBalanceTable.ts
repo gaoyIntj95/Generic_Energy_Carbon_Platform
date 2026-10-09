@@ -31,7 +31,7 @@ function balanceRow(row: FlowLevelOneBalanceRow) {
   const useTotal = balanceUseColumns.reduce((total, column) => total + row[column.key], 0);
   const difference = sourceTotal - useTotal;
   const displayedDifference = roundedBalanceAmount(difference);
-  const status = displayedDifference > 0 ? '待分配' : displayedDifference < 0 ? '超分配'
+  const status = displayedDifference > 0 ? '待分配' : displayedDifference < 0 ? '待更正填报'
     : columns.every((column) => roundedBalanceAmount(row[column.key]) === 0) ? '无可核对量' : '收支相符';
   return { ...row, sourceTotal, useTotal, difference, status };
 }
@@ -47,8 +47,7 @@ export function buildEnergyBalanceTable(sourceRows: FlowLevelOneBalanceRow[]) {
     difference: rows.reduce((total, row) => total + row.difference, 0),
   };
   const pendingRows = rows.filter((row) => row.status === '待分配');
-  const excessRows = rows.filter((row) => row.status === '超分配');
-  const issueRows = [...pendingRows, ...excessRows];
+  const issueRows = [...pendingRows, ...rows.filter((row) => row.status === '待更正填报')];
   const totalStatus = issueRows.length ? '分项待核对' : rows.some((row) => row.status === '收支相符') ? '收支相符' : '无可核对量';
   return { rows, totals, issueRows, totalStatus };
 }
@@ -61,7 +60,7 @@ export function energyBalanceCsvRows(sourceRows: FlowLevelOneBalanceRow[], scope
     ['能源品种', ...balanceSourceColumns.map((column) => column.label), '来源合计', ...balanceUseColumns.map((column) => column.label), '去向合计', '收支差额', '核对结果'],
     ...rows.map((row) => [row.energyTypeName, ...balanceSourceColumns.map((column) => formatBalanceAmount(row[column.key])), formatBalanceAmount(row.sourceTotal), ...balanceUseColumns.map((column) => formatBalanceAmount(row[column.key])), formatBalanceAmount(row.useTotal), formatBalanceAmount(row.difference, true), row.status]),
     ['分项合计', ...totals.sourceValues.map((value) => formatBalanceAmount(value)), formatBalanceAmount(totals.sourceTotal), ...totals.useValues.map((value) => formatBalanceAmount(value)), formatBalanceAmount(totals.useTotal), formatBalanceAmount(totals.difference, true), totalStatus],
-    ['核对口径', '收支差额 = 来源合计 − 已登记去向合计；正值待分配，负值超分配，不代表物理损失。'],
+    ['核对口径', '收支差额 = 来源合计 − 已登记去向合计；正值表示尚未归属，负值表示已登记去向超过来源，应更正数据。'],
     ['合计说明', '包含厂内转换与回收过程，不等同于企业外购能源或综合能耗；分项正负差额不相互抵消判定。'],
     ['显示精度', '保留两位小数；差额提示按相同精度判断，不作为计量允差。'],
   ];

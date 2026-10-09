@@ -100,6 +100,7 @@ describe('产品碳足迹运输活动', () => {
   it('在项目工作台内保持当前项目上下文并切换 Tab', async () => {
     await act(async () => root.render(<MemoryRouter initialEntries={['/product-footprint/projects/1/checklist']}><ProductCarbonFootprint pathname="/product-footprint/projects/1/checklist" /><LocationProbe /></MemoryRouter>));
     expect(container.textContent).toContain('热轧钢卷');
+    expect(container.textContent).not.toContain('查看待完善项');
     await click(button('核算结果'));
     expect(container.querySelector('[data-testid="location"]')?.textContent).toBe('/product-footprint/projects/1/result');
     expect(container.textContent).toContain('工业变频器 VFD-75');

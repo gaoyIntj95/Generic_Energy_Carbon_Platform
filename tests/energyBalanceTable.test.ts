@@ -31,7 +31,7 @@ describe('energy balance table accounting and export', () => {
       fixture({ energyTypeId: 'steam', energyTypeName: '蒸汽', conversionOutputStandardAmount: 100, distributionStandardAmount: 110 }),
     ]);
     expect(result.totals.difference).toBe(0);
-    expect(result.issueRows.map((row) => row.status)).toEqual(['待分配', '超分配']);
+    expect(result.issueRows.map((row) => row.status)).toEqual(['待分配', '待更正填报']);
     expect(result.totalStatus).toBe('分项待核对');
     expect(energyBalanceCsvRows(result.rows, '测试期间').find((row) => row[0] === '分项合计')?.slice(-2)).toEqual(['0.00', '分项待核对']);
   });
@@ -42,7 +42,7 @@ describe('energy balance table accounting and export', () => {
     expect(formatBalanceAmount(result.rows[0].difference, true)).toBe('0.00');
     expect(formatBalanceAmount(-0.0000000001)).toBe('0.00');
     expect(buildEnergyBalanceTable([fixture({ externalInputStandardAmount: 10, distributionStandardAmount: 10.004 })]).issueRows).toHaveLength(0);
-    expect(buildEnergyBalanceTable([fixture({ externalInputStandardAmount: 10, distributionStandardAmount: 10.006 })]).rows[0].status).toBe('超分配');
+    expect(buildEnergyBalanceTable([fixture({ externalInputStandardAmount: 10, distributionStandardAmount: 10.006 })]).rows[0].status).toBe('待更正填报');
   });
 
   it('totals unrounded amounts and exports the same scope, fields and differences as the table', () => {

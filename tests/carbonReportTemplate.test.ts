@@ -1,0 +1,64 @@
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import JSZip from 'jszip';
+import { afterEach, expect, it, vi } from 'vitest';
+import { listCarbonReportMocks } from '../src/mocks/carbonReportMock';
+import { listCarbonSnapshots } from '../src/mocks/platformMockStore';
+import { buildCarbonReportContent, captureReportFactorTexts, createCarbonReportDocx, emptyReportInfo, reportSupplementFields } from '../src/modules/carbon-accounting/carbonReportTemplate';
+
+afterEach(() => vi.unstubAllGlobals());
+
+it('fills the marked Word template with the bound formal inventory and every supplemental field', async () => {
+  const report = listCarbonReportMocks()[0];
+  const snapshot = listCarbonSnapshots().find((item) => item.carbonSnapshotId === report.carbonSnapshotId)!;
+  const info = emptyReportInfo('报告测试企业');
+  report.factorTexts = captureReportFactorTexts(snapshot);
+  expect(Object.keys(report.factorTexts)).toHaveLength(snapshot.sourceItems.length);
+  reportSupplementFields.forEach(({ key }) => { info[key] = key === 'organizationName' ? '报告测试企业' : `${key}测试值`; });
+  info.preparationDate = '2026-08-09';
+  const preview = buildCarbonReportContent(report, snapshot, info);
+  expect(JSON.stringify(preview.blocks)).not.toContain('{{');
+  expect(preview.blocks.some((block) => block.kind === 'paragraph' && block.text.includes('报告测试企业在2026年度核算边界内总排放量为12,980.53 tCO₂e'))).toBe(true);
+  expect(preview.blocks.some((block) => block.kind === 'paragraph' && block.text.includes('编制日期：2026 年 08 月 09 日'))).toBe(true);
+  const tocEntries = preview.blocks.filter((block) => block.kind === 'paragraph' && block.style.startsWith('toc ')).map((block) => block.text.split('\t')[0]);
+  expect(tocEntries).toContain('3.1 温室气体排放核算结果');
+  expect(tocEntries).toContain('3.5 特殊排放');
+  expect(tocEntries.some((entry) => /^3\.[67](?:\.|\s)/.test(entry))).toBe(false);
+  expect(preview.blocks.some((block) => block.kind === 'paragraph' && block.style === 'Heading 2' && block.text === '3.1 温室气体排放核算结果')).toBe(true);
+  expect(preview.tables[1]).toHaveLength(snapshot.sourceItems.length + 2);
+  expect(preview.tables[1].some((row) => row[0].includes('核对差异'))).toBe(false);
+  expect(preview.tables[1].some((row) => row.includes('天然气燃烧（锅炉房）'))).toBe(true);
+  const naturalGas = preview.tables[1].find((row) => row[1] === '天然气燃烧（锅炉房）')!;
+  expect(naturalGas[2]).toBe('120,000 Nm³');
+  expect(naturalGas[3]).toBe('2.154 kgCO₂/Nm³');
+  const carbonate = preview.tables[1].find((row) => row[1] === '碳酸盐原料分解（工艺系统）')!;
+  expect(carbonate[2]).toBe('400 t');
+  expect(carbonate[3]).toBe('92 %；0.478 tCO₂/t碳酸盐');
+  expect(preview.tables[1].some((row) => row[3].includes('天然气固定燃烧参数组'))).toBe(false);
+  expect(preview.tables[1].some((row) => row[2].includes('原料消耗量：'))).toBe(false);
+  expect(preview.tables[4].some((row) => row.includes('外购电力（企业整体）'))).toBe(true);
+
+  const template = await readFile(resolve('src/modules/carbon-accounting/industrial-ghg-report.docx'));
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, arrayBuffer: async () => template })));
+  const blob = await createCarbonReportDocx(report, snapshot, info);
+  const buffer = await new Promise<ArrayBuffer>((resolveBuffer, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolveBuffer(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(blob);
+  });
+  const zip = await JSZip.loadAsync(buffer);
+  expect(await zip.file('word/settings.xml')!.async('string')).toContain('updateFields');
+  const xml = await zip.file('word/document.xml')!.async('string');
+  expect(xml).not.toContain('{{');
+  expect(xml).toContain('报告测试企业');
+  expect(xml).toContain('12,980.53');
+  expect(xml).toContain('天然气燃烧（锅炉房）');
+  expect(xml).toContain('contactName测试值');
+  const document = new DOMParser().parseFromString(xml, 'application/xml');
+  expect(document.querySelector('parsererror')).toBeNull();
+  const tables = document.getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'tbl');
+  expect(tables[0].textContent).toContain('报告测试企业');
+  expect(tables[0].textContent).toContain('industryCategory测试值');
+  expect(tables[1].getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'tr')).toHaveLength(snapshot.sourceItems.length + 2);
+});

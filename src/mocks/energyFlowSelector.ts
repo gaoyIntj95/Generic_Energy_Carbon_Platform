@@ -1490,7 +1490,7 @@ export function buildFlowAnalysisDataset(
     ? '\u5f53\u524d\u6708\u4efd\u5b58\u5728\u4ec5\u7ef4\u62a4\u5e74\u5ea6\u503c\u7684\u5916\u4f9b\u53f0\u8d26\uff0c\u672c\u6b21\u5206\u6790\u4e0d\u5c06\u5e74\u5ea6\u5916\u4f9b\u91cf\u5206\u644a\u5230\u6708\u5ea6\u3002'
     : '';
   const levelOneBalanceNotice = levelOneOverAllocatedStandard > 0.01
-    ? `\u4e00\u7ea7\u5206\u914d\u8d85\u51fa\u53ef\u4f9b\u80fd\u6e90 ${levelOneOverAllocatedStandard.toLocaleString('zh-CN', { maximumFractionDigits: 1 })} tce\uff08${[...new Set(levelOneOverAllocatedTypes)].join('\u3001')}\uff09\uff0c\u8bf7\u8865\u5145\u5bf9\u5e94\u7684\u8f6c\u6362\u4ea7出\u6216\u6838\u67e5\u5206\u914d\u53f0\u8d26\u662f\u5426\u91cd\u590d\u8ba1\u5165\u3002`
+    ? `\u5df2\u767b\u8bb0\u53bb\u5411\u8d85\u51fa\u5f53\u671f\u53ef\u4f9b\u80fd\u6e90 ${levelOneOverAllocatedStandard.toLocaleString('zh-CN', { maximumFractionDigits: 1 })} tce\uff08${[...new Set(levelOneOverAllocatedTypes)].join('\u3001')}\uff09\uff0c\u8bf7\u66f4\u6b63\u80fd\u6e90\u6570\u636e\u3002`
     : '';
   const baseDataNotice = levelOneRecords.length === 0
     ? '当前期间尚未维护一级用能单元能源分配数据，暂无法生成能流分析。'
@@ -1500,7 +1500,7 @@ export function buildFlowAnalysisDataset(
           ? '部分一级用能单元尚未完整维护二级能源利用记录，相关差额统一计入“待分解”。'
           : '',
         overAllocatedObjectCount
-          ? `${overAllocatedObjectCount} 个一级用能单元存在二级利用超出一级分配的层级勾稽异常。`
+          ? `${overAllocatedObjectCount} 个一级用能单元的二级能源数据超过一级数据，请更正填报。`
           : '',
       ].filter(Boolean).join(' ')
       : '';
