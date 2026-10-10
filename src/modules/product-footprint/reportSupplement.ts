@@ -8,8 +8,8 @@ export const allocationExample = `示例：
 制造环节中，卷材冲压按合格率 89% 计入材料利用，11% 的边角料作为生产废料；不合格品按填料产品 4% 的平均不合格率折算目标产品报废量。`;
 
 export const reportSupplementFields = [
-  { key: 'cutoff', label: '取舍情况', section: '2.3.2 取舍原则', hint: '请说明实际取舍项目、占比和依据；不涉及取舍时请据实说明。', example: cutoffExample },
-  { key: 'allocation', label: '多产品分配方法及依据', section: '2.3.3 多产品分配', hint: '请填写多产品分配方法及依据；不涉及多产品分配时请据实说明。', example: allocationExample },
+  { key: 'cutoff', label: '取舍情况', section: '1）取舍情况', hint: '请说明实际取舍项目、占比和依据；不涉及取舍时请据实说明。', example: cutoffExample },
+  { key: 'allocation', label: '多产品分配方法及依据', section: '2）多产品分配方法及依据', hint: '请填写多产品分配方法及依据；不涉及多产品分配时请据实说明。', example: allocationExample },
 ] as const;
 export const uncertaintyGrades = [
   { value: 'A', label: 'A  优（平均分值 ≥ 5.0）' },
