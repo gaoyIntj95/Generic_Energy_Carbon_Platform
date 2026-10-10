@@ -1,4 +1,5 @@
 import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { usePageHeaderActions } from '../../components/PageHeaderActionsContext';
 import { EVIDENCE_FILE_ACCEPT, filterEvidenceFiles, isEvidenceFile } from '../../utils/evidenceFile';
@@ -6,8 +7,9 @@ import { downloadHtmlReport } from '../../utils/reportDownload';
 import styles from './ProductCarbonFootprint.module.css';
 import inventoryStyles from './ProductCarbonFootprintInventory.module.css';
 import { CarbonFootprintFactorLibrary } from './CarbonFootprintFactorLibrary';
+import { defaultGwp, emptyProductReportInfo, missingReportFields, normalizeReportInfo, reportSupplementFields, type ProductReportInfo } from '../../modules/product-footprint/reportSupplement';
 
-type Project = { id: number; name: string; spec: string; category: string; unit: string; boundary: string; year: string; period: string; processFile?: string; footprint: number; updated: string; status: '已完成' | '数据待完善' };
+type Project = { id: number; name: string; spec: string; category: string; unit: string; boundary: string; year: string; period: string; processFile?: string; processDescription?: string; productImageFile?: string; footprint: number; updated: string; status: '已完成' | '数据待完善' };
 type Activity = { id: number; stage: string; name: string; amount: string; unit: string; factor: string; source: string; result: string; dataSource: '系统引用' | '页面录入' };
 type ActivityType = '原辅材料' | '能源' | '运输' | '工艺排放' | '废弃物';
 type ActivityDataCategory = '原辅材料' | '能源与动力' | '运输' | '直接排放' | '废弃物及其他';
@@ -20,10 +22,29 @@ type ActivityDataRow = {
   calculationParams?: Record<string, string>;
 };
 type ConfirmedInventory = Record<number, ActivityDataRow[]>;
+type ProductReportSnapshot = { project: Project; rows: ActivityDataRow[]; info: ProductReportInfo; version: number };
+
+function completeInventory(rows?: ActivityDataRow[]) {
+  return Boolean(rows?.length && rows.every((row) => row.amount.trim() && Number.isFinite(Number(row.amount)) && Number(row.amount) >= 0 && (row.factor || row.calculationMethod === '实测') && Number.isFinite(emissionOf(row))));
+}
 
 function emissionOf(row: ActivityDataRow) { return row.emissionAmount ? Number(row.emissionAmount) || 0 : row.amount.trim() && row.factor ? Number(row.amount) * Number.parseFloat(row.factorValue) : 0; }
 function inventoryTotal(rows: ActivityDataRow[]) { return rows.reduce((total, row) => total + emissionOf(row), 0); }
 function stageLabel(stage: string) { return stage === '原材料获取' ? '原材料获取' : stage === '产品配送' ? '分销与运输' : '生产制造'; }
+
+function inventoryStatus(row: ActivityDataRow) {
+  const dataMissing = !row.amount.trim() && !row.emissionAmount;
+  const factorMissing = !row.factor && row.calculationMethod !== '实测';
+  const hasEvidence = Boolean(row.evidenceFiles?.length || row.evidence > 0);
+  const evidenceMissing = !hasEvidence;
+  const missing: string[] = [];
+  if (dataMissing) missing.push('数据');
+  if (factorMissing) missing.push('因子');
+  if (evidenceMissing) missing.push('证明材料');
+  const label = missing.length ? `待补${missing.join('、')}` : '已完成';
+  const tone = !missing.length ? 'complete' : missing.length === 3 ? 'all' : evidenceMissing && !dataMissing && !factorMissing ? 'evidence' : 'calculation';
+  return { dataMissing, factorMissing, hasEvidence, label, tone } as const;
+}
 
 const initialProjects: Project[] = [
   { id: 1, name: '工业变频器 VFD-75', spec: 'VFD-75 标准型', category: '机械设备', unit: '1 台产品', boundary: '摇篮到大门', year: '2026', period: '2026-01-01 至 2026-12-31', processFile: 'VFD-75-工艺流程图.png', footprint: 86.4, updated: '2026-09-14 16:20', status: '已完成' },
@@ -146,7 +167,8 @@ export function ProductCarbonFootprint({ pathname }: { pathname: string }) {
   const [projects, setProjects] = useState(initialProjects);
   const [inventories, setInventories] = useState<ConfirmedInventory>(() => initialProjectInventories);
   const [confirmedInventories, setConfirmedInventories] = useState<ConfirmedInventory>(() => ({ 1: initialProjectInventories[1], 2: initialProjectInventories[2], 3: initialProjectInventories[3] }));
-  const [generatedReportIds, setGeneratedReportIds] = useState<number[]>([1]);
+  const [reports, setReports] = useState<ProductReportSnapshot[]>([]);
+  const [reportDrafts, setReportDrafts] = useState<Record<number, ProductReportInfo>>({});
   const [keyword, setKeyword] = useState('');
   const [category, setCategory] = useState('');
   const [year, setYear] = useState('');
@@ -160,17 +182,27 @@ export function ProductCarbonFootprint({ pathname }: { pathname: string }) {
   const selectedProjectId = Number(routeProjectId);
   const selectedProject = projects.find((item) => item.id === selectedProjectId);
   const selectedActivities = inventories[selectedProjectId] ?? [];
-  const hasConfirmedSnapshot = Boolean(confirmedInventories[selectedProjectId]) && selectedActivities.every((item) => item.amount.trim() && (item.factor || item.calculationMethod === '实测'));
+  const hasConfirmedSnapshot = completeInventory(confirmedInventories[selectedProjectId]);
   const filtered = useMemo(() => projects.filter((item) => (!keyword || item.name.includes(keyword)) && (!category || item.category === category) && (!year || item.year.startsWith(year))), [projects, keyword, category, year]);
   usePageHeaderActions(useMemo(() => page === 'projects' ? <button className={styles.primary} onClick={() => setModal(true)}>＋ 新建碳足迹项目</button> : page === 'factors' ? <button className={styles.primary} onClick={() => setFactorModal(true)}>＋ 新增企业专属因子</button> : undefined, [page]));
-  const addProject = (project: Pick<Project, 'name' | 'spec' | 'category' | 'unit' | 'boundary' | 'period' | 'processFile'>) => { setProjects((items) => [{ ...project, id: Date.now(), year: project.period, footprint: 0, updated: '刚刚', status: '数据待完善' }, ...items]); setModal(false); };
+  const addProject = (project: Pick<Project, 'name' | 'spec' | 'category' | 'unit' | 'boundary' | 'period' | 'processFile' | 'processDescription' | 'productImageFile'>) => { setProjects((items) => [{ ...project, id: Date.now(), year: project.period, footprint: 0, updated: '刚刚', status: '数据待完善' }, ...items]); setModal(false); };
   const updateInventory = (projectId: number, rows: ActivityDataRow[]) => setInventories((items) => ({ ...items, [projectId]: rows }));
+  const saveReportInfo = (info: ProductReportInfo) => setReportDrafts((items) => ({ ...items, [selectedProjectId]: structuredClone(info) }));
+  const generateReport = (info: ProductReportInfo) => {
+    if (!selectedProject || !hasConfirmedSnapshot || missingReportFields(info).length) return;
+    const savedInfo = normalizeReportInfo(info);
+    saveReportInfo(savedInfo);
+    setReports((items) => [...items, {
+      project: { ...selectedProject }, rows: structuredClone(confirmedInventories[selectedProjectId]), info: savedInfo,
+      version: items.filter((item) => item.project.id === selectedProjectId).length + 1,
+    }]);
+  };
   const confirmInventory = (projectId: number, rows: ActivityDataRow[]) => {
     const total = inventoryTotal(rows);
     setConfirmedInventories((items) => ({ ...items, [projectId]: rows.map((row) => ({ ...row })) }));
     setProjects((items) => items.map((item) => item.id === projectId ? { ...item, footprint: total, status: '已完成', updated: '刚刚' } : item));
   };
-  const updateProject = (project: Pick<Project, 'name' | 'spec' | 'category' | 'unit' | 'boundary' | 'period' | 'processFile'>) => {
+  const updateProject = (project: Pick<Project, 'name' | 'spec' | 'category' | 'unit' | 'boundary' | 'period' | 'processFile' | 'processDescription' | 'productImageFile'>) => {
     if (!editTarget) return;
     setProjects((items) => items.map((item) => item.id === editTarget.id ? { ...item, ...project, year: project.period.match(/\d{4}/)?.[0] ?? item.year, updated: '刚刚' } : item));
     setEditTarget(null);
@@ -179,7 +211,7 @@ export function ProductCarbonFootprint({ pathname }: { pathname: string }) {
   if (page === 'factors') return <CarbonFootprintFactorLibrary addModal={factorModal} onCloseAddModal={() => setFactorModal(false)} />;
   if (routeProjectId) {
     if (!selectedProject) return <div className={styles.page}><div className={styles.notice}>未找到对应的产品碳足迹项目。<button className={styles.text} onClick={() => navigate('/product-footprint/projects')}>返回项目列表</button></div></div>;
-    return <><ProjectWorkspace project={selectedProject} page={page as 'checklist' | 'result' | 'report'} activities={selectedActivities} confirmedRows={hasConfirmedSnapshot ? confirmedInventories[selectedProjectId] : undefined} confirmed={hasConfirmedSnapshot} onActivitiesChange={(rows) => updateInventory(selectedProjectId, rows)} onConfirm={(rows) => confirmInventory(selectedProjectId, rows)} generatedReportIds={generatedReportIds} onGenerate={() => setGeneratedReportIds((ids) => ids.includes(selectedProjectId) ? ids : [...ids, selectedProjectId])} />{editTarget && <ProjectModal project={editTarget} onClose={() => setEditTarget(null)} onSubmit={updateProject} />}</>;
+    return <><ProjectWorkspace project={selectedProject} page={page as 'checklist' | 'result' | 'report'} activities={selectedActivities} confirmedRows={hasConfirmedSnapshot ? confirmedInventories[selectedProjectId] : undefined} confirmed={hasConfirmedSnapshot} onActivitiesChange={(rows) => updateInventory(selectedProjectId, rows)} onConfirm={(rows) => confirmInventory(selectedProjectId, rows)} reports={reports.filter((report) => report.project.id === selectedProjectId)} reportDraft={reportDrafts[selectedProjectId]} onSaveReportInfo={saveReportInfo} onGenerate={generateReport} />{editTarget && <ProjectModal project={editTarget} onClose={() => setEditTarget(null)} onSubmit={updateProject} />}</>;
   }
   return <div className={styles.page}>
     <div className={styles.notice}><b>通用版 V1：</b>先确定产品与核算范围，再按生命周期阶段维护原辅材料、能源、运输、工艺排放和废弃物等活动数据。</div>
@@ -191,16 +223,17 @@ export function ProductCarbonFootprint({ pathname }: { pathname: string }) {
   </div>;
 }
 
-function ProjectWorkspace({ project, page, activities, confirmedRows, confirmed, onActivitiesChange, onConfirm, generatedReportIds, onGenerate }: { project: Project; page: 'checklist' | 'result' | 'report'; activities: ActivityDataRow[]; confirmedRows?: ActivityDataRow[]; confirmed: boolean; onActivitiesChange: (rows: ActivityDataRow[]) => void; onConfirm: (rows: ActivityDataRow[]) => void; generatedReportIds: number[]; onGenerate: () => void }) {
+function ProjectWorkspace({ project, page, activities, confirmedRows, confirmed, onActivitiesChange, onConfirm, reports, reportDraft, onSaveReportInfo, onGenerate }: { project: Project; page: 'checklist' | 'result' | 'report'; activities: ActivityDataRow[]; confirmedRows?: ActivityDataRow[]; confirmed: boolean; onActivitiesChange: (rows: ActivityDataRow[]) => void; onConfirm: (rows: ActivityDataRow[]) => void; reports: ProductReportSnapshot[]; reportDraft?: ProductReportInfo; onSaveReportInfo: (info: ProductReportInfo) => void; onGenerate: (info: ProductReportInfo) => void }) {
   const navigate = useNavigate();
   const tabs = [{ key: 'checklist', label: '核算清单' }, { key: 'result', label: '核算结果' }, { key: 'report', label: '碳足迹报告' }] as const;
+  const pendingCount = activities.filter((item) => !item.amount.trim() || (!item.factor && item.calculationMethod !== '实测')).length;
   return <div className={`${styles.page} ${styles.workspacePage}`}>
     <div className={styles.workspaceBreadcrumb}>产品与供应链碳管理 / 产品碳足迹 / 碳足迹项目 / {project.name}</div>
-    <section className={styles.projectHeader}><div><h2>{project.name}</h2><div className={styles.projectMeta}><span>产品规格：<b>{project.spec}</b></span><span>核算年度：<b>{project.year}年度</b></span><span>核算期间：<b>{project.period}</b></span><span>功能单位：<b>{project.unit}</b></span><span>系统边界：<b>{project.boundary}</b></span><span>核算状态：<b>{confirmed ? '已确认清单' : '当前数据预览'}</b></span></div></div><div className={styles.projectActions}><button className={styles.button} onClick={() => navigate('/product-footprint/projects')}>返回</button></div></section>
+    <section className={styles.projectHeader}><div><h2>{project.name}</h2><div className={styles.projectMeta}><span>产品规格：<b>{project.spec}</b></span><span>核算年度：<b>{project.year}年度</b></span><span>核算期间：<b>{project.period}</b></span><span>功能单位：<b>{project.unit}</b></span><span>系统边界：<b>{project.boundary}</b></span><span>核算状态：<b>{confirmed ? '已确认清单' : '当前数据预览'}</b></span></div></div><div className={styles.projectActions}>{page === 'checklist' && <button className={styles.primary} style={pendingCount > 0 ? { background: '#6d817a', borderColor: '#6d817a', color: '#fff', opacity: 1 } : undefined} disabled={pendingCount > 0} onClick={() => onConfirm(activities)}>{confirmed ? '已确认核算清单' : '确认核算清单'}</button>}<button className={styles.button} onClick={() => navigate('/product-footprint/projects')}>返回</button></div></section>
     <div className={styles.projectTabs}>{tabs.map((tab) => <button key={tab.key} className={page === tab.key ? styles.projectTabActive : ''} onClick={() => navigate(`/product-footprint/projects/${project.id}/${tab.key}`)}>{tab.label}</button>)}</div>
     {page === 'checklist' && <InventoryReferencePageV2 embedded project={project} activities={activities} confirmed={confirmed} onActivitiesChange={onActivitiesChange} onConfirm={onConfirm} />}
     {page === 'result' && <LinkedResultsPage projects={[project]} activeProjectId={project.id} confirmedRows={confirmedRows ?? activities} onProjectChange={() => {}} isPreview={!confirmed} />}
-    {page === 'report' && <LinkedReportsPage projects={[project]} activeProjectId={project.id} confirmedRows={confirmedRows ?? activities} generatedReportIds={generatedReportIds} onProjectChange={() => {}} onGenerate={onGenerate} isPreview={!confirmed} />}
+    {page === 'report' && <LinkedReportsPage key={project.id} project={project} rows={confirmedRows ?? activities} reports={reports} reportDraft={reportDraft} onSaveReportInfo={onSaveReportInfo} onGenerate={onGenerate} isPreview={!confirmed} />}
   </div>;
 }
 
@@ -280,18 +313,22 @@ function InventoryReferencePageV2({ embedded = false, project, activities, confi
             <button className={`${inventoryStyles.btn} ${inventoryStyles.primary}`} onClick={() => setKeyword(queryInput.trim())}>查询</button>
             <button className={inventoryStyles.btn} onClick={resetQuery}>重置</button>
             <button className={inventoryStyles.btn} onClick={() => setDrawerOpen(true)}>＋ 新增{group === 'materials' ? '原辅材料' : selectedGroup?.label}</button>
-            {embedded && <button className={`${inventoryStyles.btn} ${inventoryStyles.primary}`} style={pendingCount > 0 ? { background: '#6d817a', borderColor: '#6d817a', color: '#fff', opacity: 1 } : undefined} disabled={pendingCount > 0} onClick={() => onConfirm(activities)}>{confirmed ? '已确认核算清单' : '确认核算清单'}</button>}
           </div>
         </div>
         {pendingCount > 0 && <div className={inventoryStyles.alert}><span>当前有 {pendingCount} 项活动数据或排放因子待补充，完成后才能确认核算清单。</span></div>}
         <div className={inventoryStyles.tableWrap}><table className={inventoryStyles.table}>
           <thead><tr>{['核算项', '活动数据', '因子名称', '因子值', '排放量', '证明材料', '数据状态', '操作'].map((head) => <th key={head}>{head}</th>)}</tr></thead>
           <tbody>{rows.map((row) => {
-            const dataMissing = !row.amount.trim() && !row.emissionAmount;
-            const factorMissing = !row.factor && row.calculationMethod !== '实测';
+            const { dataMissing, factorMissing, hasEvidence, label: status, tone: statusTone } = inventoryStatus(row);
             const emission = !dataMissing && !factorMissing ? emissionOf(row) : 0;
-            const status = dataMissing && factorMissing ? '数据与因子缺失' : dataMissing ? '数据缺失' : factorMissing ? '因子缺失' : '已完成';
-            return <tr key={row.id}><td><span className={inventoryStyles.name}>{row.name}</span></td><td><b>{dataMissing ? '—' : `${row.amount} ${row.unit}`}</b></td><td><span style={{ display: 'block', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{factorMissing ? '—' : row.factor}</span></td><td><span style={{ whiteSpace: 'nowrap' }}>{factorMissing ? '—' : row.factorValue}</span></td><td>{!dataMissing && !factorMissing ? <b className={inventoryStyles.emission}>{emission.toFixed(2)} kgCO₂e</b> : '—'}</td><td>{row.evidence > 0 ? <button className={inventoryStyles.evidence} onClick={() => setEvidenceTarget(row)}>{row.evidence}份材料</button> : <span style={{ color: '#8a9993' }}>未上传</span>}</td><td><span style={{ display: 'inline-flex', padding: '4px 8px', borderRadius: 999, background: status === '已完成' ? '#eaf7f2' : '#fff4df', color: status === '已完成' ? '#087e59' : '#a56b16', fontSize: 12, whiteSpace: 'nowrap' }}>{status}</span></td><td style={{ whiteSpace: 'nowrap' }}><button className={inventoryStyles.text} onClick={() => setViewTarget(row)}>查看</button><button className={inventoryStyles.text} onClick={() => setDataTarget(row)}>编辑</button><button className={inventoryStyles.text} style={{ color: '#c85b55' }} onClick={() => { if (window.confirm(`确认删除核算项“${row.name}”？`)) onActivitiesChange(activities.filter((item) => item.id !== row.id)); }}>删除</button></td></tr>;
+            const statusStyle = statusTone === 'complete'
+              ? { background: '#eaf7f2', color: '#087e59' }
+              : statusTone === 'evidence'
+                ? { background: '#fff6df', color: '#9a6b19' }
+                : statusTone === 'all'
+                  ? { background: '#fde9e7', color: '#b3433e' }
+                  : { background: '#fff4df', color: '#a56b16' };
+            return <tr key={row.id}><td><span className={inventoryStyles.name}>{row.name}</span></td><td><b>{dataMissing ? '—' : `${row.amount} ${row.unit}`}</b></td><td><span style={{ display: 'block', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{factorMissing ? '—' : row.factor}</span></td><td><span style={{ whiteSpace: 'nowrap' }}>{factorMissing ? '—' : row.factorValue}</span></td><td>{!dataMissing && !factorMissing ? <b className={inventoryStyles.emission}>{emission.toFixed(2)} kgCO₂e</b> : '—'}</td><td>{hasEvidence ? <span className={inventoryStyles.evidenceStatus}>已上传</span> : <span style={{ color: '#8a9993' }}>未上传</span>}</td><td><span style={{ display: 'inline-flex', padding: '4px 8px', borderRadius: 999, ...statusStyle, fontSize: 12, whiteSpace: 'nowrap' }}>{status}</span></td><td style={{ whiteSpace: 'nowrap' }}><button className={inventoryStyles.text} onClick={() => setViewTarget(row)}>查看</button><button className={inventoryStyles.text} onClick={() => setDataTarget(row)}>编辑</button><button className={inventoryStyles.text} style={{ color: '#c85b55' }} onClick={() => { if (window.confirm(`确认删除核算项“${row.name}”？`)) onActivitiesChange(activities.filter((item) => item.id !== row.id)); }}>删除</button></td></tr>;
           })}</tbody>
         </table></div>
         <div className={inventoryStyles.foot}>当前阶段小计 <strong>{total.toFixed(2)} kgCO₂e</strong></div>
@@ -336,7 +373,7 @@ function ReferenceActivityDrawer({ type, group, row, mode = 'add', onClose, onSu
   const [name, setName] = useState(row?.name ?? '');
   const [amount, setAmount] = useState(row?.amount ?? '');
   const [unit, setUnit] = useState(row?.unit ?? (type === '能源' ? 'kWh' : type === '运输' ? 't·km' : type === '工艺排放' ? 't' : 'kg'));
-  const [source] = useState(row?.source ?? sourceOptions[type][0]);
+  const [source, setSource] = useState(row?.dataSource ?? row?.source ?? '');
   const [factor, setFactor] = useState(row?.factor ?? '');
   const [factorValue, setFactorValue] = useState(row?.factorValue ?? '');
   const seededEvidenceFiles = row?.evidenceFiles?.length ? row.evidenceFiles : Array.from({ length: row?.evidence ?? 0 }, (_, index) => `${row?.name ?? '当前核算项'}-证明材料-${index + 1}.${index === 1 ? 'xlsx' : 'pdf'}`);
@@ -373,6 +410,7 @@ function ReferenceActivityDrawer({ type, group, row, mode = 'add', onClose, onSu
          <section><h3>核算项 {requiredMark}</h3><div className={styles.formGrid}><label style={{ gridColumn: '1 / -1' }} aria-label="核算项名称"><input style={{ maxWidth: 360 }} required={!isReadonly} readOnly={isReadonly} value={name} onChange={(event) => setName(event.target.value)} placeholder={placeholders[type]} /></label></div></section>
          <section><h3>活动数据（每1个功能单位） {requiredMark}</h3><div className={styles.formGrid}><label style={{ gridColumn: '1 / -1' }} aria-label="活动数据（每1个功能单位）">{valueUnit}</label></div></section>
        </div>
+       <section><h3>活动数据来源</h3><label className={styles.fullField}><input className={inventoryStyles.field} readOnly={isReadonly} value={source} onChange={(event) => setSource(event.target.value)} placeholder={`例如：${sourceOptions[type].join('、')}`} /></label></section>
        <section><h3>排放因子</h3><div className={inventoryStyles.factorCard}><div><b>{factor || '暂未选择排放因子'}</b><span className={inventoryStyles.minor}>{factor ? '以下因子信息将用于当前核算项计算，并同步展示到核算清单列表。' : '请选择与当前核算项及活动数据单位匹配的排放因子。'}</span></div><button type="button" disabled={isReadonly} className={inventoryStyles.btn} onClick={() => setFactorPickerOpen(true)}>{factor ? '更换排放因子' : '选择排放因子'}</button></div>{factor && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, marginTop: 12, padding: 14, border: '1px solid #dce8e3', borderRadius: 8, background: '#f7fbf9' }}><div><small>因子名称</small><b style={{ display: 'block', marginTop: 5, color: '#36575b' }}>{factor}</b></div><div><small>因子值</small><b style={{ display: 'block', marginTop: 5, color: '#36575b' }}>{factorNumber}</b></div><div><small>因子单位</small><b style={{ display: 'block', marginTop: 5, color: '#36575b' }}>{factorUnit || '—'}</b></div></div>}</section>
        <section><h3>证明材料</h3>{!isReadonly && <label className={styles.uploadField} style={{ minHeight: 82 }}><strong>＋ 上传证明材料</strong><input type="file" multiple accept={EVIDENCE_FILE_ACCEPT} onChange={appendEvidence} /><span className={styles.uploadHint}>用于支撑当前核算项的活动数据及核算结果。仅支持 PDF 或图片</span></label>}{evidenceFiles.length > 0 && <div style={{ marginTop: isReadonly ? 0 : 12, border: '1px solid #dce8e3', borderRadius: 8, overflow: 'hidden' }}>{evidenceFiles.map((file) => <div key={file} style={{ display: 'grid', gridTemplateColumns: '1fr 130px', gap: 12, alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid #edf2ef' }}><div><b style={{ color: '#36575b' }}>{file}</b><small style={{ display: 'block', marginTop: 3, color: '#88999c' }}>{file.split('.').pop()?.toUpperCase() ?? 'FILE'} · 业务凭证</small></div><div style={{ textAlign: 'right' }}><button type="button" className={inventoryStyles.text} onClick={() => setPreviewFile(file)}>预览</button>{!isReadonly && <button type="button" className={inventoryStyles.text} onClick={() => setEvidenceFiles((files) => files.filter((item) => item !== file))}>删除</button>}</div></div>)}</div>}{attachmentCount === 0 && <div className={inventoryStyles.minor} style={{ marginTop: 8 }}>暂无证明材料，可在下方上传。</div>}</section>
        <section><h3>备注</h3><label className={styles.fullField}><textarea className={inventoryStyles.field} rows={3} readOnly={isReadonly} value={remark} onChange={(event) => setRemark(event.target.value)} placeholder="补充数据口径、来源或特殊说明" /></label></section>
@@ -545,61 +583,128 @@ function LinkedResultsPage({ projects, activeProjectId, confirmedRows, onProject
   return <div className={`${styles.page} ${styles.resultPage}`}>
     {isPreview && <div className={styles.notice}>当前项目仍有核算数据待完善，以下为当前数据形成的预览结果。</div>}<><div className={styles.resultSummary}><section className={`${styles.card} ${styles.bigNumber}`}><b>产品碳足迹</b><strong>{total.toFixed(2)}</strong><span>{emissionUnit}</span></section><section className={`${styles.card} ${styles.resultInfo}`}>{[['产品名称', project.name], ['功能单位', project.unit], ['产品规格', project.spec], ['系统边界', project.boundary], ['核算期间', project.period], ['核算状态', isPreview ? '当前数据预览' : '已确认清单快照']].map(([label, value]) => <div key={label}><span>{label}</span><b>{value}</b></div>)}</section></div><div className={styles.resultCharts}><section className={`${styles.card} ${styles.chartCard}`}><h3>生命周期阶段贡献</h3><div className={styles.donutLayout}><div className={styles.donutWrap}><div className={styles.donut} style={{ background: donutBackground }} /><div className={styles.donutCenter}><strong>{total.toFixed(2)}</strong><span>已核算 {emissionUnit}</span></div></div><div className={styles.resultLegend}><div><i /><b>阶段</b><b>排放量（{emissionUnit}）</b><b>占比</b></div>{stageRows.map((item, index) => <div key={item.label}><i style={{ background: stageColors[index] }} /><span>{item.label}</span><span>{item.value.toFixed(2)} {emissionUnit}</span><span>{total ? (item.value / total * 100).toFixed(2) : '0.00'}%</span></div>)}</div></div></section><section className={`${styles.card} ${styles.chartCard}`}><h3>主要排放来源（TOP5）</h3><div className={styles.resultBars}>{topRows.map((row) => <div key={row.id}><span>{row.name}</span><i><b style={{ width: `${topRows[0] ? emissionOf(row) / emissionOf(topRows[0]) * 100 : 0}%` }} /></i><span>{emissionOf(row).toFixed(2)} {emissionUnit}</span><span>{total ? (emissionOf(row) / total * 100).toFixed(2) : '0.00'}%</span></div>)}</div></section></div><section className={`${styles.card} ${styles.resultTable}`}><h3>排放活动明细</h3><div className={styles.tableWrap}><table><thead><tr>{['生命周期阶段', '排放活动', '活动数据', '排放因子', '因子来源', `排放量（${emissionUnit}）`, '占比'].map((head) => <th key={head}>{head}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td>{stageLabel(row.stage)}</td><td>{row.name}</td><td>{row.amount} {row.unit}</td><td>{row.factorValue}</td><td>{row.source}</td><td>{emissionOf(row).toFixed(2)} {emissionUnit}</td><td>{total ? (emissionOf(row) / total * 100).toFixed(2) : '0.00'}%</td></tr>)}<tr className={styles.totalRow}><td>已核算合计</td><td>—</td><td>—</td><td>—</td><td>—</td><td>{total.toFixed(2)} {emissionUnit}</td><td>100.00%</td></tr></tbody></table></div></section></></div>;
 }
-function downloadProductCarbonReport(project: Project, rows: ActivityDataRow[]) {
-  const total = inventoryTotal(rows);
-  const stageRows = ['原材料获取', '生产制造', '分销与运输'].map((stage) => ({ label: stage, value: rows.filter((row) => stageLabel(row.stage) === stage).reduce((sum, row) => sum + emissionOf(row), 0) }));
-  const detailRows = rows.filter((row) => emissionOf(row) > 0).map((row) => `<tr><td>${stageLabel(row.stage)}</td><td>${row.name}</td><td>${row.amount} ${row.unit}</td><td>${emissionOf(row).toFixed(2)}</td></tr>`).join('');
+function downloadProductCarbonReport(report: ProductReportSnapshot) {
+  const { project, rows, info, version } = report;
+  const content = renderToStaticMarkup(<ProductCarbonReportPreview project={project} rows={rows} info={info} version={version} />);
   downloadHtmlReport({
-    filename: `${project.name}-产品碳足迹报告.html`,
-    title: `${project.name} 产品碳足迹报告`,
-    content: `<p>报告编号：CFP-${project.year.slice(0, 4)}-${project.id}-001</p><h2>01 报告摘要</h2><p><strong>单位产品碳足迹：${total.toFixed(2)} kgCO₂e/${project.unit}</strong></p><table><tbody><tr><th>产品名称</th><td>${project.name}</td></tr><tr><th>功能单位</th><td>${project.unit}</td></tr><tr><th>系统边界</th><td>${project.boundary}</td></tr><tr><th>核算期间</th><td>${project.period}</td></tr><tr><th>核算依据</th><td>ISO 14067:2018</td></tr></tbody></table><h2>生命周期阶段贡献</h2><table><thead><tr><th>生命周期阶段</th><th>排放量（kgCO₂e）</th><th>占比</th></tr></thead><tbody>${stageRows.map((row) => `<tr><td>${row.label}</td><td>${row.value.toFixed(2)}</td><td>${total ? (row.value / total * 100).toFixed(2) : '0.00'}%</td></tr>`).join('')}<tr><th>合计</th><th>${total.toFixed(2)}</th><th>100.00%</th></tr></tbody></table><h2>02 目标与范围定义</h2><p>本报告以${project.unit}为功能单位，依据已确认核算清单，对${project.boundary}边界内的温室气体排放进行量化。</p><h2>03 数据收集与核算方法</h2><p>各排放活动按“活动数据 × 排放因子”计算，并汇总为二氧化碳当量。</p><h2>04 产品碳足迹核算结果</h2><table><thead><tr><th>生命周期阶段</th><th>排放活动</th><th>活动数据</th><th>排放量（kgCO₂e）</th></tr></thead><tbody>${detailRows}</tbody></table><h2>05 数据质量与不确定性</h2><p>报告数据来自已确认核算清单快照；未取得供应商特定数据的活动使用适配因子并应持续完善。</p><h2>06 排放热点与减排建议</h2><p>优先针对高贡献排放活动推进低碳材料替代、供应商碳数据协同及制造环节节能优化。</p>`,
+    filename: `${project.name}-产品碳足迹报告-V${version}.html`,
+    title: renderToStaticMarkup(<>{project.name} 产品碳足迹报告 V{version}</>),
+    content: `<style>article{max-width:1000px;margin:auto}article>section{padding:24px 0;border-bottom:1px solid #dce8e3}article p,article dd{white-space:pre-wrap;overflow-wrap:anywhere}article dl>div{margin:12px 0}article dt{font-weight:bold}article dd{margin:6px 0}article table{margin:16px 0}article section>div{margin:12px 0}article h3{margin-top:24px}@media print{article>section{break-before:page}article>section:first-child{break-before:auto}tr{break-inside:avoid}}</style>${content}`,
   });
 }
 
-function ProductCarbonReportPreview({ project, rows }: { project: Project; rows: ActivityDataRow[] }) {
+function ReportSupplementSection({ fields, info }: { fields: Array<{ label: string; value: string }>; info?: ProductReportInfo }) {
+  if (!info || !fields.some((field) => field.value)) return null;
+  return <dl className={styles.reportSupplementValues}>{fields.filter((field) => field.value).map(({ label, value }) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>;
+}
+
+function ProductCarbonReportPreview({ project, rows, info, version = 0, isPreview = false }: { project: Project; rows: ActivityDataRow[]; info?: ProductReportInfo; version?: number; isPreview?: boolean }) {
   const total = inventoryTotal(rows);
-  const reportNo = `CFP-${project.year.slice(0, 4)}-${project.id}-001`;
+  const reportNo = version ? `CFP-${project.year.slice(0, 4)}-${project.id}-${String(version).padStart(3, '0')}` : '待生成';
+  const standard = info?.values.standard || '核算依据待补充';
   const stageRows = ['原材料获取', '生产制造', '分销与运输'].map((stage) => ({ label: stage, value: rows.filter((row) => stageLabel(row.stage) === stage).reduce((sum, row) => sum + emissionOf(row), 0) }));
   const topRows = rows.filter((row) => emissionOf(row) > 0).sort((left, right) => emissionOf(right) - emissionOf(left)).slice(0, 3);
-  const evidenceRate = rows.length ? Math.round(rows.filter((row) => row.evidence > 0).length / rows.length * 100) : 0;
   return <article className={styles.productReportPaper}>
     <section className={styles.reportCover}>
-      <div className={styles.reportCoverHead}><div><b>工业企业能碳管理平台</b><span>PRODUCT CARBON FOOTPRINT</span></div><div>ISO 14067:2018<br />产品碳足迹核算报告</div></div>
-      <div className={styles.reportCoverTitle}><span>PRODUCT CARBON FOOTPRINT REPORT</span><h2>产品碳足迹核算报告</h2><strong>{project.name}</strong></div>
-      <div className={styles.reportMeta}><span>报告编号</span><b>{reportNo}</b><span>功能单位</span><b>{project.unit}</b><span>系统边界</span><b>{project.boundary}</b><span>核算周期</span><b>{project.period}</b><span>数据依据</span><b>已确认核算清单快照</b><span>报告版本</span><b>V1.0</b></div>
-      <p>本报告基于已确认核算清单快照生成，用于产品碳足迹量化、热点识别与减排管理。</p>
+      <div className={styles.reportCoverHead}><div><b>工业企业能碳管理平台</b><span>PRODUCT CARBON FOOTPRINT</span></div><div>{standard}<br />产品碳足迹核算报告</div></div>
+      <div className={styles.reportCoverTitle}><span>PRODUCT CARBON FOOTPRINT REPORT</span><h2>产品碳足迹核算报告</h2><strong>{project.name}</strong>{info?.values.companyName && <p>{info.values.companyName}</p>}</div>
+      <div className={styles.reportMeta}><span>报告编号</span><b>{reportNo}</b><span>功能单位</span><b>{project.unit}</b><span>系统边界</span><b>{project.boundary}</b><span>核算周期</span><b>{project.period}</b><span>数据依据</span><b>{isPreview ? '当前数据预览' : '已确认核算清单快照'}</b><span>报告版本</span><b>{version ? `V${version}` : '待生成'}</b><span>报告编制日期</span><b>{info?.reportDate || '待生成'}</b></div>
+      <p>{isPreview ? '当前为草稿预览，完成并确认核算清单后可生成正式报告。' : '本报告基于已确认核算清单快照，用于产品碳足迹量化、热点识别与减排管理。'}</p>
     </section>
     <section className={styles.reportPageSection}>
       <div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>{reportNo}</span></div><h2>01 报告摘要</h2><p>本报告基于既定系统边界与功能单位，对目标产品相关生命周期阶段的温室气体排放进行量化。</p>
-      <div className={styles.reportSummaryGrid}><div className={styles.reportResultCard}><span>单位产品碳足迹</span><strong>{total.toFixed(2)}</strong><b>kgCO₂e / {project.unit}</b></div><div className={styles.reportInfoCard}>{[['目标产品', project.name], ['功能单位', project.unit], ['系统边界', project.boundary], ['核算依据', 'ISO 14067:2018'], ['数据质量等级', evidenceRate >= 90 ? '良好' : '待完善']].map(([label, value]) => <div key={label}><span>{label}</span><b>{value}</b></div>)}</div></div>
-      <h3>生命周期阶段贡献</h3><table><thead><tr><th>生命周期阶段</th><th>排放量（kgCO₂e）</th><th>占比</th></tr></thead><tbody>{stageRows.map((row) => <tr key={row.label}><td>{row.label}</td><td>{row.value.toFixed(2)}</td><td>{total ? (row.value / total * 100).toFixed(2) : '0.00'}%</td></tr>)}<tr className={styles.reportTotalRow}><td>合计</td><td>{total.toFixed(2)}</td><td>100.00%</td></tr></tbody></table>
+      <div className={styles.reportSummaryGrid}><div className={styles.reportResultCard}><span>单位产品碳足迹</span><strong>{total.toFixed(2)}</strong><b>kgCO₂e / {project.unit}</b></div><div className={styles.reportInfoCard}>{[['目标产品', project.name], ['功能单位', project.unit], ['系统边界', project.boundary], ['核算依据', standard]].map(([label, value]) => <div key={label}><span>{label}</span><b>{value}</b></div>)}</div></div>
+      <h3>生命周期阶段贡献</h3><table><thead><tr><th>生命周期阶段</th><th>排放量（kgCO₂e/功能单位）</th><th>占比</th></tr></thead><tbody>{stageRows.map((row) => <tr key={row.label}><td>{row.label}</td><td>{row.value.toFixed(2)}</td><td>{total ? (row.value / total * 100).toFixed(2) : '0.00'}%</td></tr>)}<tr className={styles.reportTotalRow}><td>合计</td><td>{total.toFixed(2)}</td><td>{total ? '100.00%' : '—'}</td></tr></tbody></table>
     </section>
-    <section className={styles.reportPageSection}><div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>目标与范围</span></div><h2>02 目标与范围定义</h2><h3>核算目标</h3><p>量化目标产品在既定系统边界内的温室气体排放，识别主要排放贡献环节，为低碳设计、供应链协同和减排管理提供依据。</p><h3>产品与功能单位</h3><table><tbody><tr><th>产品名称</th><td>{project.name}</td></tr><tr><th>产品规格</th><td>{project.spec}</td></tr><tr><th>功能单位</th><td>{project.unit}</td></tr><tr><th>核算周期</th><td>{project.period}</td></tr></tbody></table><h3>系统边界</h3><div className={styles.reportScopeFlow}>{stageRows.map((row) => <span key={row.label}>{row.label}</span>)}</div><p className={styles.reportCallout}>纳入核算的阶段依据已确认核算清单确定；未纳入的生命周期阶段不计入本次结果。</p></section>
-    <section className={styles.reportPageSection}><div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>数据收集与方法</span></div><h2>03 数据收集与核算方法</h2><h3>数据来源</h3><table><thead><tr><th>数据对象</th><th>活动数据</th><th>数据来源</th><th>因子来源</th></tr></thead><tbody>{rows.filter((row) => emissionOf(row) > 0).map((row) => <tr key={row.id}><td>{row.name}</td><td>{row.amount} {row.unit}</td><td>{row.source}</td><td>{row.factor}</td></tr>)}</tbody></table><h3>计算方法</h3><p>各排放活动按照“活动数据 × 对应排放因子”计算，并按功能单位归集为二氧化碳当量。</p><p className={styles.reportCallout}>产品碳足迹 = Σ（活动数据 × 排放因子 × 必要的换算或分配系数）</p></section>
-    <section className={styles.reportPageSection}><div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>核算结果</span></div><h2>04 产品碳足迹核算结果</h2><table><thead><tr><th>阶段</th><th>排放活动</th><th>活动数据</th><th>因子来源</th><th>排放量（kgCO₂e）</th><th>占比</th></tr></thead><tbody>{rows.filter((row) => emissionOf(row) > 0).map((row) => <tr key={row.id}><td>{stageLabel(row.stage)}</td><td>{row.name}</td><td>{row.amount} {row.unit}</td><td>{row.source}</td><td>{emissionOf(row).toFixed(2)}</td><td>{total ? (emissionOf(row) / total * 100).toFixed(2) : '0.00'}%</td></tr>)}<tr className={styles.reportTotalRow}><td colSpan={4}>合计</td><td>{total.toFixed(2)}</td><td>100.00%</td></tr></tbody></table><p>单位产品碳足迹为 <b>{total.toFixed(2)} kgCO₂e/{project.unit}</b>，应优先关注高贡献排放活动。</p></section>
-    <section className={styles.reportPageSection}><div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>数据质量与不确定性</span></div><h2>05 数据质量与不确定性</h2><div className={styles.reportQualityGrid}><div><span>数据完整性</span><b>{evidenceRate}%</b></div><div><span>初级数据覆盖</span><b>{evidenceRate}%</b></div><div><span>因子适配度</span><b>良好</b></div><div><span>综合质量等级</span><b>{evidenceRate >= 90 ? 'B' : '待完善'}</b></div></div><p className={styles.reportCallout}>结果基于已确认清单快照。采用行业或通用因子的活动，建议后续以供应商特定数据持续替换和完善。</p></section>
-    <section className={styles.reportPageSection}><div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>热点分析与减排建议</span></div><h2>06 排放热点与减排建议</h2><div className={styles.reportHotspots}>{topRows.map((row, index) => <div key={row.id}><b>{index + 1}</b><strong>{row.name}</strong><p>贡献 {total ? (emissionOf(row) / total * 100).toFixed(2) : '0.00'}%，建议优先结合工艺、供应链或能源管理措施降低该环节影响。</p></div>)}</div><div className={styles.reportRecommendations}><div><b>推进高贡献活动减排</b><p>优先开展低碳材料替代、设备节能和低碳能源采购。</p></div><div><b>完善供应商碳数据协同</b><p>逐步以供应商特定数据替换行业平均排放因子。</p></div><div><b>提升产品级数据颗粒度</b><p>持续完善 BOM、计量、运输和废弃物台账，为年度复算提供依据。</p></div></div></section>
+    <section className={styles.reportPageSection}>
+      <div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>目标与范围</span></div><h2>02 目标与范围定义</h2>
+      <ReportSupplementSection info={info} fields={[{ label: '企业名称', value: info?.values.companyName || '' }]} />
+      <h3>产品与功能单位</h3><table><tbody>{[['产品名称', project.name], ['产品规格', project.spec], ['产品类别', project.category], ['功能单位', project.unit], ['核算周期', project.period], ['系统边界', project.boundary], ...(project.processFile ? [['项目工艺图文件名', project.processFile]] : []), ...(project.processDescription ? [['生产工艺说明', project.processDescription]] : [])].map(([label, value]) => <tr key={label}><th>{label}</th><td>{value}</td></tr>)}</tbody></table>
+      <h3>核算依据与补充信息</h3><ReportSupplementSection info={info} fields={[
+        { label: '核算依据', value: info?.values.standard || '' },
+        { label: 'GWP 来源版本', value: info?.values.gwpVersion || '' },
+        { label: 'GWP 时间尺度', value: info?.values.gwpHorizon || '' },
+        { label: '生产地址', value: info?.values.productionAddress || '' },
+      ]} />
+    </section>
+    <section className={styles.reportPageSection}>
+      <div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>数据收集与方法</span></div><h2>03 数据收集与核算方法</h2>
+      <h3>活动数据与因子</h3><table><thead><tr><th>核算项</th><th>每功能单位活动数据</th><th>活动数据来源</th><th>因子名称</th><th>因子值</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td>{row.name}</td><td>{row.amount} {row.unit}</td><td>{row.dataSource || row.source}</td><td>{row.factor || '待补充'}</td><td>{row.factorValue || '待补充'}</td></tr>)}</tbody></table>
+      <h3>计算方法</h3><p>各排放活动按照“每功能单位活动数据 × 对应排放因子”计算，并汇总为二氧化碳当量。</p>
+    </section>
+    <section className={styles.reportPageSection}>
+      <div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>核算结果</span></div><h2>04 产品碳足迹核算结果</h2><table><thead><tr><th>阶段</th><th>排放活动</th><th>活动数据</th><th>排放因子</th><th>排放量（kgCO₂e/功能单位）</th><th>占比</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td>{stageLabel(row.stage)}</td><td>{row.name}</td><td>{row.amount} {row.unit}</td><td>{row.factorValue || '待补充'}</td><td>{emissionOf(row).toFixed(2)}</td><td>{total ? (emissionOf(row) / total * 100).toFixed(2) : '0.00'}%</td></tr>)}<tr className={styles.reportTotalRow}><td colSpan={4}>合计</td><td>{total.toFixed(2)}</td><td>{total ? '100.00%' : '—'}</td></tr></tbody></table><p>单位产品碳足迹为 <b>{total.toFixed(2)} kgCO₂e/{project.unit}</b>。</p>
+    </section>
+    <section className={styles.reportPageSection}>
+      <div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>数据质量与不确定性</span></div><h2>05 数据质量与不确定性</h2><p className={styles.reportLimitations}>{info?.values.dataLimitations || '请在生成报告时补充实际存在的数据局限及其对结果的可能影响。'}</p>
+    </section>
+    <section className={styles.reportPageSection}>
+      <div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>热点分析与减排建议</span></div><h2>06 排放热点与减排建议</h2><div className={styles.reportHotspots}>{topRows.map((row, index) => <div key={row.id}><b>{index + 1}</b><strong>{row.name}</strong><p>贡献 {total ? (emissionOf(row) / total * 100).toFixed(2) : '0.00'}%，建议结合实际工艺、供应链或能源管理措施，评估该环节的减排机会。</p></div>)}</div>
+    </section>
   </article>;
 }
 
-function LinkedReportsPage({ projects, activeProjectId, confirmedRows, generatedReportIds, onProjectChange, onGenerate, isPreview = false }: { projects: Project[]; activeProjectId: number; confirmedRows?: ActivityDataRow[]; generatedReportIds: number[]; onProjectChange: (projectId: number) => void; onGenerate: () => void; isPreview?: boolean }) {
-  const project = projects.find((item) => item.id === activeProjectId) ?? projects[0];
-  const total = inventoryTotal(confirmedRows ?? []);
-  const generated = generatedReportIds.includes(project.id);
-  return <div className={`${styles.page} ${styles.reportLayout}`}>
-    <section className={styles.card}>
-      <div className={styles.cardHead}><b>报告列表</b><button className={styles.primary} disabled={!confirmedRows || isPreview} onClick={onGenerate}>＋ 生成报告</button></div>
-      {generatedReportIds.map((id) => {
-        const item = projects.find((candidate) => candidate.id === id);
-        return item ? <button className={`${styles.reportItem} ${id === project.id ? styles.selected : ''}`} key={id} onClick={() => onProjectChange(id)}><b>{item.name} 产品碳足迹报告</b><span>基于已确认清单快照</span></button> : null;
-      })}
-    </section>
-    <section className={`${styles.card} ${styles.reportPreviewCard}`}>
-      <div className={styles.cardHead}><b>报告预览</b><div><button className={styles.button} disabled={!confirmedRows || isPreview} onClick={onGenerate}>重新生成</button> <button className={styles.primary} disabled={!generated} onClick={() => downloadProductCarbonReport(project, confirmedRows ?? [])}>⇩ 下载报告</button></div></div>
-      {isPreview && <div className={styles.notice}>核算清单尚未确认完成，可以查看预览，但需要先完成核算清单后才能生成正式报告。</div>}<div className={styles.reportPreviewViewport}>{!isPreview && !generated ? <div className={styles.empty}><div><strong>结果已确认，可生成报告</strong><p>点击“生成报告”后创建该项目的报告版本。</p></div></div> : <ProductCarbonReportPreview project={project} rows={confirmedRows ?? []} />}</div>
-    </section>
+function ReportSupplementModal({ project, initialInfo, canGenerate, onClose, onSave, onGenerate }: { project: Project; initialInfo?: ProductReportInfo; canGenerate: boolean; onClose: () => void; onSave: (info: ProductReportInfo) => void; onGenerate: (info: ProductReportInfo) => void }) {
+  const [info, setInfo] = useState(() => {
+    const initial = structuredClone(initialInfo ?? emptyProductReportInfo());
+    return { ...initial, values: { ...initial.values, ...defaultGwp } };
+  });
+  const [showErrors, setShowErrors] = useState(false);
+  const missing = missingReportFields(info);
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!canGenerate) return;
+    if (missing.length) {
+      setShowErrors(true);
+      const fieldId = `report-${missing[0].key}`;
+      requestAnimationFrame(() => document.getElementById(fieldId)?.focus());
+      return;
+    }
+    onGenerate(normalizeReportInfo(info));
+  };
+  return <div className={styles.overlay}>
+    <form className={`${styles.modal} ${styles.reportSupplementModal}`} role="dialog" aria-modal="true" aria-labelledby="report-supplement-title" noValidate onSubmit={submit} onKeyDown={(event) => { if (event.key === 'Escape') onClose(); }}>
+      <header><div><b id="report-supplement-title">补充报告信息</b><p className={styles.modalSubTitle}>只填写系统无法从项目和核算清单获取的信息。</p></div><button type="button" aria-label="关闭补充报告信息" onClick={onClose}>×</button></header>
+      <div className={styles.reportSupplementBody}>
+        <div className={styles.reportProjectContext} aria-label="已录入项目信息，只读"><strong>已录入项目信息（只读）</strong><b>{project.name}</b><span>规格：{project.spec}</span><span>类别：{project.category}</span><span>功能单位：{project.unit}</span><span>系统边界：{project.boundary}</span><span>核算期间：{project.period}</span>{project.processFile && <span>工艺图文件名：{project.processFile}</span>}</div>
+        {!canGenerate && <p className={styles.reportFormNotice}>核算清单尚未确认。可先保存补充信息，确认清单后再生成正式报告。</p>}
+        {showErrors && missing.length > 0 && <p role="alert" className={styles.reportFormError}>还有 {missing.length} 项必填信息未完成，请先填写“{missing[0].label}”。</p>}
+        <p className={styles.reportFieldHelp}>GWP 默认采用 AR6、100 年口径，以下灰色字段只读；其他未录入项请按实际资料补充。</p>
+        <div className={styles.reportSupplementFields}>{reportSupplementFields.map((field, index) => {
+          const invalid = showErrors && missing.some((item) => item.key === field.key);
+          const required = 'required' in field && field.required;
+          const readOnly = 'readOnly' in field && field.readOnly;
+          const shared = { id: `report-${field.key}`, 'aria-label': field.label, 'aria-invalid': invalid, required, readOnly, value: info.values[field.key], autoFocus: index === 0, onChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => { if (!readOnly) setInfo((current) => ({ ...current, values: { ...current.values, [field.key]: event.target.value } })); } };
+          return <label key={field.key} className={'multiline' in field && field.multiline ? styles.fullField : undefined}><span>{field.label}{required ? <em className={styles.reportRequired}> *</em> : readOnly ? '（系统默认）' : '（选填）'}</span>{'multiline' in field && field.multiline ? <textarea {...shared} rows={3} placeholder={field.hint} /> : <input {...shared} type="text" placeholder={'hint' in field ? field.hint : `请填写${field.label}`} />}{invalid && <small className={styles.reportFormError}>请填写{field.label}</small>}</label>;
+        })}</div>
+      </div>
+      <footer><button type="button" className={styles.button} onClick={onClose}>取消</button><button type="button" className={styles.button} onClick={() => onSave(info)}>保存补充信息</button><button type="submit" className={styles.primary} disabled={!canGenerate}>生成报告</button></footer>
+    </form>
   </div>;
 }
+
+function LinkedReportsPage({ project, rows, reports, reportDraft, onSaveReportInfo, onGenerate, isPreview }: { project: Project; rows: ActivityDataRow[]; reports: ProductReportSnapshot[]; reportDraft?: ProductReportInfo; onSaveReportInfo: (info: ProductReportInfo) => void; onGenerate: (info: ProductReportInfo) => void; isPreview: boolean }) {
+  const [supplementOpen, setSupplementOpen] = useState(false);
+  const [selectedVersion, setSelectedVersion] = useState<number>();
+  const [savedNotice, setSavedNotice] = useState('');
+  const latestReport = reports.at(-1);
+  const selectedReport = reports.find((report) => report.version === selectedVersion) ?? latestReport;
+  return <div className={`${styles.page} ${styles.reportLayout}`}>
+    <section className={styles.card}>
+      <div className={styles.cardHead}><b>报告列表</b><button className={styles.primary} onClick={() => setSupplementOpen(true)}>＋ 生成报告</button></div>
+      {reports.length ? reports.slice().reverse().map((report) => <button className={`${styles.reportItem} ${selectedReport?.version === report.version ? styles.selected : ''}`} key={report.version} onClick={() => setSelectedVersion(report.version)}><b>{report.project.name} 产品碳足迹报告</b><span>V{report.version} · {report.info.reportDate}</span></button>) : <p className={styles.reportFieldHelp} style={{ padding: 20 }}>暂无已生成报告，请先补充报告信息。</p>}
+    </section>
+    <section className={`${styles.card} ${styles.reportPreviewCard}`}>
+      <div className={styles.cardHead}><b>报告预览</b><div><button className={styles.button} disabled={!latestReport} onClick={() => setSupplementOpen(true)}>重新生成</button> <button className={styles.primary} disabled={!selectedReport} onClick={() => { if (selectedReport) downloadProductCarbonReport(selectedReport); }}>⇩ 下载报告</button></div></div>
+      {savedNotice && <div role="status" className={styles.notice}>{savedNotice}</div>}
+      {isPreview && <div className={styles.notice}>核算清单尚未确认。点击“生成报告”可先填写并保存补充信息，确认清单后才能生成正式报告。</div>}
+      {!isPreview && !selectedReport && <div className={styles.notice}>清单已确认。请点击“生成报告”补充信息并生成正式报告。</div>}
+      <div className={styles.reportPreviewViewport}>{selectedReport ? <ProductCarbonReportPreview project={selectedReport.project} rows={selectedReport.rows} info={selectedReport.info} version={selectedReport.version} /> : <ProductCarbonReportPreview project={project} rows={rows} info={reportDraft} isPreview={isPreview} />}</div>
+    </section>
+    {supplementOpen && <ReportSupplementModal project={project} initialInfo={reportDraft ?? latestReport?.info} canGenerate={!isPreview} onClose={() => setSupplementOpen(false)} onSave={(info) => { onSaveReportInfo(info); setSupplementOpen(false); setSavedNotice('补充信息已保存，可在生成报告时继续填写。'); }} onGenerate={(info) => { onGenerate(info); setSelectedVersion(undefined); setSupplementOpen(false); setSavedNotice('报告已生成，预览和下载使用同一份报告内容。'); }} />}
+  </div>;
+}
+
 // Kept temporarily for the legacy product-footprint prototype; the route uses the CPCD library below.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function FactorsPage({ addModal, onCloseAddModal }: { addModal: boolean; onCloseAddModal: () => void }) {
@@ -636,7 +741,7 @@ function FactorEvidenceModal({ factor, onClose, onUpdate, onPreview }: { factor:
   return <div className={styles.overlay} onMouseDown={onClose}><section className={styles.modal} role="dialog" aria-modal="true" aria-label="企业专属因子凭证" style={{ width: 'min(760px, 94vw)' }} onMouseDown={(event) => event.stopPropagation()}><header><div><b>企业专属因子凭证</b><span className={styles.modalSubTitle}>{factor.name} · 共 {factor.evidence.length} 份</span></div><button type="button" onClick={onClose}>×</button></header><div>{factor.evidence.length ? factor.evidence.map((file, index) => <div key={`${file}-${index}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 0', borderBottom: '1px solid #e7efec' }}><b style={{ flex: 1 }}>{file}</b><button type="button" className={styles.factorDetailLink} onClick={() => onPreview(file)}>查看/预览</button><label className={styles.factorDetailLink}>编辑/重传<input type="file" hidden accept={EVIDENCE_FILE_ACCEPT} onChange={(event) => { const replacement = Array.from(event.target.files ?? []).find(isEvidenceFile)?.name; if (replacement) onUpdate(factor.evidence.map((item, itemIndex) => itemIndex === index ? replacement : item)); }} /></label><button type="button" className={styles.factorDetailLink} onClick={() => onUpdate(factor.evidence.filter((_, itemIndex) => itemIndex !== index))}>删除</button></div>) : <p className={styles.modalHint}>暂无凭证，请使用“编辑/重传”补充。</p>}<label className={styles.uploadField}><strong>新增凭证</strong><input type="file" multiple accept={EVIDENCE_FILE_ACCEPT} onChange={(event) => { const files = filterEvidenceFiles(Array.from(event.target.files ?? [])).map((file) => file.name); if (files.length) onUpdate([...factor.evidence, ...files]); }} /><span className={styles.uploadHint}>仅支持 PDF 或图片，可多选</span></label></div><footer><button type="button" className={styles.button} onClick={onClose}>关闭</button></footer></section></div>;
 }
 function ActivityModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (activity: Activity) => void }) { const [activityType, setActivityType] = useState<ActivityType>('原辅材料'); const [stage, setStage] = useState('原材料获取阶段'); const [name, setName] = useState('主要原材料'); const [amount, setAmount] = useState('1'); const [unit, setUnit] = useState('kg'); const [extra, setExtra] = useState(''); const factors: Record<ActivityType, { name: string; value: number; unit: string; source: string }> = { '原辅材料': { name: '通用原材料因子（示例）', value: 2.15, unit: 'kgCO₂e/kg', source: '公共因子库' }, 能源: { name: '全国电力因子（示例）', value: 0.5306, unit: 'kgCO₂e/kWh', source: '国家电力因子' }, 运输: { name: '重型柴油货车运输（示例）', value: 0.0978, unit: 'kgCO₂e/(t·km)', source: 'CPCD' }, 工艺排放: { name: '企业工艺过程因子（示例）', value: 0.85, unit: 'kgCO₂e/功能单位', source: '企业特定数据' }, 废弃物: { name: '一般工业固废处理（示例）', value: 0.12, unit: 'kgCO₂e/kg', source: 'CPCD' } }; const defaults: Record<ActivityType, { name: string; unit: string; stage: string }> = { 原辅材料: { name: '主要原材料', unit: 'kg', stage: '原材料获取阶段' }, 能源: { name: '外购电力', unit: 'kWh', stage: '产品制造阶段' }, 运输: { name: '公路运输', unit: 't·km', stage: '产品配送阶段' }, 工艺排放: { name: '工艺过程排放', unit: '功能单位', stage: '产品制造阶段' }, 废弃物: { name: '生产废弃物处理', unit: 'kg', stage: '产品制造阶段' } }; const factor = factors[activityType]; const numericAmount = Number(amount) || 0; const normalizedAmount = activityType === '运输' ? numericAmount * (Number(extra) || 0) : numericAmount; const result = (normalizedAmount * factor.value).toFixed(2); const changeType = (type: ActivityType) => { setActivityType(type); setName(defaults[type].name); setUnit(defaults[type].unit); setStage(defaults[type].stage); setAmount('1'); setExtra(''); }; return <div className={styles.overlay} onMouseDown={onClose}><form className={styles.modal} onMouseDown={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); onSubmit({ id: Date.now(), stage, name: name || '待补充活动', amount: activityType === '运输' ? normalizedAmount.toFixed(2) : amount || '0', unit, factor: `${factor.value}`, source: factor.source, result, dataSource: '页面录入' }); }}><header><b>新增活动数据</b><button type="button" onClick={onClose}>×</button></header><div><h3>1. 选择活动类型</h3><div className={styles.activityTypeGrid}>{(Object.keys(factors) as ActivityType[]).map((type) => <button type="button" key={type} className={`${styles.activityType} ${activityType === type ? styles.activityTypeActive : ''}`} onClick={() => changeType(type)}>{type}</button>)}</div><h3>2. 录入活动数据</h3><div className={styles.formGrid}><label>生命周期阶段<select value={stage} onChange={(e) => setStage(e.target.value)}>{lifecycleStages.slice(0, 3).map(([, title]) => <option key={title}>{title}</option>)}</select></label><label>排放活动名称<input value={name} onChange={(e) => setName(e.target.value)} placeholder="请输入活动名称" /></label><label>活动数据<input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="请输入数值" /></label><label>单位<select value={unit} onChange={(e) => setUnit(e.target.value)}>{(activityType === '能源' ? ['kWh', 'Nm³', 'kg', 't', 'GJ'] : activityType === '运输' ? ['t·km'] : activityType === '工艺排放' ? ['功能单位', 'kg', 't'] : ['kg', 't', '件']).map((item) => <option key={item}>{item}</option>)}</select></label>{activityType === '运输' && <><label>运输距离<input type="number" min="0" step="0.01" value={extra} onChange={(e) => setExtra(e.target.value)} placeholder="km" /></label><p className={styles.fieldHelp}>系统按运输重量 × 运输距离计算运输周转量（t·km）。</p></>}{activityType === '原辅材料' && <label className={styles.fullField}>供应商（可选）<input value={extra} onChange={(e) => setExtra(e.target.value)} placeholder="用于记录供应商特定数据来源" /></label>}{activityType === '废弃物' && <label className={styles.fullField}>处理方式（可选）<select value={extra} onChange={(e) => setExtra(e.target.value)}><option value="">请选择</option><option>委外处置</option><option>回收利用</option><option>填埋</option><option>焚烧</option></select></label>}</div><h3>3. 确认排放因子</h3><label className={styles.fullField}>排放因子<select><option>{factor.name}｜{factor.value} {factor.unit}｜{factor.source}</option></select></label><div className={styles.factorPreview}><div><span>当前因子</span><b>{factor.name} · {factor.value} {factor.unit}</b></div><div><span>预计排放结果</span><b>{result} kgCO₂e/功能单位</b></div></div></div><footer><button type="button" className={styles.button} onClick={onClose}>取消</button><button className={styles.button}>保存并继续新增</button><button className={styles.primary}>保存</button></footer></form></div>; }
-function ProjectModal({ project, onClose, onSubmit }: { project?: Project; onClose: () => void; onSubmit: (project: Pick<Project, 'name' | 'spec' | 'category' | 'unit' | 'boundary' | 'period' | 'processFile'>) => void }) {
+function ProjectModal({ project, onClose, onSubmit }: { project?: Project; onClose: () => void; onSubmit: (project: Pick<Project, 'name' | 'spec' | 'category' | 'unit' | 'boundary' | 'period' | 'processFile' | 'processDescription' | 'productImageFile'>) => void }) {
   const categoryOptions = ['机械设备', '金属制品', '电子电器', '包装制品'];
   const initialCategory = project?.category ?? '机械设备';
   const [name, setName] = useState(project?.name ?? '');
@@ -650,11 +755,14 @@ function ProjectModal({ project, onClose, onSubmit }: { project?: Project; onClo
   const [endDate, setEndDate] = useState(project?.period.match(/\d{4}-\d{2}-\d{2}/g)?.[1] ?? '2026-12-31');
   const [boundary, setBoundary] = useState('摇篮到大门（Cradle to Gate）');
   const [processFile, setProcessFile] = useState(project?.processFile ?? '');
+  const [processDescription, setProcessDescription] = useState(project?.processDescription ?? '');
+  const [productImageFile, setProductImageFile] = useState(project?.productImageFile ?? '');
   const period = periodMode === 'annual' ? `${annualYear}年度（${annualYear}-01-01 至 ${annualYear}-12-31）` : `${startDate} 至 ${endDate}`;
-  return <div className={styles.overlay} onMouseDown={onClose}><form className={styles.modal} onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); if (startDate > endDate) return; onSubmit({ name, spec, category: category === '其他（自定义）' ? customCategory.trim() : category, unit, boundary: boundary.split('（')[0], period, processFile }); }}><header><b>{project ? '编辑产品碳足迹项目' : '新建产品碳足迹项目'}</b><button type="button" onClick={onClose}>×</button></header><div>
+  return <div className={styles.overlay} onMouseDown={onClose}><form className={styles.modal} onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); if (startDate > endDate) return; onSubmit({ name, spec, category: category === '其他（自定义）' ? customCategory.trim() : category, unit, boundary: boundary.split('（')[0], period, processFile, processDescription, productImageFile }); }}><header><b>{project ? '编辑产品碳足迹项目' : '新建产品碳足迹项目'}</b><button type="button" onClick={onClose}>×</button></header><div>
     <h3>产品信息</h3><div className={styles.formGrid}><label>产品名称<input required value={name} onChange={(e) => setName(e.target.value)} placeholder="请输入产品名称" /></label><label>规格型号<input required value={spec} onChange={(e) => setSpec(e.target.value)} placeholder="请输入产品规格型号" /></label><label>产品类别<select value={category} onChange={(e) => setCategory(e.target.value)}>{categoryOptions.map((item) => <option key={item}>{item}</option>)}<option>其他（自定义）</option></select></label>{category === '其他（自定义）' && <label>自定义产品类别<input required value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} placeholder="请输入产品类别" /></label>}<label>功能单位<input value={unit} onChange={(e) => setUnit(e.target.value)} /></label></div>
+    <h3>产品外观图</h3><label className={styles.uploadField}><span className={styles.uploadTitle}>☁</span><strong>点击上传产品外观图</strong><input type="file" accept="image/*" onChange={(event) => setProductImageFile(Array.from(event.target.files ?? []).find((file) => file.type.startsWith('image/'))?.name ?? productImageFile)} /><span className={styles.uploadHint}>{productImageFile || '仅支持图片格式，单张上传'}</span></label>
     <h3>核算范围</h3><div className={styles.formGrid}><label>核算周期<div className={styles.periodModes}><button type="button" className={periodMode === 'annual' ? styles.periodModeActive : ''} onClick={() => setPeriodMode('annual')}>自然年度</button><button type="button" className={periodMode === 'custom' ? styles.periodModeActive : ''} onClick={() => setPeriodMode('custom')}>自定义周期</button></div>{periodMode === 'annual' ? <><select aria-label="自然年度" value={annualYear} onChange={(e) => { setAnnualYear(e.target.value); setStartDate(`${e.target.value}-01-01`); setEndDate(`${e.target.value}-12-31`); }}><option>2026</option><option>2025</option><option>2024</option></select><span className={styles.periodSummary}>{annualYear} 年 1 月 1 日至 {annualYear} 年 12 月 31 日（自然年）</span></> : <><span className={styles.modalHint}>支持非自然年，请选择数据统计的起止日期</span><div className={styles.dateRange}><input aria-label="核算开始日期" type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)} /><span>至</span><input aria-label="核算结束日期" type="date" required value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>{startDate > endDate && <small className={styles.errorText}>结束日期不能早于开始日期</small>}</>}</label><label>系统边界<select value={boundary} onChange={(e) => setBoundary(e.target.value)}><option>摇篮到大门（Cradle to Gate）</option></select></label></div>
-    <h3>生产工艺</h3><label className={styles.uploadField}><span className={styles.uploadTitle}>☁</span><strong>点击上传工艺图</strong><input type="file" multiple accept={EVIDENCE_FILE_ACCEPT} onChange={(e) => setProcessFile(filterEvidenceFiles(Array.from(e.target.files ?? [])).map((file) => file.name).join('、'))} /><span className={styles.uploadHint}>{processFile || '仅支持 PDF 或图片，可多选'}</span></label>
+    <h3>生产工艺</h3><label className={styles.uploadField}><span className={styles.uploadTitle}>☁</span><strong>点击上传工艺图</strong><input type="file" multiple accept={EVIDENCE_FILE_ACCEPT} onChange={(e) => setProcessFile(filterEvidenceFiles(Array.from(e.target.files ?? [])).map((file) => file.name).join('、'))} /><span className={styles.uploadHint}>{processFile || '仅支持 PDF 或图片，可多选'}</span></label><label style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 12 }}>生产工艺说明<textarea rows={3} value={processDescription} onChange={(event) => setProcessDescription(event.target.value)} placeholder="请简要说明产品的主要生产工序及流程" /></label>
     <h3>取舍规则</h3><ol className={styles.selectionRules}><li>普通物料重量＜1%产品重量时，以及含稀贵或高纯成分的物料重量＜0.1%产品重量时，可忽略该物料的上游生产数据；总共忽略的物料重量不超过 5%。</li><li>低价值废物作为原料，如粉煤灰、矿渣、秸秆、生活垃圾等，可忽略其上游生产数据。</li><li>大多数情况下，生产设备、厂房、生活设施等可以忽略。</li><li>在选定环境影响类型范围内的已知排放数据不应忽略。</li></ol>
   </div><footer><button type="button" className={styles.button} onClick={onClose}>取消</button><button className={styles.primary} disabled={startDate > endDate}>{project ? '保存修改' : '创建项目'}</button></footer></form></div>; }
 

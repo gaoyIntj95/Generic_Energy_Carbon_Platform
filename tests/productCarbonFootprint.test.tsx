@@ -36,6 +36,9 @@ describe('产品碳足迹运输活动', () => {
   });
 
   it('入厂运输复用统一的标准活动数据弹窗', async () => {
+    expect(container.textContent).toContain('已上传');
+    expect(container.textContent).toContain('待补因子');
+    expect(container.textContent).not.toContain('份材料');
     await click(button('入厂运输'));
     await click(button('新增入厂运输'));
 
@@ -47,6 +50,18 @@ describe('产品碳足迹运输活动', () => {
     expect(dialog.textContent).not.toContain('运输方式');
     const selects = dialog.querySelectorAll('select');
     expect([...selects[0].options].map((option) => option.textContent)).toEqual(['t·km', 'kg·km']);
+  });
+
+  it('已上传仅显示状态，查看操作打开证明材料详情', async () => {
+    const uploadedCell = [...container.querySelectorAll('td')].find((cell) => cell.textContent?.trim() === '已上传');
+    expect(uploadedCell?.querySelector('button')).toBeNull();
+
+    await click(button('查看'));
+    const dialog = container.querySelector('form[role="dialog"]')!;
+    expect(dialog.textContent).toContain('证明材料');
+    expect(dialog.textContent).toContain('热轧钢卷-证明材料-1.pdf');
+    await click(button('关闭', dialog));
+    expect(container.querySelector('form[role="dialog"]')).toBeNull();
   });
 
   it('工艺过程排放统一使用活动数据和因子法', async () => {
@@ -69,6 +84,15 @@ describe('产品碳足迹运输活动', () => {
   it('项目列表移除更新时间列', async () => {
     await act(async () => root.render(<MemoryRouter><ProductCarbonFootprint pathname="/product-footprint/projects" /><LocationProbe /></MemoryRouter>));
     expect(container.querySelector('table')?.textContent).not.toContain('更新时间');
+  });
+
+  it('将确认核算清单操作置于项目概要区', () => {
+    const projectHeader = [...container.querySelectorAll('section')].find((section) => section.querySelector('h2')?.textContent === '工业变频器 VFD-75')!;
+    const confirmButton = button('确认核算清单');
+
+    expect(projectHeader.contains(confirmButton)).toBe(true);
+    expect(confirmButton.nextElementSibling?.textContent).toContain('返回');
+    expect([...container.querySelectorAll('button')].filter((item) => item.textContent?.includes('确认核算清单'))).toHaveLength(1);
   });
 
   it('将确认后的核算清单快照传递至核算结果和报告', async () => {
