@@ -116,9 +116,9 @@ describe('产品碳足迹运输活动', () => {
     await act(async () => root.render(<MemoryRouter><ProductCarbonFootprint pathname="/product-footprint/projects/1/report" /></MemoryRouter>));
     expect(container.textContent).toContain('数据依据已确认核算清单快照');
     expect(container.textContent).toContain('98.88');
-    expect(container.textContent).toContain('01 报告摘要');
-    expect(container.textContent).toContain('03 数据收集与核算方法');
-    expect(container.textContent).toContain('06 排放热点与减排建议');
+    expect(container.textContent).toContain('1 产品碳足迹（PCF）介绍');
+    expect(container.textContent).toContain('3 数据收集');
+    expect(container.textContent).toContain('5 碳足迹分析');
   });
 
   it('在项目工作台内保持当前项目上下文并切换 Tab', async () => {

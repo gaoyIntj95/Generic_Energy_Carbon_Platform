@@ -1,4 +1,4 @@
-import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { usePageHeaderActions } from '../../components/PageHeaderActionsContext';
@@ -7,9 +7,12 @@ import { downloadHtmlReport } from '../../utils/reportDownload';
 import styles from './ProductCarbonFootprint.module.css';
 import inventoryStyles from './ProductCarbonFootprintInventory.module.css';
 import { CarbonFootprintFactorLibrary } from './CarbonFootprintFactorLibrary';
-import { defaultGwp, emptyProductReportInfo, missingReportFields, normalizeReportInfo, reportSupplementFields, type ProductReportInfo } from '../../modules/product-footprint/reportSupplement';
+import { uncertaintyGrades, emptyProductReportInfo, missingReportFields, normalizeReportInfo, reportSupplementFields, type ProductReportInfo } from '../../modules/product-footprint/reportSupplement';
 
-type Project = { id: number; name: string; spec: string; category: string; unit: string; boundary: string; year: string; period: string; processFile?: string; processDescription?: string; productImageFile?: string; footprint: number; updated: string; status: '已完成' | '数据待完善' };
+import { reportTemplate } from '../../modules/product-footprint/reportTemplate';
+
+const DEFAULT_PRODUCT_STANDARD = 'GB/T 24067—2024《温室气体 产品碳足迹 量化要求和指南》';
+type Project = { id: number; name: string; spec: string; category: string; unit: string; boundary: string; standard: string; year: string; period: string; processFile?: string; processDescription?: string; productImageFile?: string; footprint: number; updated: string; status: '已完成' | '数据待完善' };
 type Activity = { id: number; stage: string; name: string; amount: string; unit: string; factor: string; source: string; result: string; dataSource: '系统引用' | '页面录入' };
 type ActivityType = '原辅材料' | '能源' | '运输' | '工艺排放' | '废弃物';
 type ActivityDataCategory = '原辅材料' | '能源与动力' | '运输' | '直接排放' | '废弃物及其他';
@@ -47,10 +50,10 @@ function inventoryStatus(row: ActivityDataRow) {
 }
 
 const initialProjects: Project[] = [
-  { id: 1, name: '工业变频器 VFD-75', spec: 'VFD-75 标准型', category: '机械设备', unit: '1 台产品', boundary: '摇篮到大门', year: '2026', period: '2026-01-01 至 2026-12-31', processFile: 'VFD-75-工艺流程图.png', footprint: 86.4, updated: '2026-09-14 16:20', status: '已完成' },
-  { id: 2, name: '铝合金型材 6063', spec: '6063-T5', category: '金属制品', unit: '1 t 产品', boundary: '摇篮到大门', year: '2026', period: '2026-01-01 至 2026-12-31', footprint: 1240.8, updated: '2026-09-12 14:30', status: '已完成' },
-  { id: 3, name: '电子控制器 EC-20', spec: 'EC-20 通用型', category: '电子电器', unit: '1 件产品', boundary: '摇篮到大门', year: '2026', period: '2026-01-01 至 2026-12-31', footprint: 42.8, updated: '2026-09-10 09:10', status: '已完成' },
-  { id: 4, name: '环保包装箱 E-50', spec: 'E-50', category: '包装制品', unit: '1 个产品', boundary: '摇篮到大门', year: '2026', period: '2026-01-01 至 2026-12-31', footprint: 0, updated: '2026-09-08 11:45', status: '数据待完善' },
+  { id: 1, name: '工业变频器 VFD-75', spec: 'VFD-75 标准型', category: '机械设备', unit: '1 台产品', boundary: '摇篮到大门', standard: DEFAULT_PRODUCT_STANDARD, year: '2026', period: '2026-01-01 至 2026-12-31', processFile: 'VFD-75-工艺流程图.png', footprint: 86.4, updated: '2026-09-14 16:20', status: '已完成' },
+  { id: 2, name: '铝合金型材 6063', spec: '6063-T5', category: '金属制品', unit: '1 t 产品', boundary: '摇篮到大门', standard: DEFAULT_PRODUCT_STANDARD, year: '2026', period: '2026-01-01 至 2026-12-31', footprint: 1240.8, updated: '2026-09-12 14:30', status: '已完成' },
+  { id: 3, name: '电子控制器 EC-20', spec: 'EC-20 通用型', category: '电子电器', unit: '1 件产品', boundary: '摇篮到大门', standard: DEFAULT_PRODUCT_STANDARD, year: '2026', period: '2026-01-01 至 2026-12-31', footprint: 42.8, updated: '2026-09-10 09:10', status: '已完成' },
+  { id: 4, name: '环保包装箱 E-50', spec: 'E-50', category: '包装制品', unit: '1 个产品', boundary: '摇篮到大门', standard: DEFAULT_PRODUCT_STANDARD, year: '2026', period: '2026-01-01 至 2026-12-31', footprint: 0, updated: '2026-09-08 11:45', status: '数据待完善' },
 ];
 
 const resultStages = [{ label: '原材料获取', value: 187.55, color: '#4d87da' }, { label: '生产制造', value: 54.62, color: '#24a8b5' }, { label: '分销与运输', value: 4.22, color: '#68bd69' }];
@@ -185,7 +188,7 @@ export function ProductCarbonFootprint({ pathname }: { pathname: string }) {
   const hasConfirmedSnapshot = completeInventory(confirmedInventories[selectedProjectId]);
   const filtered = useMemo(() => projects.filter((item) => (!keyword || item.name.includes(keyword)) && (!category || item.category === category) && (!year || item.year.startsWith(year))), [projects, keyword, category, year]);
   usePageHeaderActions(useMemo(() => page === 'projects' ? <button className={styles.primary} onClick={() => setModal(true)}>＋ 新建碳足迹项目</button> : page === 'factors' ? <button className={styles.primary} onClick={() => setFactorModal(true)}>＋ 新增企业专属因子</button> : undefined, [page]));
-  const addProject = (project: Pick<Project, 'name' | 'spec' | 'category' | 'unit' | 'boundary' | 'period' | 'processFile' | 'processDescription' | 'productImageFile'>) => { setProjects((items) => [{ ...project, id: Date.now(), year: project.period, footprint: 0, updated: '刚刚', status: '数据待完善' }, ...items]); setModal(false); };
+  const addProject = (project: Pick<Project, 'name' | 'spec' | 'category' | 'unit' | 'boundary' | 'standard' | 'period' | 'processFile' | 'processDescription' | 'productImageFile'>) => { setProjects((items) => [{ ...project, id: Date.now(), year: project.period, footprint: 0, updated: '刚刚', status: '数据待完善' }, ...items]); setModal(false); };
   const updateInventory = (projectId: number, rows: ActivityDataRow[]) => setInventories((items) => ({ ...items, [projectId]: rows }));
   const saveReportInfo = (info: ProductReportInfo) => setReportDrafts((items) => ({ ...items, [selectedProjectId]: structuredClone(info) }));
   const generateReport = (info: ProductReportInfo) => {
@@ -202,7 +205,7 @@ export function ProductCarbonFootprint({ pathname }: { pathname: string }) {
     setConfirmedInventories((items) => ({ ...items, [projectId]: rows.map((row) => ({ ...row })) }));
     setProjects((items) => items.map((item) => item.id === projectId ? { ...item, footprint: total, status: '已完成', updated: '刚刚' } : item));
   };
-  const updateProject = (project: Pick<Project, 'name' | 'spec' | 'category' | 'unit' | 'boundary' | 'period' | 'processFile' | 'processDescription' | 'productImageFile'>) => {
+  const updateProject = (project: Pick<Project, 'name' | 'spec' | 'category' | 'unit' | 'boundary' | 'standard' | 'period' | 'processFile' | 'processDescription' | 'productImageFile'>) => {
     if (!editTarget) return;
     setProjects((items) => items.map((item) => item.id === editTarget.id ? { ...item, ...project, year: project.period.match(/\d{4}/)?.[0] ?? item.year, updated: '刚刚' } : item));
     setEditTarget(null);
@@ -593,67 +596,73 @@ function downloadProductCarbonReport(report: ProductReportSnapshot) {
   });
 }
 
-function ReportSupplementSection({ fields, info }: { fields: Array<{ label: string; value: string }>; info?: ProductReportInfo }) {
-  if (!info || !fields.some((field) => field.value)) return null;
-  return <dl className={styles.reportSupplementValues}>{fields.filter((field) => field.value).map(({ label, value }) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>;
-}
-
 function ProductCarbonReportPreview({ project, rows, info, version = 0, isPreview = false }: { project: Project; rows: ActivityDataRow[]; info?: ProductReportInfo; version?: number; isPreview?: boolean }) {
   const total = inventoryTotal(rows);
-  const reportNo = version ? `CFP-${project.year.slice(0, 4)}-${project.id}-${String(version).padStart(3, '0')}` : '待生成';
-  const standard = info?.values.standard || '核算依据待补充';
-  const stageRows = ['原材料获取', '生产制造', '分销与运输'].map((stage) => ({ label: stage, value: rows.filter((row) => stageLabel(row.stage) === stage).reduce((sum, row) => sum + emissionOf(row), 0) }));
-  const topRows = rows.filter((row) => emissionOf(row) > 0).sort((left, right) => emissionOf(right) - emissionOf(left)).slice(0, 3);
+  const stages = ['原材料获取', '生产制造', '分销与运输'].map(label => ({ label, value: rows.filter(row => stageLabel(row.stage) === label).reduce((sum, row) => sum + emissionOf(row), 0) }));
+  const percent = (value: number) => total ? `${(value / total * 100).toFixed(2)}%` : '—';
+  const values: Record<string, string> = {
+    '功能单位': project.unit, '产品名称': project.name, '产品规格型号': project.spec,
+    '核算标准': project.standard,
+    '核算开始日期': project.period.split(' 至 ')[0], '核算结束日期': project.period.split(' 至 ')[1] || '未维护',
+    '系统边界类型': project.boundary, '产品碳足迹': total.toFixed(2),
+    '报告编制日期': info?.reportDate || '待生成', '生产工艺流程图': project.processFile || '未维护',
+    '产品外观图': project.productImageFile || '未维护', '目标产品生产工艺流程说明': project.processDescription || '未维护',
+    '取舍情况': info?.values.cutoff || '待补充', '多产品分配方法及依据': info?.values.allocation || '待补充',
+    '评价等级': info?.values.uncertaintyGrade || '待选择',
+  };
+  const fill = (text: string) => text.replace(/\{\{(?:输入|系统)[：:]([^}]+)\}\}/g, (_, key: string) => values[key] || `未维护（${key}）`);
+  const table = (headers: string[], data: string[][]) => <table><thead><tr>{headers.map((header, i) => <th key={i}>{header}</th>)}</tr></thead><tbody>{data.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j}>{cell}</td>)}</tr>)}</tbody></table>;
+  const stageTable = () => table(['生命周期阶段', '碳足迹（kgCO₂e/功能单位）', '占比'], [...stages.map(stage => [stage.label, stage.value.toFixed(2), percent(stage.value)]), ['合计', total.toFixed(2), percent(total)]]);
+  const chart = () => <div className={styles.reportStageChart}>{stages.map(stage => <div key={stage.label}><span>{stage.label}</span><meter min={0} max={total || 1} value={stage.value} /><b>{stage.value.toFixed(2)} kgCO₂e（{percent(stage.value)}）</b></div>)}</div>;
   return <article className={styles.productReportPaper}>
-    <section className={styles.reportCover}>
-      <div className={styles.reportCoverHead}><div><b>工业企业能碳管理平台</b><span>PRODUCT CARBON FOOTPRINT</span></div><div>{standard}<br />产品碳足迹核算报告</div></div>
-      <div className={styles.reportCoverTitle}><span>PRODUCT CARBON FOOTPRINT REPORT</span><h2>产品碳足迹核算报告</h2><strong>{project.name}</strong>{info?.values.companyName && <p>{info.values.companyName}</p>}</div>
-      <div className={styles.reportMeta}><span>报告编号</span><b>{reportNo}</b><span>功能单位</span><b>{project.unit}</b><span>系统边界</span><b>{project.boundary}</b><span>核算周期</span><b>{project.period}</b><span>数据依据</span><b>{isPreview ? '当前数据预览' : '已确认核算清单快照'}</b><span>报告版本</span><b>{version ? `V${version}` : '待生成'}</b><span>报告编制日期</span><b>{info?.reportDate || '待生成'}</b></div>
-      <p>{isPreview ? '当前为草稿预览，完成并确认核算清单后可生成正式报告。' : '本报告基于已确认核算清单快照，用于产品碳足迹量化、热点识别与减排管理。'}</p>
-    </section>
-    <section className={styles.reportPageSection}>
-      <div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>{reportNo}</span></div><h2>01 报告摘要</h2><p>本报告基于既定系统边界与功能单位，对目标产品相关生命周期阶段的温室气体排放进行量化。</p>
-      <div className={styles.reportSummaryGrid}><div className={styles.reportResultCard}><span>单位产品碳足迹</span><strong>{total.toFixed(2)}</strong><b>kgCO₂e / {project.unit}</b></div><div className={styles.reportInfoCard}>{[['目标产品', project.name], ['功能单位', project.unit], ['系统边界', project.boundary], ['核算依据', standard]].map(([label, value]) => <div key={label}><span>{label}</span><b>{value}</b></div>)}</div></div>
-      <h3>生命周期阶段贡献</h3><table><thead><tr><th>生命周期阶段</th><th>排放量（kgCO₂e/功能单位）</th><th>占比</th></tr></thead><tbody>{stageRows.map((row) => <tr key={row.label}><td>{row.label}</td><td>{row.value.toFixed(2)}</td><td>{total ? (row.value / total * 100).toFixed(2) : '0.00'}%</td></tr>)}<tr className={styles.reportTotalRow}><td>合计</td><td>{total.toFixed(2)}</td><td>{total ? '100.00%' : '—'}</td></tr></tbody></table>
-    </section>
-    <section className={styles.reportPageSection}>
-      <div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>目标与范围</span></div><h2>02 目标与范围定义</h2>
-      <ReportSupplementSection info={info} fields={[{ label: '企业名称', value: info?.values.companyName || '' }]} />
-      <h3>产品与功能单位</h3><table><tbody>{[['产品名称', project.name], ['产品规格', project.spec], ['产品类别', project.category], ['功能单位', project.unit], ['核算周期', project.period], ['系统边界', project.boundary], ...(project.processFile ? [['项目工艺图文件名', project.processFile]] : []), ...(project.processDescription ? [['生产工艺说明', project.processDescription]] : [])].map(([label, value]) => <tr key={label}><th>{label}</th><td>{value}</td></tr>)}</tbody></table>
-      <h3>核算依据与补充信息</h3><ReportSupplementSection info={info} fields={[
-        { label: '核算依据', value: info?.values.standard || '' },
-        { label: 'GWP 来源版本', value: info?.values.gwpVersion || '' },
-        { label: 'GWP 时间尺度', value: info?.values.gwpHorizon || '' },
-        { label: '生产地址', value: info?.values.productionAddress || '' },
-      ]} />
-    </section>
-    <section className={styles.reportPageSection}>
-      <div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>数据收集与方法</span></div><h2>03 数据收集与核算方法</h2>
-      <h3>活动数据与因子</h3><table><thead><tr><th>核算项</th><th>每功能单位活动数据</th><th>活动数据来源</th><th>因子名称</th><th>因子值</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td>{row.name}</td><td>{row.amount} {row.unit}</td><td>{row.dataSource || row.source}</td><td>{row.factor || '待补充'}</td><td>{row.factorValue || '待补充'}</td></tr>)}</tbody></table>
-      <h3>计算方法</h3><p>各排放活动按照“每功能单位活动数据 × 对应排放因子”计算，并汇总为二氧化碳当量。</p>
-    </section>
-    <section className={styles.reportPageSection}>
-      <div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>核算结果</span></div><h2>04 产品碳足迹核算结果</h2><table><thead><tr><th>阶段</th><th>排放活动</th><th>活动数据</th><th>排放因子</th><th>排放量（kgCO₂e/功能单位）</th><th>占比</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td>{stageLabel(row.stage)}</td><td>{row.name}</td><td>{row.amount} {row.unit}</td><td>{row.factorValue || '待补充'}</td><td>{emissionOf(row).toFixed(2)}</td><td>{total ? (emissionOf(row) / total * 100).toFixed(2) : '0.00'}%</td></tr>)}<tr className={styles.reportTotalRow}><td colSpan={4}>合计</td><td>{total.toFixed(2)}</td><td>{total ? '100.00%' : '—'}</td></tr></tbody></table><p>单位产品碳足迹为 <b>{total.toFixed(2)} kgCO₂e/{project.unit}</b>。</p>
-    </section>
-    <section className={styles.reportPageSection}>
-      <div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>数据质量与不确定性</span></div><h2>05 数据质量与不确定性</h2><p className={styles.reportLimitations}>{info?.values.dataLimitations || '请在生成报告时补充实际存在的数据局限及其对结果的可能影响。'}</p>
-    </section>
-    <section className={styles.reportPageSection}>
-      <div className={styles.reportPageHead}><span>产品碳足迹核算报告</span><span>热点分析与减排建议</span></div><h2>06 排放热点与减排建议</h2><div className={styles.reportHotspots}>{topRows.map((row, index) => <div key={row.id}><b>{index + 1}</b><strong>{row.name}</strong><p>贡献 {total ? (emissionOf(row) / total * 100).toFixed(2) : '0.00'}%，建议结合实际工艺、供应链或能源管理措施，评估该环节的减排机会。</p></div>)}</div>
-    </section>
+    <section className={styles.reportCover}><div className={styles.reportCoverHead}>PRODUCT CARBON FOOTPRINT</div><div className={styles.reportCoverTitle}><p>未维护（企业名称）</p><strong>{project.unit} {project.name}</strong><p>（型号：{project.spec}）</p><h2>产品碳足迹分析报告</h2></div><div className={styles.reportMeta}><span>报告版本</span><b>{version ? `V${version}` : '待生成'}</b><span>报告编制日期</span><b>{info?.reportDate || '待生成'}</b><span>数据依据</span><b>{isPreview ? '当前数据预览' : '已确认核算清单快照'}</b><span>产品类别</span><b>{project.category}</b></div></section>
+    <section className={styles.reportPageSection}><h2>目录</h2>{reportTemplate.filter(block => block.kind === 'heading').map(block => <p key={block.text}>{block.text}</p>)}</section>
+    <section className={styles.reportPageSection}>{reportTemplate.map((block, index) => {
+      if (block.kind === 'heading') return /^\d+ /.test(block.text) ? <h2 key={index}>{block.text}</h2> : <h3 key={index}>{block.text}</h3>;
+      if (block.kind === 'results') return <div key={index}>{table(['序号', '生命周期阶段', '排放活动', '活动数据', '单位', '排放量（kgCO₂e）', '占比'], rows.map((row, i) => [String(i + 1), stageLabel(row.stage), row.name, row.amount, row.unit, emissionOf(row).toFixed(2), percent(emissionOf(row))]))}{stageTable()}</div>;
+        if (block.kind === 'inventory') return <div key={index}>{table(['类别', '排放源 / 原材料', '数据来源'], rows.map(row => [row.category, row.name, row.dataSource || row.source || '未维护']))}</div>;
+        if (block.kind === 'stages') return <div key={index}>{stageTable()}</div>;
+      if (block.kind === 'table' && block.rows) return <div key={index}>{table(block.rows[0], block.rows.slice(1))}</div>;
+      if (block.text.includes('{{系统:系统边界图}}')) return <div key={index} className={styles.reportBoundaryDiagram}><span>原材料生产 → 运输 → 制造过程{rows.some(row => stageLabel(row.stage) === '分销与运输') || project.boundary.includes('坟墓') ? ' → 产品配送' : ''}{project.boundary.includes('坟墓') ? ' → 使用 → 废弃处理' : ''}</span><p>系统边界：{project.boundary}</p></div>;
+      if (/生命周期排放量图|各阶段排放占比图/.test(block.text)) return <div key={index}>{chart()}</div>;
+      if (block.text.includes('{{不确定性评价计算表}}')) return <p key={index}>清单数据不确定性分析结果为{info?.values.uncertaintyGrade || '待选择'}等级，详情请见{info?.uncertaintyFile ? <a href={info.uncertaintyFile.dataUrl} download={info.uncertaintyFile.name}>不确定性评价计算表（{info.uncertaintyFile.name}）</a> : '不确定性评价计算表（待上传 PDF）'}。</p>;
+      return <p key={index} className={styles.reportLimitations}>{fill(block.text)}</p>;
+    })}</section>
   </article>;
 }
 
 function ReportSupplementModal({ project, initialInfo, canGenerate, onClose, onSave, onGenerate }: { project: Project; initialInfo?: ProductReportInfo; canGenerate: boolean; onClose: () => void; onSave: (info: ProductReportInfo) => void; onGenerate: (info: ProductReportInfo) => void }) {
   const [info, setInfo] = useState(() => {
     const initial = structuredClone(initialInfo ?? emptyProductReportInfo());
-    return { ...initial, values: { ...initial.values, ...defaultGwp } };
+    return initial;
   });
   const [showErrors, setShowErrors] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [draggingFile, setDraggingFile] = useState(false);
+  const uncertaintyFileInput = useRef<HTMLInputElement>(null);
   const missing = missingReportFields(info);
+  const readUncertaintyFile = (file?: File) => {
+    if (!file) return;
+    setUploadError('');
+    if (!/\.pdf$/i.test(file.name) || (file.type && file.type !== 'application/pdf')) {
+      setUploadError('仅支持上传 PDF 格式的不确定性评价计算表。');
+      return;
+    }
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onerror = () => { setUploadError('文件读取失败，请重新上传。'); setUploading(false); };
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      if (!atob(dataUrl.split(',')[1] || '').startsWith('%PDF-')) setUploadError('文件内容不是有效的 PDF，请重新上传。');
+      else setInfo(current => ({ ...current, uncertaintyFile: { name: file.name, dataUrl: `data:application/pdf;base64,${dataUrl.split(',')[1]}` } }));
+      setUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!canGenerate) return;
+    if (!canGenerate || uploading) return;
     if (missing.length) {
       setShowErrors(true);
       const fieldId = `report-${missing[0].key}`;
@@ -666,19 +675,20 @@ function ReportSupplementModal({ project, initialInfo, canGenerate, onClose, onS
     <form className={`${styles.modal} ${styles.reportSupplementModal}`} role="dialog" aria-modal="true" aria-labelledby="report-supplement-title" noValidate onSubmit={submit} onKeyDown={(event) => { if (event.key === 'Escape') onClose(); }}>
       <header><div><b id="report-supplement-title">补充报告信息</b><p className={styles.modalSubTitle}>只填写系统无法从项目和核算清单获取的信息。</p></div><button type="button" aria-label="关闭补充报告信息" onClick={onClose}>×</button></header>
       <div className={styles.reportSupplementBody}>
-        <div className={styles.reportProjectContext} aria-label="已录入项目信息，只读"><strong>已录入项目信息（只读）</strong><b>{project.name}</b><span>规格：{project.spec}</span><span>类别：{project.category}</span><span>功能单位：{project.unit}</span><span>系统边界：{project.boundary}</span><span>核算期间：{project.period}</span>{project.processFile && <span>工艺图文件名：{project.processFile}</span>}</div>
+        <div className={styles.reportProjectContext} aria-label="已录入项目信息，只读"><strong>已录入项目信息（只读）</strong><b>{project.name}</b><span>规格：{project.spec}</span><span>类别：{project.category}</span><span>功能单位：{project.unit}</span><span>系统边界：{project.boundary}</span><span>核算标准：{project.standard}</span><span>核算期间：{project.period}</span>{project.processFile && <span>工艺图文件名：{project.processFile}</span>}</div>
         {!canGenerate && <p className={styles.reportFormNotice}>核算清单尚未确认。可先保存补充信息，确认清单后再生成正式报告。</p>}
         {showErrors && missing.length > 0 && <p role="alert" className={styles.reportFormError}>还有 {missing.length} 项必填信息未完成，请先填写“{missing[0].label}”。</p>}
-        <p className={styles.reportFieldHelp}>GWP 默认采用 AR6、100 年口径，以下灰色字段只读；其他未录入项请按实际资料补充。</p>
         <div className={styles.reportSupplementFields}>{reportSupplementFields.map((field, index) => {
-          const invalid = showErrors && missing.some((item) => item.key === field.key);
-          const required = 'required' in field && field.required;
-          const readOnly = 'readOnly' in field && field.readOnly;
-          const shared = { id: `report-${field.key}`, 'aria-label': field.label, 'aria-invalid': invalid, required, readOnly, value: info.values[field.key], autoFocus: index === 0, onChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => { if (!readOnly) setInfo((current) => ({ ...current, values: { ...current.values, [field.key]: event.target.value } })); } };
-          return <label key={field.key} className={'multiline' in field && field.multiline ? styles.fullField : undefined}><span>{field.label}{required ? <em className={styles.reportRequired}> *</em> : readOnly ? '（系统默认）' : '（选填）'}</span>{'multiline' in field && field.multiline ? <textarea {...shared} rows={3} placeholder={field.hint} /> : <input {...shared} type="text" placeholder={'hint' in field ? field.hint : `请填写${field.label}`} />}{invalid && <small className={styles.reportFormError}>请填写{field.label}</small>}</label>;
-        })}</div>
+          const invalid = showErrors && missing.some(item => item.key === field.key);
+          return <label key={field.key} className={styles.fullField}><strong>{field.section}</strong><span>{field.label}<em className={styles.reportRequired}> *</em></span><textarea id={`report-${field.key}`} aria-label={field.label} aria-invalid={invalid} required autoFocus={index === 0} value={info.values[field.key]} rows={9} placeholder={`${field.hint}\n\n${field.example}`} onChange={event => setInfo(current => ({ ...current, values: { ...current.values, [field.key]: event.target.value } }))} />{invalid && <small className={styles.reportFormError}>请填写{field.label}</small>}</label>;
+        })}
+          <label className={styles.fullField}><strong>4.3 清单数据不确定性分析</strong><span>评价等级<em className={styles.reportRequired}> *</em></span><select id="report-uncertaintyGrade" aria-label="评价等级" required aria-invalid={showErrors && !info.values.uncertaintyGrade} value={info.values.uncertaintyGrade} onChange={event => setInfo(current => ({ ...current, values: { ...current.values, uncertaintyGrade: event.target.value } }))}><option value="">请选择评价等级</option>{uncertaintyGrades.map(grade => <option key={grade.value} value={grade.value}>{grade.label}</option>)}</select></label>
+          <div className={styles.fullField}><span>不确定性评价计算表<em className={styles.reportRequired}> *</em></span><div className={`${styles.reportUploadArea} ${draggingFile ? styles.reportUploadDragging : ''} ${info.uncertaintyFile ? styles.reportUploadComplete : ''}`} aria-invalid={showErrors && !info.uncertaintyFile} onDragOver={event => { event.preventDefault(); setDraggingFile(true); }} onDragLeave={() => setDraggingFile(false)} onDrop={event => { event.preventDefault(); setDraggingFile(false); readUncertaintyFile(event.dataTransfer.files[0]); }}><input ref={uncertaintyFileInput} id="report-uncertaintyFile" aria-label="上传不确定性评价计算表" type="file" accept=".pdf,application/pdf" disabled={uploading} onChange={event => { readUncertaintyFile(event.target.files?.[0]); event.target.value = ''; }} />{info.uncertaintyFile ? <><strong>{info.uncertaintyFile.name}</strong><small>已上传 PDF 文件</small><div><button type="button" className={styles.button} disabled={uploading} onClick={() => uncertaintyFileInput.current?.click()}>重新选择</button><button type="button" className={styles.button} disabled={uploading} onClick={() => setInfo(current => ({ ...current, uncertaintyFile: undefined }))}>移除</button></div></> : <><b aria-hidden="true">↑</b><strong>点击或拖拽文件到此处上传</strong><small>仅支持 PDF 格式</small><button type="button" className={styles.button} disabled={uploading} onClick={() => uncertaintyFileInput.current?.click()}>选择文件</button></>}</div><small className={styles.reportFieldHelp}>请上传不确定性评价计算表，仅支持 PDF 格式。</small></div>
+          {uploading && <p role="status">正在读取 PDF…</p>}
+          {uploadError && <p role="alert" className={styles.reportFormError}>{uploadError}</p>}
+        </div>
       </div>
-      <footer><button type="button" className={styles.button} onClick={onClose}>取消</button><button type="button" className={styles.button} onClick={() => onSave(info)}>保存补充信息</button><button type="submit" className={styles.primary} disabled={!canGenerate}>生成报告</button></footer>
+      <footer><button type="button" className={styles.button} onClick={onClose}>取消</button><button type="button" className={styles.button} disabled={uploading} onClick={() => onSave(info)}>保存补充信息</button><button type="submit" className={styles.primary} disabled={!canGenerate || uploading}>生成报告</button></footer>
     </form>
   </div>;
 }
@@ -741,7 +751,7 @@ function FactorEvidenceModal({ factor, onClose, onUpdate, onPreview }: { factor:
   return <div className={styles.overlay} onMouseDown={onClose}><section className={styles.modal} role="dialog" aria-modal="true" aria-label="企业专属因子凭证" style={{ width: 'min(760px, 94vw)' }} onMouseDown={(event) => event.stopPropagation()}><header><div><b>企业专属因子凭证</b><span className={styles.modalSubTitle}>{factor.name} · 共 {factor.evidence.length} 份</span></div><button type="button" onClick={onClose}>×</button></header><div>{factor.evidence.length ? factor.evidence.map((file, index) => <div key={`${file}-${index}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 0', borderBottom: '1px solid #e7efec' }}><b style={{ flex: 1 }}>{file}</b><button type="button" className={styles.factorDetailLink} onClick={() => onPreview(file)}>查看/预览</button><label className={styles.factorDetailLink}>编辑/重传<input type="file" hidden accept={EVIDENCE_FILE_ACCEPT} onChange={(event) => { const replacement = Array.from(event.target.files ?? []).find(isEvidenceFile)?.name; if (replacement) onUpdate(factor.evidence.map((item, itemIndex) => itemIndex === index ? replacement : item)); }} /></label><button type="button" className={styles.factorDetailLink} onClick={() => onUpdate(factor.evidence.filter((_, itemIndex) => itemIndex !== index))}>删除</button></div>) : <p className={styles.modalHint}>暂无凭证，请使用“编辑/重传”补充。</p>}<label className={styles.uploadField}><strong>新增凭证</strong><input type="file" multiple accept={EVIDENCE_FILE_ACCEPT} onChange={(event) => { const files = filterEvidenceFiles(Array.from(event.target.files ?? [])).map((file) => file.name); if (files.length) onUpdate([...factor.evidence, ...files]); }} /><span className={styles.uploadHint}>仅支持 PDF 或图片，可多选</span></label></div><footer><button type="button" className={styles.button} onClick={onClose}>关闭</button></footer></section></div>;
 }
 function ActivityModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (activity: Activity) => void }) { const [activityType, setActivityType] = useState<ActivityType>('原辅材料'); const [stage, setStage] = useState('原材料获取阶段'); const [name, setName] = useState('主要原材料'); const [amount, setAmount] = useState('1'); const [unit, setUnit] = useState('kg'); const [extra, setExtra] = useState(''); const factors: Record<ActivityType, { name: string; value: number; unit: string; source: string }> = { '原辅材料': { name: '通用原材料因子（示例）', value: 2.15, unit: 'kgCO₂e/kg', source: '公共因子库' }, 能源: { name: '全国电力因子（示例）', value: 0.5306, unit: 'kgCO₂e/kWh', source: '国家电力因子' }, 运输: { name: '重型柴油货车运输（示例）', value: 0.0978, unit: 'kgCO₂e/(t·km)', source: 'CPCD' }, 工艺排放: { name: '企业工艺过程因子（示例）', value: 0.85, unit: 'kgCO₂e/功能单位', source: '企业特定数据' }, 废弃物: { name: '一般工业固废处理（示例）', value: 0.12, unit: 'kgCO₂e/kg', source: 'CPCD' } }; const defaults: Record<ActivityType, { name: string; unit: string; stage: string }> = { 原辅材料: { name: '主要原材料', unit: 'kg', stage: '原材料获取阶段' }, 能源: { name: '外购电力', unit: 'kWh', stage: '产品制造阶段' }, 运输: { name: '公路运输', unit: 't·km', stage: '产品配送阶段' }, 工艺排放: { name: '工艺过程排放', unit: '功能单位', stage: '产品制造阶段' }, 废弃物: { name: '生产废弃物处理', unit: 'kg', stage: '产品制造阶段' } }; const factor = factors[activityType]; const numericAmount = Number(amount) || 0; const normalizedAmount = activityType === '运输' ? numericAmount * (Number(extra) || 0) : numericAmount; const result = (normalizedAmount * factor.value).toFixed(2); const changeType = (type: ActivityType) => { setActivityType(type); setName(defaults[type].name); setUnit(defaults[type].unit); setStage(defaults[type].stage); setAmount('1'); setExtra(''); }; return <div className={styles.overlay} onMouseDown={onClose}><form className={styles.modal} onMouseDown={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); onSubmit({ id: Date.now(), stage, name: name || '待补充活动', amount: activityType === '运输' ? normalizedAmount.toFixed(2) : amount || '0', unit, factor: `${factor.value}`, source: factor.source, result, dataSource: '页面录入' }); }}><header><b>新增活动数据</b><button type="button" onClick={onClose}>×</button></header><div><h3>1. 选择活动类型</h3><div className={styles.activityTypeGrid}>{(Object.keys(factors) as ActivityType[]).map((type) => <button type="button" key={type} className={`${styles.activityType} ${activityType === type ? styles.activityTypeActive : ''}`} onClick={() => changeType(type)}>{type}</button>)}</div><h3>2. 录入活动数据</h3><div className={styles.formGrid}><label>生命周期阶段<select value={stage} onChange={(e) => setStage(e.target.value)}>{lifecycleStages.slice(0, 3).map(([, title]) => <option key={title}>{title}</option>)}</select></label><label>排放活动名称<input value={name} onChange={(e) => setName(e.target.value)} placeholder="请输入活动名称" /></label><label>活动数据<input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="请输入数值" /></label><label>单位<select value={unit} onChange={(e) => setUnit(e.target.value)}>{(activityType === '能源' ? ['kWh', 'Nm³', 'kg', 't', 'GJ'] : activityType === '运输' ? ['t·km'] : activityType === '工艺排放' ? ['功能单位', 'kg', 't'] : ['kg', 't', '件']).map((item) => <option key={item}>{item}</option>)}</select></label>{activityType === '运输' && <><label>运输距离<input type="number" min="0" step="0.01" value={extra} onChange={(e) => setExtra(e.target.value)} placeholder="km" /></label><p className={styles.fieldHelp}>系统按运输重量 × 运输距离计算运输周转量（t·km）。</p></>}{activityType === '原辅材料' && <label className={styles.fullField}>供应商（可选）<input value={extra} onChange={(e) => setExtra(e.target.value)} placeholder="用于记录供应商特定数据来源" /></label>}{activityType === '废弃物' && <label className={styles.fullField}>处理方式（可选）<select value={extra} onChange={(e) => setExtra(e.target.value)}><option value="">请选择</option><option>委外处置</option><option>回收利用</option><option>填埋</option><option>焚烧</option></select></label>}</div><h3>3. 确认排放因子</h3><label className={styles.fullField}>排放因子<select><option>{factor.name}｜{factor.value} {factor.unit}｜{factor.source}</option></select></label><div className={styles.factorPreview}><div><span>当前因子</span><b>{factor.name} · {factor.value} {factor.unit}</b></div><div><span>预计排放结果</span><b>{result} kgCO₂e/功能单位</b></div></div></div><footer><button type="button" className={styles.button} onClick={onClose}>取消</button><button className={styles.button}>保存并继续新增</button><button className={styles.primary}>保存</button></footer></form></div>; }
-function ProjectModal({ project, onClose, onSubmit }: { project?: Project; onClose: () => void; onSubmit: (project: Pick<Project, 'name' | 'spec' | 'category' | 'unit' | 'boundary' | 'period' | 'processFile' | 'processDescription' | 'productImageFile'>) => void }) {
+function ProjectModal({ project, onClose, onSubmit }: { project?: Project; onClose: () => void; onSubmit: (project: Pick<Project, 'name' | 'spec' | 'category' | 'unit' | 'boundary' | 'standard' | 'period' | 'processFile' | 'processDescription' | 'productImageFile'>) => void }) {
   const categoryOptions = ['机械设备', '金属制品', '电子电器', '包装制品'];
   const initialCategory = project?.category ?? '机械设备';
   const [name, setName] = useState(project?.name ?? '');
@@ -754,15 +764,19 @@ function ProjectModal({ project, onClose, onSubmit }: { project?: Project; onClo
   const [startDate, setStartDate] = useState(project?.period.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? '2026-01-01');
   const [endDate, setEndDate] = useState(project?.period.match(/\d{4}-\d{2}-\d{2}/g)?.[1] ?? '2026-12-31');
   const [boundary, setBoundary] = useState('摇篮到大门（Cradle to Gate）');
+  const standard = project?.standard ?? DEFAULT_PRODUCT_STANDARD;
   const [processFile, setProcessFile] = useState(project?.processFile ?? '');
   const [processDescription, setProcessDescription] = useState(project?.processDescription ?? '');
   const [productImageFile, setProductImageFile] = useState(project?.productImageFile ?? '');
   const period = periodMode === 'annual' ? `${annualYear}年度（${annualYear}-01-01 至 ${annualYear}-12-31）` : `${startDate} 至 ${endDate}`;
-  return <div className={styles.overlay} onMouseDown={onClose}><form className={styles.modal} onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); if (startDate > endDate) return; onSubmit({ name, spec, category: category === '其他（自定义）' ? customCategory.trim() : category, unit, boundary: boundary.split('（')[0], period, processFile, processDescription, productImageFile }); }}><header><b>{project ? '编辑产品碳足迹项目' : '新建产品碳足迹项目'}</b><button type="button" onClick={onClose}>×</button></header><div>
+  return <div className={styles.overlay} onMouseDown={onClose}><form className={styles.modal} onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); if (startDate > endDate) return; onSubmit({ name, spec, category: category === '其他（自定义）' ? customCategory.trim() : category, unit, boundary: boundary.split('（')[0], standard, period, processFile, processDescription, productImageFile }); }}><header><b>{project ? '编辑产品碳足迹项目' : '新建产品碳足迹项目'}</b><button type="button" onClick={onClose}>×</button></header><div>
     <h3>产品信息</h3><div className={styles.formGrid}><label>产品名称<input required value={name} onChange={(e) => setName(e.target.value)} placeholder="请输入产品名称" /></label><label>规格型号<input required value={spec} onChange={(e) => setSpec(e.target.value)} placeholder="请输入产品规格型号" /></label><label>产品类别<select value={category} onChange={(e) => setCategory(e.target.value)}>{categoryOptions.map((item) => <option key={item}>{item}</option>)}<option>其他（自定义）</option></select></label>{category === '其他（自定义）' && <label>自定义产品类别<input required value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} placeholder="请输入产品类别" /></label>}<label>功能单位<input value={unit} onChange={(e) => setUnit(e.target.value)} /></label></div>
     <h3>产品外观图</h3><label className={styles.uploadField}><span className={styles.uploadTitle}>☁</span><strong>点击上传产品外观图</strong><input type="file" accept="image/*" onChange={(event) => setProductImageFile(Array.from(event.target.files ?? []).find((file) => file.type.startsWith('image/'))?.name ?? productImageFile)} /><span className={styles.uploadHint}>{productImageFile || '仅支持图片格式，单张上传'}</span></label>
-    <h3>核算范围</h3><div className={styles.formGrid}><label>核算周期<div className={styles.periodModes}><button type="button" className={periodMode === 'annual' ? styles.periodModeActive : ''} onClick={() => setPeriodMode('annual')}>自然年度</button><button type="button" className={periodMode === 'custom' ? styles.periodModeActive : ''} onClick={() => setPeriodMode('custom')}>自定义周期</button></div>{periodMode === 'annual' ? <><select aria-label="自然年度" value={annualYear} onChange={(e) => { setAnnualYear(e.target.value); setStartDate(`${e.target.value}-01-01`); setEndDate(`${e.target.value}-12-31`); }}><option>2026</option><option>2025</option><option>2024</option></select><span className={styles.periodSummary}>{annualYear} 年 1 月 1 日至 {annualYear} 年 12 月 31 日（自然年）</span></> : <><span className={styles.modalHint}>支持非自然年，请选择数据统计的起止日期</span><div className={styles.dateRange}><input aria-label="核算开始日期" type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)} /><span>至</span><input aria-label="核算结束日期" type="date" required value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>{startDate > endDate && <small className={styles.errorText}>结束日期不能早于开始日期</small>}</>}</label><label>系统边界<select value={boundary} onChange={(e) => setBoundary(e.target.value)}><option>摇篮到大门（Cradle to Gate）</option></select></label></div>
-    <h3>生产工艺</h3><label className={styles.uploadField}><span className={styles.uploadTitle}>☁</span><strong>点击上传工艺图</strong><input type="file" multiple accept={EVIDENCE_FILE_ACCEPT} onChange={(e) => setProcessFile(filterEvidenceFiles(Array.from(e.target.files ?? [])).map((file) => file.name).join('、'))} /><span className={styles.uploadHint}>{processFile || '仅支持 PDF 或图片，可多选'}</span></label><label style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 12 }}>生产工艺说明<textarea rows={3} value={processDescription} onChange={(event) => setProcessDescription(event.target.value)} placeholder="请简要说明产品的主要生产工序及流程" /></label>
+    <h3>核算标准及范围</h3><div className={styles.formGrid}>
+      <label>核算标准<input aria-label="核算标准" value={standard} readOnly style={{ maxWidth: 560, backgroundColor: '#f1f4f3', color: '#71808f', cursor: 'not-allowed' }} /></label>
+      <label>系统边界<input aria-label="系统边界" value={boundary} readOnly style={{ maxWidth: 420, backgroundColor: '#f1f4f3', color: '#71808f', cursor: 'not-allowed' }} /></label>
+      <label>核算周期<div className={styles.periodModes} style={{ alignItems: 'center' }}><button type="button" className={periodMode === 'annual' ? styles.periodModeActive : ''} onClick={() => setPeriodMode('annual')}>自然年度</button><button type="button" className={periodMode === 'custom' ? styles.periodModeActive : ''} onClick={() => setPeriodMode('custom')}>自定义周期</button>{periodMode === 'annual' && <select aria-label="自然年度" value={annualYear} style={{ width: 160, maxWidth: 160, height: 32, marginLeft: 8 }} onChange={(e) => { setAnnualYear(e.target.value); setStartDate(`${e.target.value}-01-01`); setEndDate(`${e.target.value}-12-31`); }}><option>2026</option><option>2025</option><option>2024</option></select>}</div>{periodMode === 'annual' ? <span className={styles.periodSummary}>{annualYear} 年 1 月 1 日至 {annualYear} 年 12 月 31 日（自然年）</span> : <><span className={styles.modalHint}>支持非自然年，请选择数据统计的起止日期</span><div className={styles.dateRange} style={{ maxWidth: 480 }}><input aria-label="核算开始日期" type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)} /><span>至</span><input aria-label="核算结束日期" type="date" required value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>{startDate > endDate && <small className={styles.errorText}>结束日期不能早于开始日期</small>}</>}</label>
+    </div><h3>生产工艺</h3><label className={styles.uploadField}><span className={styles.uploadTitle}>☁</span><strong>点击上传工艺图</strong><input type="file" multiple accept={EVIDENCE_FILE_ACCEPT} onChange={(e) => setProcessFile(filterEvidenceFiles(Array.from(e.target.files ?? [])).map((file) => file.name).join('、'))} /><span className={styles.uploadHint}>{processFile || '仅支持 PDF 或图片，可多选'}</span></label><label style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 12 }}>生产工艺说明<textarea rows={3} value={processDescription} onChange={(event) => setProcessDescription(event.target.value)} placeholder="请简要说明产品的主要生产工序及流程" /></label>
     <h3>取舍规则</h3><ol className={styles.selectionRules}><li>普通物料重量＜1%产品重量时，以及含稀贵或高纯成分的物料重量＜0.1%产品重量时，可忽略该物料的上游生产数据；总共忽略的物料重量不超过 5%。</li><li>低价值废物作为原料，如粉煤灰、矿渣、秸秆、生活垃圾等，可忽略其上游生产数据。</li><li>大多数情况下，生产设备、厂房、生活设施等可以忽略。</li><li>在选定环境影响类型范围内的已知排放数据不应忽略。</li></ol>
   </div><footer><button type="button" className={styles.button} onClick={onClose}>取消</button><button className={styles.primary} disabled={startDate > endDate}>{project ? '保存修改' : '创建项目'}</button></footer></form></div>; }
 
