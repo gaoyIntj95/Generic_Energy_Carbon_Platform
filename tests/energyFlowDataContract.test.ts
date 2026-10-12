@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { listV11ConversionOutputs, listV11ExternalSupplyRecords, listV11EnergyRecords, listV11EnergyTypes, v11EnergyRecordAnnualAmount, v11RecordScopeType, resetDataManagementV11Store, saveV11ConversionOutput, saveV11EnergyRecord, saveV11ExternalSupplyRecord } from '../src/mocks/dataManagementV11Store';
-import { buildFlowAnalysisDataset } from '../src/mocks/energyFlowSelector';
+import { buildFlowAnalysisDataset, summarizeFlowBalance } from '../src/mocks/energyFlowSelector';
 
 describe('energy flow phase-one data contract', () => {
   beforeEach(() => {
@@ -28,6 +28,24 @@ describe('energy flow phase-one data contract', () => {
     expect(result.links).toHaveLength(0);
     expect(result.inputStandardCoalAmount).toBe(0);
     expect(result.dataNotice).toContain('当前月份有');
+  });
+
+  it('keeps the balance optimization summary on the energy flow page amounts', () => {
+    const period = { year: 2026, grain: 'month' as const, month: 6 };
+    const levelOne = buildFlowAnalysisDataset(period, 'level1');
+    const levelTwo = buildFlowAnalysisDataset(period, 'level2');
+    const summary = summarizeFlowBalance(levelOne, levelTwo);
+    const distributed = levelOne.levelOneDistributionByUnit.reduce((total, row) => total + row.standardCoalAmount, 0);
+
+    expect(summary.inputStandardCoalAmount).toBeCloseTo(levelOne.inputStandardCoalAmount, 8);
+    expect(summary.availableStandardCoalAmount).toBeCloseTo(levelOne.internalAvailableStandardCoalAmount, 8);
+    expect(summary.effectiveUseStandardCoalAmount).toBeCloseTo(distributed, 8);
+    expect(summary.directExternalOutputStandardCoalAmount).toBeCloseTo(levelOne.directExternalStandardCoalAmount, 8);
+    expect(summary.differenceStandardCoalAmount).toBeCloseTo(levelOne.differenceStandardCoalAmount, 8);
+    expect(summary.overAllocatedStandardCoalAmount).toBeCloseTo(levelOne.overAllocatedStandardCoalAmount, 8);
+    expect(summary.effectiveUseStandardCoalAmount + summary.directExternalOutputStandardCoalAmount
+      + summary.differenceStandardCoalAmount - summary.overAllocatedStandardCoalAmount)
+      .toBeCloseTo(summary.availableStandardCoalAmount, 8);
   });
 
   it('does not spread manual annual conversion output into a monthly flow', () => {

@@ -111,6 +111,10 @@ describe('产品碳足迹运输活动', () => {
     expect(container.textContent).toContain('排放量（kgCO₂e/1 台产品）');
     expect(container.textContent).toContain('65.88 kgCO₂e/1 台产品');
     expect(container.querySelector('div[style*="conic-gradient"]')).not.toBeNull();
+    expect([...container.querySelectorAll('tbody tr')].slice(0, -1).map((row) => row.querySelector('td')?.textContent)).toEqual([
+      '原材料获取', '原材料获取', '原材料获取', '原材料获取',
+      '生产制造', '生产制造', '生产制造', '生产制造', '分销与运输',
+    ]);
     expect(container.textContent).not.toContain('生成报告');
 
     await act(async () => root.render(<MemoryRouter><ProductCarbonFootprint pathname="/product-footprint/projects/1/report" /></MemoryRouter>));

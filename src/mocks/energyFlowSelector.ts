@@ -177,6 +177,7 @@ export interface FlowAnalysisDataset {
   conversionLossStandardCoalAmount: number;
   conversionDifferenceStandardCoalAmount: number;
   externalStandardCoalAmount: number;
+  directExternalStandardCoalAmount: number;
   utilizationRate: number;
   inputTypeCount: number;
   conversionCount: number;
@@ -187,6 +188,7 @@ export interface FlowAnalysisDataset {
   overAllocatedStandardCoalAmount: number;
   nodes: FlowNode[];
   links: FlowLink[];
+  levelOneDistributionByUnit: { energyUnitId: string; standardCoalAmount: number }[];
   levelOneBalanceRows: FlowLevelOneBalanceRow[];
   levelTwoBalanceRows: FlowLevelTwoBalanceRow[];
   conversionDifferenceRows: FlowConversionDifferenceRow[];
@@ -197,10 +199,13 @@ export interface FlowAnalysisDataset {
 
 export interface EnergyBalanceSummary {
   inputStandardCoalAmount: number;
+  availableStandardCoalAmount: number;
   effectiveUseStandardCoalAmount: number;
   recoveredStandardCoalAmount: number;
   externalOutputStandardCoalAmount: number;
+  directExternalOutputStandardCoalAmount: number;
   differenceStandardCoalAmount: number;
+  overAllocatedStandardCoalAmount: number;
 }
 
 export function summarizeFlowBalance(
@@ -209,18 +214,20 @@ export function summarizeFlowBalance(
   scope = 'enterprise',
 ): EnergyBalanceSummary {
   if (scope === 'enterprise') {
-    // Phase one diagnoses the management balance that is already closed by the
-    // level-one flow view. Level-two utilization is an optional decomposition
-    // and must not turn undisaggregated level-one energy into a false loss.
+    // Reuse the level-one flow KPIs. Only direct external supply leaves the
+    // internal available pool; conversion external output has already left it.
     const distributed = levelOneDataset.utilizationStandardCoalAmount;
     const external = levelOneDataset.externalStandardCoalAmount;
     const difference = levelOneDataset.differenceStandardCoalAmount;
     return {
-      inputStandardCoalAmount: distributed + external + difference,
+      inputStandardCoalAmount: levelOneDataset.inputStandardCoalAmount,
+      availableStandardCoalAmount: levelOneDataset.internalAvailableStandardCoalAmount,
       effectiveUseStandardCoalAmount: distributed,
       recoveredStandardCoalAmount: 0,
       externalOutputStandardCoalAmount: external,
+      directExternalOutputStandardCoalAmount: levelOneDataset.directExternalStandardCoalAmount,
       differenceStandardCoalAmount: difference,
+      overAllocatedStandardCoalAmount: levelOneDataset.overAllocatedStandardCoalAmount,
     };
   }
 
@@ -234,10 +241,13 @@ export function summarizeFlowBalance(
     .map((row) => row.standardCoalAmount));
   return {
     inputStandardCoalAmount: distributed + external,
+    availableStandardCoalAmount: distributed + external,
     effectiveUseStandardCoalAmount: distributed,
     recoveredStandardCoalAmount: 0,
     externalOutputStandardCoalAmount: external,
+    directExternalOutputStandardCoalAmount: external,
     differenceStandardCoalAmount: 0,
+    overAllocatedStandardCoalAmount: 0,
   };
 }
 
@@ -1547,6 +1557,7 @@ export function buildFlowAnalysisDataset(
     conversionLossStandardCoalAmount: conversionLossStandard,
     conversionDifferenceStandardCoalAmount: conversionDifferenceStandard,
     externalStandardCoalAmount: externalStandard,
+    directExternalStandardCoalAmount: directExternalStandard,
     utilizationRate: viewLevel === 'level1'
       ? (availableForInternal > 0 ? distributionStandard / availableForInternal * 100 : 0)
       : (distributionStandard > 0 ? utilizationStandard / distributionStandard * 100 : 0),
@@ -1561,6 +1572,7 @@ export function buildFlowAnalysisDataset(
     overAllocatedStandardCoalAmount: overAllocatedStandard,
     nodes: levelOneRecords.length ? nodes : [],
     links: levelOneRecords.length ? links : [],
+    levelOneDistributionByUnit: [...distributionByUnit].map(([energyUnitId, standardCoalAmount]) => ({ energyUnitId, standardCoalAmount })),
     levelOneBalanceRows,
     levelTwoBalanceRows,
     conversionDifferenceRows,

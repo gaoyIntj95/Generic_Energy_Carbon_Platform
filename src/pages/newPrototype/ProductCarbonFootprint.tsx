@@ -7,7 +7,7 @@ import { downloadHtmlReport } from '../../utils/reportDownload';
 import styles from './ProductCarbonFootprint.module.css';
 import inventoryStyles from './ProductCarbonFootprintInventory.module.css';
 import { CarbonFootprintFactorLibrary } from './CarbonFootprintFactorLibrary';
-import { uncertaintyGrades, emptyProductReportInfo, missingReportFields, normalizeReportInfo, reportSupplementFields, type ProductReportInfo } from '../../modules/product-footprint/reportSupplement';
+import { uncertaintyGrades, emptyProductReportInfo, missingReportFields, normalizeReportInfo, reportProfileFields, reportSupplementFields, type ProductReportInfo } from '../../modules/product-footprint/reportSupplement';
 
 import { reportTemplate } from '../../modules/product-footprint/reportTemplate';
 
@@ -34,6 +34,14 @@ function completeInventory(rows?: ActivityDataRow[]) {
 function emissionOf(row: ActivityDataRow) { return row.emissionAmount ? Number(row.emissionAmount) || 0 : row.amount.trim() && row.factor ? Number(row.amount) * Number.parseFloat(row.factorValue) : 0; }
 function inventoryTotal(rows: ActivityDataRow[]) { return rows.reduce((total, row) => total + emissionOf(row), 0); }
 function stageLabel(stage: string) { return stage === '原材料获取' ? '原材料获取' : stage === '产品配送' ? '分销与运输' : '生产制造'; }
+const lifecycleStageOrder = ['原材料获取', '生产制造', '分销与运输'] as const;
+const lifecycleStageRank: Record<(typeof lifecycleStageOrder)[number], number> = { '原材料获取': 0, '生产制造': 1, '分销与运输': 2 };
+function sortByLifecycleStage<T>(rows: T[], getStage: (row: T) => string) {
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => (lifecycleStageRank[stageLabel(getStage(a.row))] ?? lifecycleStageOrder.length) - (lifecycleStageRank[stageLabel(getStage(b.row))] ?? lifecycleStageOrder.length) || a.index - b.index)
+    .map(({ row }) => row);
+}
 
 function inventoryStatus(row: ActivityDataRow) {
   const dataMissing = !row.amount.trim() && !row.emissionAmount;
@@ -571,7 +579,7 @@ function ResultsPage() {
 function ReportsPage() { return <div className={`${styles.page} ${styles.reportLayout}`}><section className={styles.card}><div className={styles.cardHead}><b>报告列表</b><button className={styles.primary}>＋ 生成报告</button></div>{['工业变频器 VFD-75 产品碳足迹报告', '铝合金型材 6063 产品碳足迹报告', '电子控制器 EC-20 产品碳足迹报告'].map((name, i) => <button className={`${styles.reportItem} ${i === 0 ? styles.selected : ''}`} key={name}><b>{name}</b><span>2026-09-{14 - i * 2} 已生成</span></button>)}</section><section className={styles.card}><div className={styles.cardHead}><b>报告预览</b><div><button className={styles.button}>重新生成</button> <button className={styles.primary}>⇩ 下载报告</button></div></div><article className={styles.paper}><div>ISO 14067 / 适用 PCR</div><h2>产品碳足迹报告</h2><p>报告编号：CFP-2026-VFD75-001</p><dl><dt>产品名称</dt><dd>工业变频器 VFD-75</dd><dt>功能单位</dt><dd>1 台产品</dd><dt>系统边界</dt><dd>摇篮到大门</dd><dt>核算期间</dt><dd>2026 年度</dd></dl><strong>86.4 <small>kgCO₂e/功能单位</small></strong></article></section></div>; }
 function LinkedResultsPage({ projects, activeProjectId, confirmedRows, onProjectChange, isPreview = false }: { projects: Project[]; activeProjectId: number; confirmedRows?: ActivityDataRow[]; onProjectChange: (projectId: number) => void; isPreview?: boolean }) {
   const project = projects.find((item) => item.id === activeProjectId) ?? projects[0];
-  const rows = (confirmedRows ?? []).filter((row) => emissionOf(row) > 0);
+  const rows = sortByLifecycleStage((confirmedRows ?? []).filter((row) => emissionOf(row) > 0), (row) => row.stage);
   const total = inventoryTotal(rows);
   const emissionUnit = `kgCO₂e/${project.unit}`;
   const stageRows = ['原材料获取', '生产制造', '分销与运输'].map((stage) => ({ label: stage, value: rows.filter((row) => stageLabel(row.stage) === stage).reduce((sum, row) => sum + emissionOf(row), 0) }));
@@ -601,6 +609,10 @@ function ProductCarbonReportPreview({ project, rows, info, version = 0, isPrevie
   const stages = ['原材料获取', '生产制造', '分销与运输'].map(label => ({ label, value: rows.filter(row => stageLabel(row.stage) === label).reduce((sum, row) => sum + emissionOf(row), 0) }));
   const percent = (value: number) => total ? `${(value / total * 100).toFixed(2)}%` : '—';
   const values: Record<string, string> = {
+    '企业名称': info?.values.companyName || '待补充', '企业地址': info?.values.companyAddress || '待补充',
+    '企业成立年份': info?.values.companyEstablishedYear ? `${info.values.companyEstablishedYear}年` : '待补充',
+    '企业主营业务': info?.values.companyBusiness || '待补充', '生产地址': info?.values.productionAddress || '待补充',
+    '产品形状与形态': info?.values.productForm || '待补充',
     '功能单位': project.unit, '产品名称': project.name, '产品规格型号': project.spec,
     '核算标准': project.standard,
     '核算开始日期': project.period.split(' 至 ')[0], '核算结束日期': project.period.split(' 至 ')[1] || '未维护',
@@ -615,7 +627,7 @@ function ProductCarbonReportPreview({ project, rows, info, version = 0, isPrevie
   const stageTable = () => table(['生命周期阶段', '碳足迹（kgCO₂e/功能单位）', '占比'], [...stages.map(stage => [stage.label, stage.value.toFixed(2), percent(stage.value)]), ['合计', total.toFixed(2), percent(total)]]);
   const chart = () => <div className={styles.reportStageChart}>{stages.map(stage => <div key={stage.label}><span>{stage.label}</span><meter min={0} max={total || 1} value={stage.value} /><b>{stage.value.toFixed(2)} kgCO₂e（{percent(stage.value)}）</b></div>)}</div>;
   return <article className={styles.productReportPaper}>
-    <section className={styles.reportCover}><div className={styles.reportCoverHead}>PRODUCT CARBON FOOTPRINT</div><div className={styles.reportCoverTitle}><p>未维护（企业名称）</p><strong>{project.unit} {project.name}</strong><p>（型号：{project.spec}）</p><h2>产品碳足迹分析报告</h2></div><div className={styles.reportMeta}><span>报告版本</span><b>{version ? `V${version}` : '待生成'}</b><span>报告编制日期</span><b>{info?.reportDate || '待生成'}</b><span>数据依据</span><b>{isPreview ? '当前数据预览' : '已确认核算清单快照'}</b><span>产品类别</span><b>{project.category}</b></div></section>
+    <section className={styles.reportCover}><div className={styles.reportCoverHead}>PRODUCT CARBON FOOTPRINT</div><div className={styles.reportCoverTitle}><p>{values['企业名称']}</p><strong>{project.unit} {project.name}</strong><p>（型号：{project.spec}）</p><h2>产品碳足迹分析报告</h2></div><div className={styles.reportMeta}><span>报告版本</span><b>{version ? `V${version}` : '待生成'}</b><span>报告编制日期</span><b>{info?.reportDate || '待生成'}</b><span>数据依据</span><b>{isPreview ? '当前数据预览' : '已确认核算清单快照'}</b><span>产品类别</span><b>{project.category}</b></div></section>
     <section className={styles.reportPageSection}><h2>目录</h2>{reportTemplate.filter(block => block.kind === 'heading').map(block => <p key={block.text}>{block.text}</p>)}</section>
     <section className={styles.reportPageSection}>{reportTemplate.map((block, index) => {
       if (block.kind === 'heading') return /^\d+ /.test(block.text) ? <h2 key={index}>{block.text}</h2> : <h3 key={index}>{block.text}</h3>;
@@ -633,7 +645,7 @@ function ProductCarbonReportPreview({ project, rows, info, version = 0, isPrevie
 
 function ReportSupplementModal({ project, initialInfo, canGenerate, onClose, onSave, onGenerate }: { project: Project; initialInfo?: ProductReportInfo; canGenerate: boolean; onClose: () => void; onSave: (info: ProductReportInfo) => void; onGenerate: (info: ProductReportInfo) => void }) {
   const [info, setInfo] = useState(() => {
-    const initial = structuredClone(initialInfo ?? emptyProductReportInfo());
+    const initial = structuredClone({ ...emptyProductReportInfo(), ...initialInfo, values: { ...emptyProductReportInfo().values, ...initialInfo?.values } });
     return initial;
   });
   const [showErrors, setShowErrors] = useState(false);
@@ -678,11 +690,33 @@ function ReportSupplementModal({ project, initialInfo, canGenerate, onClose, onS
         <div className={styles.reportProjectContext} aria-label="已录入项目信息，只读"><strong>已录入项目信息（只读）</strong><b>{project.name}</b><span>规格：{project.spec}</span><span>类别：{project.category}</span><span>功能单位：{project.unit}</span><span>系统边界：{project.boundary}</span><span>核算标准：{project.standard}</span><span>核算期间：{project.period}</span>{project.processFile && <span>工艺图文件名：{project.processFile}</span>}</div>
         {!canGenerate && <p className={styles.reportFormNotice}>核算清单尚未确认。可先保存补充信息，确认清单后再生成正式报告。</p>}
         {showErrors && missing.length > 0 && <p role="alert" className={styles.reportFormError}>还有 {missing.length} 项必填信息未完成，请先填写“{missing[0].label}”。</p>}
-        <div className={styles.reportSupplementFields}>{reportSupplementFields.map((field, index) => {
-          const invalid = showErrors && missing.some(item => item.key === field.key);
-          return <label key={field.key} className={styles.fullField}><strong>{field.section}</strong><span>{field.label}<em className={styles.reportRequired}> *</em></span><textarea id={`report-${field.key}`} aria-label={field.label} aria-invalid={invalid} required autoFocus={index === 0} value={info.values[field.key]} rows={9} placeholder={`${field.hint}\n\n${field.example}`} onChange={event => setInfo(current => ({ ...current, values: { ...current.values, [field.key]: event.target.value } }))} />{invalid && <small className={styles.reportFormError}>请填写{field.label}</small>}</label>;
-        })}
-          <label className={styles.fullField}><strong>3）清单数据不确定性分析</strong><span>评价等级<em className={styles.reportRequired}> *</em></span><select id="report-uncertaintyGrade" aria-label="评价等级" required aria-invalid={showErrors && !info.values.uncertaintyGrade} value={info.values.uncertaintyGrade} onChange={event => setInfo(current => ({ ...current, values: { ...current.values, uncertaintyGrade: event.target.value } }))}><option value="">请选择评价等级</option>{uncertaintyGrades.map(grade => <option key={grade.value} value={grade.value}>{grade.label}</option>)}</select></label>
+        <div className={styles.reportSupplementFields}>
+          <h3 className={styles.reportSectionTitle}>1）企业与产品信息</h3>
+          {reportProfileFields.map((field, index) => {
+            const issue = showErrors ? missing.find(item => item.key === field.key) : undefined;
+            const fieldProps = {
+              id: `report-${field.key}`, 'aria-label': field.label, 'aria-invalid': Boolean(issue), required: true,
+              autoFocus: index === 0, value: info.values[field.key], placeholder: field.hint,
+              onChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setInfo(current => ({ ...current, values: { ...current.values, [field.key]: event.target.value } })),
+            };
+            return <label key={field.key} className={field.kind === 'textarea' ? styles.fullField : undefined}>
+              <span>{field.label}<em className={styles.reportRequired}> *</em></span>
+              {field.kind === 'textarea' ? <textarea {...fieldProps} rows={3} /> : <input {...fieldProps} type="text" inputMode={field.kind === 'year' ? 'numeric' : undefined} maxLength={field.kind === 'year' ? 4 : undefined} />}
+              {issue && <small className={styles.reportFormError}>请填写{issue.label}</small>}
+            </label>;
+          })}
+          {reportSupplementFields.map(field => {
+            const invalid = showErrors && missing.some(item => item.key === field.key);
+            return <section key={field.key} className={styles.reportTextSection}>
+              <h3 className={styles.reportSectionTitle}>{field.section}</h3>
+              <label htmlFor={`report-${field.key}`}><span>{field.label}<em className={styles.reportRequired}> *</em></span>
+                <textarea id={`report-${field.key}`} aria-label={field.label} aria-invalid={invalid} required value={info.values[field.key]} rows={9} placeholder={`${field.hint}\n\n${field.example}`} onChange={event => setInfo(current => ({ ...current, values: { ...current.values, [field.key]: event.target.value } }))} />
+                {invalid && <small className={styles.reportFormError}>请填写{field.label}</small>}
+              </label>
+            </section>;
+          })}
+          <h3 className={styles.reportSectionTitle}>4）清单数据不确定性分析</h3>
+          <label className={styles.fullField}><span>评价等级<em className={styles.reportRequired}> *</em></span><select id="report-uncertaintyGrade" aria-label="评价等级" required aria-invalid={showErrors && !info.values.uncertaintyGrade} value={info.values.uncertaintyGrade} onChange={event => setInfo(current => ({ ...current, values: { ...current.values, uncertaintyGrade: event.target.value } }))}><option value="">请选择评价等级</option>{uncertaintyGrades.map(grade => <option key={grade.value} value={grade.value}>{grade.label}</option>)}</select></label>
           <div className={styles.fullField}><span>不确定性评价计算表<em className={styles.reportRequired}> *</em></span><div className={`${styles.reportUploadArea} ${draggingFile ? styles.reportUploadDragging : ''} ${info.uncertaintyFile ? styles.reportUploadComplete : ''}`} aria-invalid={showErrors && !info.uncertaintyFile} onDragOver={event => { event.preventDefault(); setDraggingFile(true); }} onDragLeave={() => setDraggingFile(false)} onDrop={event => { event.preventDefault(); setDraggingFile(false); readUncertaintyFile(event.dataTransfer.files[0]); }}><input ref={uncertaintyFileInput} id="report-uncertaintyFile" aria-label="上传不确定性评价计算表" type="file" accept=".pdf,application/pdf" disabled={uploading} onChange={event => { readUncertaintyFile(event.target.files?.[0]); event.target.value = ''; }} />{info.uncertaintyFile ? <><strong>{info.uncertaintyFile.name}</strong><small>已上传 PDF 文件</small><div><button type="button" className={styles.button} disabled={uploading} onClick={() => uncertaintyFileInput.current?.click()}>重新选择</button><button type="button" className={styles.button} disabled={uploading} onClick={() => setInfo(current => ({ ...current, uncertaintyFile: undefined }))}>移除</button></div></> : <><b aria-hidden="true">↑</b><strong>点击或拖拽文件到此处上传</strong><small>仅支持 PDF 格式</small><button type="button" className={styles.button} disabled={uploading} onClick={() => uncertaintyFileInput.current?.click()}>选择文件</button></>}</div><small className={styles.reportFieldHelp}>请上传不确定性评价计算表，仅支持 PDF 格式。</small></div>
           {uploading && <p role="status">正在读取 PDF…</p>}
           {uploadError && <p role="alert" className={styles.reportFormError}>{uploadError}</p>}

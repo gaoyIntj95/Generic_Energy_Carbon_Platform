@@ -7,9 +7,17 @@ export const allocationExample = `示例：
 能源环节仅核算电力，包括填料车间直接用电和该车间使用压缩空气对应的空压机用电。空压机用电先按填料车间用电量占全厂用电量的比例分配至填料生产，再按 HMX-180 产量占填料总产量的比例分配至目标产品。
 制造环节中，卷材冲压按合格率 89% 计入材料利用，11% 的边角料作为生产废料；不合格品按填料产品 4% 的平均不合格率折算目标产品报废量。`;
 
+export const reportProfileFields = [
+  { key: 'companyName', label: '企业名称', kind: 'text', hint: '请输入目标产品所属企业名称' },
+  { key: 'companyEstablishedYear', label: '企业成立年份', kind: 'year', hint: '请输入4位年份，如2010' },
+  { key: 'companyAddress', label: '企业地址', kind: 'text', hint: '请输入企业地址' },
+  { key: 'productionAddress', label: '生产地址', kind: 'text', hint: '请输入目标产品实际生产地址' },
+  { key: 'companyBusiness', label: '企业主营业务', kind: 'textarea', hint: '请简要说明企业主营业务' },
+  { key: 'productForm', label: '产品形状与形态', kind: 'textarea', hint: '请说明目标产品的实际形状与形态' },
+] as const;
 export const reportSupplementFields = [
-  { key: 'cutoff', label: '取舍情况', section: '1）取舍情况', hint: '请说明实际取舍项目、占比和依据；不涉及取舍时请据实说明。', example: cutoffExample },
-  { key: 'allocation', label: '多产品分配方法及依据', section: '2）多产品分配方法及依据', hint: '请填写多产品分配方法及依据；不涉及多产品分配时请据实说明。', example: allocationExample },
+  { key: 'cutoff', label: '取舍情况', section: '2）取舍原则', hint: '请说明实际取舍项目、占比和依据；不涉及取舍时请据实说明。', example: cutoffExample },
+  { key: 'allocation', label: '多产品分配方法及依据', section: '3）多产品分配', hint: '请填写多产品分配方法及依据；不涉及多产品分配时请据实说明。', example: allocationExample },
 ] as const;
 export const uncertaintyGrades = [
   { value: 'A', label: 'A  优（平均分值 ≥ 5.0）' },
@@ -19,19 +27,27 @@ export const uncertaintyGrades = [
   { value: 'E', label: 'E  低（平均分值 ＜ 2.0）' },
 ] as const;
 export type ProductReportInfo = {
-  values: Record<typeof reportSupplementFields[number]['key'] | 'uncertaintyGrade', string>;
+  values: Record<typeof reportProfileFields[number]['key'] | typeof reportSupplementFields[number]['key'] | 'uncertaintyGrade', string>;
   uncertaintyFile?: { name: string; dataUrl: string };
   reportDate: string;
 };
 export function emptyProductReportInfo(): ProductReportInfo {
-  return { values: { cutoff: '', allocation: '', uncertaintyGrade: '' }, reportDate: '' };
+  return { values: { companyName: '', companyAddress: '', companyEstablishedYear: '', companyBusiness: '', productionAddress: '', productForm: '', cutoff: '', allocation: '', uncertaintyGrade: '' }, reportDate: '' };
 }
 export function missingReportFields(info: ProductReportInfo) {
-  const missing: Array<{ key: string; label: string }> = reportSupplementFields.filter(field => !info.values[field.key].trim());
+  const missing = [...reportProfileFields, ...reportSupplementFields].flatMap<{ key: string; label: string }>(field => {
+    const value = info.values[field.key]?.trim() ?? '';
+    if (field.key === 'companyEstablishedYear' && value && (!/^\d{4}$/.test(value) || Number(value) < 1 || Number(value) > new Date().getFullYear())) {
+      return [{ key: field.key, label: '有效的企业成立年份' }];
+    }
+    return value ? [] : [{ key: field.key, label: field.label }];
+  });
   if (!uncertaintyGrades.some(grade => grade.value === info.values.uncertaintyGrade)) missing.push({ key: 'uncertaintyGrade', label: '评价等级' });
   if (!info.uncertaintyFile) missing.push({ key: 'uncertaintyFile', label: '不确定性评价计算表' });
   return missing;
 }
 export function normalizeReportInfo(info: ProductReportInfo): ProductReportInfo {
-  return { ...info, values: { cutoff: info.values.cutoff.trim(), allocation: info.values.allocation.trim(), uncertaintyGrade: info.values.uncertaintyGrade }, reportDate: new Date().toLocaleDateString('sv-SE') };
+  const values = { ...emptyProductReportInfo().values, ...info.values };
+  for (const field of [...reportProfileFields, ...reportSupplementFields]) values[field.key] = values[field.key].trim();
+  return { ...info, values, reportDate: new Date().toLocaleDateString('sv-SE') };
 }

@@ -452,27 +452,33 @@ export function BalanceOptimizationPage() {
     const summary = summarizeFlowBalance(levelOneDataset, levelTwoDataset, 'enterprise');
     return {
       input: summary.inputStandardCoalAmount,
+      available: summary.availableStandardCoalAmount,
       effectiveUse: summary.effectiveUseStandardCoalAmount,
-      recovered: summary.recoveredStandardCoalAmount,
       external: summary.externalOutputStandardCoalAmount,
+      directExternal: summary.directExternalOutputStandardCoalAmount,
       difference: summary.differenceStandardCoalAmount,
+      overAllocated: summary.overAllocatedStandardCoalAmount,
     };
   }, [levelOneDataset, levelTwoDataset]);
-  const confirmedAmount = totals.effectiveUse + totals.recovered + totals.external;
-  const confirmationRate = totals.input > 0 ? confirmedAmount / totals.input * 100 : 0;
-  const deviationRate = totals.input > 0 ? totals.difference / totals.input * 100 : 0;
-  const balanceHealth = Math.abs(deviationRate) <= 0.5 ? '正常' : Math.abs(deviationRate) <= 2 ? '需关注' : '异常';
-  const unmatchedEnergy = Math.max(0, totals.input - confirmedAmount);
+  const confirmedAmount = totals.effectiveUse + totals.directExternal;
+  const confirmationRate = totals.available > 0 ? confirmedAmount / totals.available * 100 : null;
+  const unmatchedEnergy = totals.difference;
+  const overAllocatedEnergy = totals.overAllocated;
+  const enterpriseIssueEvidence = [
+    unmatchedEnergy > 0.01 ? `未匹配能源 ${format(unmatchedEnergy, 1)} tce` : '',
+    overAllocatedEnergy > 0.01 ? `超分配量 ${format(overAllocatedEnergy, 1)} tce` : '',
+  ].filter(Boolean).join('；');
   const diagnosticRows = visibleUnitRows.filter((row) => diagnosticSignals(row).issue !== '暂无明显异常');
   const enterpriseFlowStatus = taskStatuses[ENTERPRISE_BALANCE_ID] ?? '待核查';
   const exceptionCount = diagnosticRows.filter((row) => (taskStatuses[row.energyUnitId] ?? '待核查') !== '已完成').length
-    + (unmatchedEnergy > 0 && enterpriseFlowStatus !== '已完成' ? 1 : 0);
-  const allocation = useMemo(() => visibleUnitRows.reduce((result, row) => {
-    if (row.unitType === '生产单元') result.production += row.energyInputStandardAmount;
-    else if (row.unitType === '能源转换系统' || row.unitType === '能源转换子系统') result.power += row.energyInputStandardAmount;
-    else result.auxiliary += row.energyInputStandardAmount;
+    + (enterpriseIssueEvidence && enterpriseFlowStatus !== '已完成' ? 1 : 0);
+  const allocation = useMemo(() => levelOneDataset.levelOneDistributionByUnit.reduce((result, row) => {
+    const unitType = levelOneUnits.find((unit) => unit.energyUnitId === row.energyUnitId)?.unitType;
+    if (unitType === '生产单元') result.production += row.standardCoalAmount;
+    else if (unitType === '能源转换系统' || unitType === '能源转换子系统') result.power += row.standardCoalAmount;
+    else result.auxiliary += row.standardCoalAmount;
     return result;
-  }, { production: 0, power: 0, auxiliary: 0 }), [visibleUnitRows]);
+  }, { production: 0, power: 0, auxiliary: 0 }), [levelOneDataset, levelOneUnits]);
   const applyFilters = () => {
     const next = { year, period, month };
     setApplied(next);
@@ -535,7 +541,7 @@ export function BalanceOptimizationPage() {
       intensityMetricName: '能源平衡',
       issueSource: '能源平衡',
       issueType: '能源分配异常',
-      evidence: `未匹配能源 ${format(unmatchedEnergy, 1)} tce`,
+      evidence: enterpriseIssueEvidence,
       action: '核对能源分配、终端利用和外部输出记录',
     });
   };
@@ -577,7 +583,7 @@ export function BalanceOptimizationPage() {
     />
     <div className={`${styles.kpiThree} ${styles.balanceKpiThree}`}>
       <Kpi label="能源输入量" value={format(totals.input, 1)} unit="tce" sub={<>当前统计范围内的能源输入</>} />
-      <Kpi label="能源平衡率" value={format(confirmationRate, 2)} unit="%" sub={<>已确认去向 ÷ 能源输入量</>} />
+      <Kpi label="能源平衡率" value={confirmationRate === null ? '—' : format(confirmationRate, 2)} unit={confirmationRate === null ? '' : '%'} sub={<>已确认去向 ÷ 可供分配能源</>} />
       <Kpi label="待处理问题" value={String(exceptionCount)} unit="个" danger={exceptionCount > 0} sub={<>当前统计范围内未完成的问题</>} />
     </div>
     <div className={`${styles.twoColumns} ${styles.balanceColumns}`}>
@@ -586,15 +592,15 @@ export function BalanceOptimizationPage() {
           <h2>能源分配平衡概览</h2>
         </div>
         <BalanceOverview
-          input={totals.input}
+          input={totals.available}
           confirmed={confirmedAmount}
           production={allocation.production}
           power={allocation.power}
           auxiliary={allocation.auxiliary}
-          external={totals.external}
+          external={totals.directExternal}
           unmatched={unmatchedEnergy}
         />
-        <BalanceIssueHint unmatched={unmatchedEnergy} />
+        <BalanceIssueHint unmatched={unmatchedEnergy} overAllocated={overAllocatedEnergy} external={totals.external} directExternal={totals.directExternal} />
       </section>
       <section className={`${styles.card} ${styles.panel}`}>
         <div className={styles.panelHead}>
@@ -610,7 +616,7 @@ export function BalanceOptimizationPage() {
       <UnitBalanceTable
         rows={diagnosticRows}
         taskStatuses={taskStatuses}
-        enterpriseFlow={unmatchedEnergy > 0 ? { amount: unmatchedEnergy, status: enterpriseFlowStatus } : undefined}
+        enterpriseFlow={enterpriseIssueEvidence ? { evidence: enterpriseIssueEvidence, status: enterpriseFlowStatus } : undefined}
         onOpenTracking={openTracking}
         onEnterpriseTracking={openEnterpriseTracking}
       />
@@ -692,7 +698,7 @@ function BalanceOverview({
       <path className={styles.balanceFlowWarn} d="M200 165 C380 165 454 266 630 266" />
       <g className={`${styles.balanceNode} ${styles.balanceInputNode}`}>
         <rect x="20" y="91" width="180" height="112" rx="14" />
-        <text x="42" y="126">能源输入量</text>
+        <text x="42" y="126">可供分配能源</text>
         <text className={styles.balanceNodeValue} x="42" y="165">{format(input, 1)}<tspan className={styles.balanceNodeUnit} dx="7">tce</tspan></text>
       </g>
       <g className={`${styles.balanceNode} ${styles.balanceConfirmedNode}`}>
@@ -703,7 +709,7 @@ function BalanceOverview({
       <BalanceOverviewNode x={630} y={10} label="生产系统" value={production} tone="blue" />
       <BalanceOverviewNode x={630} y={68} label="能源转换系统" value={power} tone="green" />
       <BalanceOverviewNode x={630} y={126} label="辅助系统" value={auxiliary} tone="green" />
-      <BalanceOverviewNode x={630} y={184} label="外供输出" value={external} tone="orange" />
+      <BalanceOverviewNode x={630} y={184} label="直接外供" value={external} tone="orange" />
       <BalanceOverviewNode x={630} y={242} label="未匹配能源" value={unmatched} tone="red" />
     </svg>
   </div>;
@@ -729,9 +735,12 @@ function BalanceOverviewNode({
   </g>;
 }
 
-function BalanceIssueHint({ unmatched }: { unmatched: number }) {
+function BalanceIssueHint({ unmatched, overAllocated, external, directExternal }: { unmatched: number; overAllocated: number; external: number; directExternal: number }) {
   return <div className={styles.balanceIssueHint}>
-    <b>{unmatched > 0 ? `全企业未匹配能源 ${format(unmatched, 1)} tce` : '全企业能源分配已完成匹配'}</b>
+    <b>{unmatched > 0.01 || overAllocated > 0.01
+      ? [unmatched > 0.01 ? `未匹配能源 ${format(unmatched, 1)} tce` : '', overAllocated > 0.01 ? `超分配量 ${format(overAllocated, 1)} tce` : ''].filter(Boolean).join('；')
+      : '全企业能源分配已完成匹配'}</b>
+    <span>外供输出合计 {format(external, 1)} tce，其中直接外供 {format(directExternal, 1)} tce</span>
   </div>;
 }
 
@@ -1063,7 +1072,7 @@ function UnitBalanceTable({
 }: {
   rows: UnitBalanceRow[];
   taskStatuses: Record<string, BalanceTaskStatus>;
-  enterpriseFlow?: { amount: number; status: BalanceTaskStatus };
+  enterpriseFlow?: { evidence: string; status: BalanceTaskStatus };
   onOpenTracking: (row: UnitBalanceRow) => void;
   onEnterpriseTracking: () => void;
 }) {
@@ -1076,7 +1085,7 @@ function UnitBalanceTable({
       <td>企业级问题</td>
       <td>能源平衡</td>
       <td><Tag tone="red">能源分配异常</Tag></td>
-      <td>未匹配能源 {format(enterpriseFlow.amount, 1)} tce</td>
+      <td>{enterpriseFlow.evidence}</td>
       <td>核对能源分配、终端利用和外部输出记录</td>
       <td><button type="button" className={`${styles.diagnosisStatusButton} ${taskStatusButtonClass(enterpriseFlow.status)}`} aria-label={`${enterpriseFlow.status}，打开核查详情`} onClick={onEnterpriseTracking}>{taskStatusActionLabel(enterpriseFlow.status)}</button></td>
     </tr>}

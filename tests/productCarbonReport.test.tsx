@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProductCarbonFootprint } from '../src/pages/newPrototype/ProductCarbonFootprint';
-import { reportSupplementFields } from '../src/modules/product-footprint/reportSupplement';
+import { emptyProductReportInfo, missingReportFields, reportProfileFields, reportSupplementFields, type ProductReportInfo } from '../src/modules/product-footprint/reportSupplement';
 import { downloadHtmlReport } from '../src/utils/reportDownload';
 
 vi.mock('../src/utils/reportDownload', () => ({ downloadHtmlReport: vi.fn() }));
@@ -42,7 +42,15 @@ async function upload(name = '不确定性评价计算表.pdf', content = '%PDF-
     await new Promise(resolve => setTimeout(resolve, 30));
   });
 }
+const profileValues = {
+  companyName: '测试制造企业 <集团>', companyAddress: '上海市企业路1号', companyEstablishedYear: '2010',
+  companyBusiness: '工业设备制造', productionAddress: '苏州市生产路2号', productForm: '长方体金属设备',
+};
+async function fillProfile() {
+  for (const [key, value] of Object.entries(profileValues)) await fill(key, value);
+}
 async function completeForm() {
+  await fillProfile();
   for (const field of reportSupplementFields) await fill(field.key, `${field.label}：测试内容 <说明>`);
   await grade('B');
   await upload();
@@ -66,7 +74,7 @@ describe('碳足迹报告补充信息', () => {
     await click(button('＋ 生成报告'));
     expect(button('生成报告', dialog()).disabled).toBe(true);
     expect(dialog().querySelector('nav')).toBeNull();
-    expect(dialog().querySelectorAll('input, textarea, select')).toHaveLength(4);
+    expect(dialog().querySelectorAll('input, textarea, select')).toHaveLength(10);
     expect(dialog().textContent).toContain('已录入项目信息（只读）');
     expect([...dialog().querySelectorAll('select option')].map(option => option.textContent)).toEqual([
       '请选择评价等级',
@@ -76,21 +84,28 @@ describe('碳足迹报告补充信息', () => {
       'D  较低（3.0 ＞ 平均分值 ≥ 2.0）',
       'E  低（平均分值 ＜ 2.0）',
     ]);
-    expect(dialog().querySelector<HTMLTextAreaElement>('#report-cutoff')!.placeholder).toContain('HMX-180 规整填料');
+    expect(dialog().querySelector<HTMLTextAreaElement>('#report-cutoff')!.placeholder).toContain('HMX-180');
+    expect(dialog().querySelectorAll('details')).toHaveLength(0);
+    expect([...dialog().querySelectorAll('h3')].map(item => item.textContent)).toEqual(['1）企业与产品信息', '2）取舍原则', '3）多产品分配', '4）清单数据不确定性分析']);
     expect(dialog().querySelector<HTMLTextAreaElement>('#report-allocation')!.placeholder).toContain('空压机用电');
+    expect(dialog().querySelector<HTMLTextAreaElement>('#report-cutoff')!.value).toBe('');
     expect(dialog().textContent).toContain('类别：机械设备');
     expect(dialog().textContent).toContain('VFD-75-工艺流程图.png');
     expect(dialog().textContent).not.toContain('工艺、取舍与分配补充说明');
     expect(container.querySelector('article')!.textContent).toContain('VFD-75-工艺流程图.png');
+    await fill('companyName', '项目一企业');
     await fill('cutoff', '项目一企业');
     expect(dialog().querySelector<HTMLTextAreaElement>('#report-allocation')!.value).toBe('');
     await click(button('保存补充信息', dialog()));
     await click(button('＋ 生成报告'));
     expect(dialog().querySelector<HTMLTextAreaElement>('#report-cutoff')!.value).toBe('项目一企业');
+    expect(dialog().querySelector<HTMLInputElement>('#report-companyName')!.value).toBe('项目一企业');
+    await fill('companyName', '未保存的企业');
     await fill('cutoff', '未保存的修改');
     await click(button('取消', dialog()));
     await render(2);
     await click(button('＋ 生成报告'));
+    expect(dialog().querySelector<HTMLInputElement>('#report-companyName')!.value).toBe('');
     expect(dialog().querySelector<HTMLTextAreaElement>('#report-cutoff')!.value).toBe('');
     await click(button('取消', dialog()));
     await render(1);
@@ -101,6 +116,7 @@ describe('碳足迹报告补充信息', () => {
   it('校验必填内容，全部输入进入预览和下载，重新生成保留历史内容', async () => {
     await render(3);
     await click(button('＋ 生成报告'));
+    await fillProfile();
     await fill('cutoff', '   ');
     await click(button('生成报告', dialog()));
     expect(dialog().querySelector('[role="alert"]')?.textContent).toContain('取舍情况');
@@ -110,6 +126,8 @@ describe('碳足迹报告补充信息', () => {
     for (const field of reportSupplementFields.filter((item) => !('readOnly' in item))) {
       expect(container.querySelector('article')!.textContent).toContain(`${field.label}：测试内容 <说明>`);
     }
+    for (const value of Object.values(profileValues)) expect(container.querySelector('article')!.textContent).toContain(value);
+    expect(container.querySelector('article')!.textContent).toContain('成立于2010年');
     expect(container.querySelector('article')!.textContent).toContain('清单数据不确定性分析结果为B等级');
     expect(container.querySelector('article a')!.getAttribute('href')).toContain('data:application/pdf;base64,');
     for (const heading of ['1 产品碳足迹（PCF）介绍', '2.3.2 取舍原则', '2.3.3 多产品分配', '4.3 清单数据不确定性分析', '5 碳足迹分析']) expect(container.querySelector('article')!.textContent).toContain(heading);
@@ -130,13 +148,18 @@ describe('碳足迹报告补充信息', () => {
 
     await click(button('重新生成'));
     expect(dialog().querySelector<HTMLTextAreaElement>('#report-allocation')!.value).toContain('测试内容');
+    for (const field of reportProfileFields) expect(dialog().querySelector<HTMLInputElement>(`#report-${field.key}`)!.value).toBe(profileValues[field.key]);
+    await fill('companyName', '第二版企业');
     await fill('allocation', '第二版：运输距离采用估算，可能影响运输阶段结果。');
     await grade('C');
     await upload('第二版计算表.pdf');
     await click(button('生成报告', dialog()));
+    expect(container.querySelector('article')!.textContent).toContain('第二版企业');
     expect(container.querySelector('article')!.textContent).toContain('第二版：运输距离采用估算');
     const firstVersion = [...container.querySelectorAll('button')].find((item) => item.textContent?.includes('V1 ·'))!;
     await click(firstVersion);
+    expect(container.querySelector('article')!.textContent).not.toContain('第二版企业');
+    expect(container.querySelector('article')!.textContent).toContain(profileValues.companyName);
     expect(container.querySelector('article')!.textContent).not.toContain('第二版：运输距离采用估算');
     expect(container.querySelector('article')!.textContent).toContain('清单数据不确定性分析结果为B等级');
     expect(container.querySelector('article a')!.getAttribute('download')).toBe('不确定性评价计算表.pdf');
@@ -145,9 +168,32 @@ describe('碳足迹报告补充信息', () => {
     expect(vi.mocked(downloadHtmlReport).mock.calls[1][0].content).toBe(exported.content);
   });
 
+  it('新增字段必填，成立年份需有效，旧版资料按缺失字段校验', async () => {
+    await render(3);
+    await click(button('＋ 生成报告'));
+    await click(button('生成报告', dialog()));
+    expect(dialog().querySelector('[role="alert"]')?.textContent).toContain('企业名称');
+    await completeForm();
+    await fill('companyName', '   ');
+    await click(button('生成报告', dialog()));
+    expect(dialog().querySelector('#report-companyName')?.getAttribute('aria-invalid')).toBe('true');
+    await fill('companyName', profileValues.companyName);
+    for (const year of ['0000', '20xx', String(new Date().getFullYear() + 1)]) {
+      await fill('companyEstablishedYear', year);
+      await click(button('生成报告', dialog()));
+      expect(dialog().querySelector('[role="alert"]')?.textContent).toContain('有效的企业成立年份');
+    }
+    await fill('companyEstablishedYear', '2010');
+    await click(button('生成报告', dialog()));
+    expect(dialog()).toBeNull();
+    const legacy = { ...emptyProductReportInfo(), values: { cutoff: '无取舍', allocation: '无分配', uncertaintyGrade: 'B' } } as ProductReportInfo;
+    expect(missingReportFields(legacy).map(field => field.key)).toEqual([...reportProfileFields.map(field => field.key), 'uncertaintyFile']);
+  });
+
   it('校验 PDF 扩展名和文件内容，支持更换和移除附件', async () => {
     await render(3);
     await click(button('＋ 生成报告'));
+    await fillProfile();
     await fill('cutoff', '不涉及取舍。');
     await fill('allocation', '采用质量分配法。');
     await click(button('生成报告', dialog()));

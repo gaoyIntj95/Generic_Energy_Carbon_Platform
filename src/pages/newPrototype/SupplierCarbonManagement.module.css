@@ -2,6 +2,7 @@
 td b,td small { display:inline; } td small { margin-left:4px; }
 .card td small { display:none; }
 .card .footprintUnit { display:inline; margin-left:4px; color:#6b7280; font-size:12px; }
+.statDetail { display:block; margin-top:4px; margin-left:0!important; color:#9ca3af; font-size:11px; line-height:1.4; white-space:nowrap; }
 
 /* Modal fields follow the supplied supplier-carbon prototype. */
 .modal { width:min(1120px,96vw); }
