@@ -69,6 +69,9 @@ describe('AssetOperationsV2 V2 prototype fidelity and interactions', () => {
     await render('/asset-strategy/balance');
     expect(container.textContent).toContain('一级管理平衡基数');
     expect(container.textContent).toContain('能源分配平衡概览');
+    expect(container.textContent).toContain('与能流分析对应');
+    expect(container.textContent).toContain('直接外供”是企业边界输出中的直接外供');
+    expect(container.textContent).toContain('未匹配能源对应未分配量');
     expect(container.textContent).toContain('诊断摘要');
     expect(container.textContent).toContain('能效对标');
     expect(container.textContent).toContain('能效对标诊断');
@@ -153,12 +156,14 @@ describe('AssetOperationsV2 V2 prototype fidelity and interactions', () => {
     expect(container.textContent).not.toContain('问题核查｜生产车间B');
   });
 
-  it('links data-completeness issues directly to data entry', async () => {
+  it('keeps data-completeness review on the issue list and highlights the matching row', async () => {
     await render('/asset-strategy/balance');
     const dataGroup = [...container.querySelectorAll('section[class*="energyDiagnosisGroup"]')]
       .find((section) => [...section.querySelectorAll('strong')].some((node) => node.textContent === '数据完整性问题'))!;
-    await click(button('查看缺失项', dataGroup));
-    expect(container.textContent).not.toContain('数据完整性｜办公区域');
+    expect(dataGroup.textContent).toContain('月度指标不适用 · 年度静态值');
+    await click(button('查看问题清单', dataGroup));
+    expect(container.querySelector('[data-testid="location"]')?.textContent).toBe('/asset-strategy/balance');
+    expect(container.querySelector('tr[aria-current="true"]')?.textContent).toContain('办公区域');
     expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 
@@ -277,6 +282,14 @@ describe('AssetOperationsV2 V2 prototype fidelity and interactions', () => {
     await click(button('保存预测'));
     expect(container.textContent).toContain('101,000');
     expect(container.textContent).toContain('5,200');
+  });
+
+  it('labels the generic scenario amount as obtainable quota rather than quota demand', async () => {
+    await render('/asset-strategy/assets');
+    expect(container.textContent).toContain('预计可取得配额');
+    expect(container.textContent).toContain('预计可结转资产（结算后）');
+    expect(container.textContent).toContain('0 tCO₂');
+    expect(container.textContent).not.toContain('情景配额需求');
   });
 
   it.each([

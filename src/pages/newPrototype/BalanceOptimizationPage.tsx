@@ -1,5 +1,5 @@
 /* eslint-disable no-irregular-whitespace */
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   buildFlowAnalysisDataset,
@@ -21,6 +21,7 @@ import {
   buildIntensityCalculationViews,
   type CalculatedIntensityMetric,
 } from '../../mocks/energyIntensitySelector';
+import { listV11OperationMetrics } from '../../mocks/dataManagementV11Store';
 import { Button, Drawer, Field, Modal, Tag, Toast } from './PrototypeUI';
 import styles from './AssetOperationsV2.module.css';
 
@@ -91,6 +92,7 @@ interface UnitBalanceRow {
   benchmarkMonthlyTargets: Array<number | null>;
   dataCompletenessStatus: DataCompletenessStatus;
   dataCompletenessReason: string;
+  dataCompletenessIssues: string[];
 }
 
 function metricDeviation(
@@ -211,10 +213,17 @@ function buildDataCompletenessMap(year: number, period: FlowPeriod) {
     }
     if (period.grain === 'month') {
       const hasCurrentMonthData = calculatedMetrics.some((metric) => metric.monthlyMetrics[period.month - 1]?.status === '已计算');
+      const operationRecords = listV11OperationMetrics().filter((record) => record.year === year && record.energyUnitId === view.object.energyUnitId);
+      const annualOnlyOperation = operationRecords.length > 0 && operationRecords.every((record) => record.entryMode === 'annual');
+      const periodIssues = hasCurrentMonthData
+        ? []
+        : annualOnlyOperation
+          ? [`当前月度指标缺少可计算的运营分母：${operationRecords.map((record) => record.metricName).join('、')}（该指标仅维护年度值，月度无需补录）`]
+          : view.pendingReasons.length ? view.pendingReasons : [`当前期间缺少${period.month}月能耗指标数据`];
       return [view.object.objectId, {
         status: hasCurrentMonthData ? 'complete' as const : 'incomplete' as const,
         reason: hasCurrentMonthData ? '当前期间能源与运营数据完整' : `当前期间缺少${period.month}月能耗指标数据`,
-        issues: hasCurrentMonthData ? [] : view.pendingReasons.length ? view.pendingReasons : [`当前期间缺少${period.month}月能耗指标数据`],
+        issues: periodIssues,
       }];
     }
     return [view.object.objectId, { status: 'complete' as const, reason: '年度能源与运营数据完整', issues: [] }];
@@ -371,6 +380,11 @@ function buildUnitBalanceRows(
       benchmarkMonthlyTargets: benchmarkDeviations.get(unit.energyUnitId)?.monthlyTargets ?? [],
       dataCompletenessStatus: rows.length && dataCompleteness.get(unit.energyUnitId)?.status === 'complete' ? 'complete' : 'incomplete',
       dataCompletenessReason: rows.length ? dataCompleteness.get(unit.energyUnitId)?.reason ?? '缺少可追溯的能耗指标数据' : '当前期间未找到能源消费记录',
+      dataCompletenessIssues: rows.length
+        ? dataCompleteness.get(unit.energyUnitId)?.issues?.length
+          ? dataCompleteness.get(unit.energyUnitId)!.issues
+          : [dataCompleteness.get(unit.energyUnitId)?.reason ?? '缺少可追溯的能耗指标数据']
+        : ['当前期间未找到能源消费记录'],
     };
   });
 }
@@ -393,6 +407,8 @@ export function BalanceOptimizationPage() {
   const [toast, setToast] = useState('');
   const [selectedUnit, setSelectedUnit] = useState<UnitBalanceRow | null>(null);
   const [selectedTrackingUnit, setSelectedTrackingUnit] = useState<TrackingSelection | null>(null);
+  const [highlightedIssueId, setHighlightedIssueId] = useState<string | null>(null);
+  const issueListRef = useRef<HTMLDivElement>(null);
   const [selectedDiagnosisMode, setSelectedDiagnosisMode] = useState<DiagnosisMode>('benchmark');
   const [taskStatuses, setTaskStatuses] = useState<Record<string, BalanceTaskStatus>>(() => listBalanceTaskStatuses({
     year: initialFilters.year,
@@ -506,13 +522,12 @@ export function BalanceOptimizationPage() {
         ? 'benchmark'
         : 'trend');
     if (nextMode === 'data') {
-      const dataIssue = buildDiagnosticIssues(row).find((issue) => ['ENERGY_RECORD_MISSING', 'ENERGY_NUMERATOR_MISSING', 'OPERATION_DENOMINATOR_MISSING', 'METRIC_PERIOD_INCOMPLETE'].includes(issue.code));
-      const path = dataIssue?.actionCode === 'GO_OPERATION_DATA'
-        ? '/data-management/operations'
-        : dataIssue?.actionCode === 'GO_INTENSITY'
-          ? '/energy-analysis/intensity'
-          : '/data-management/energy-data';
-      navigateFromDiagnosis(path, row);
+      setHighlightedIssueId(row.energyUnitId);
+      window.setTimeout(() => setHighlightedIssueId((current) => current === row.energyUnitId ? null : current), 2200);
+      window.requestAnimationFrame(() => {
+        const issueList = issueListRef.current;
+        if (issueList && typeof issueList.scrollIntoView === 'function') issueList.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
       return;
     }
     setSelectedDiagnosisMode(nextMode);
@@ -564,8 +579,11 @@ export function BalanceOptimizationPage() {
       params.set('objectType', 'unit');
       params.set('objectId', targetUnitId);
     }
-    if (path === '/data-management/energy-data') params.set('energyUnitId', targetUnitId);
-    if (path === '/data-management/operations') params.set('energyUnitId', targetUnitId);
+    if (path === '/data-management/energy-data' || path === '/data-management/operations') {
+      params.set('scopeLevel', '一级用能单元');
+      params.set('unitId', targetUnitId);
+      params.set('keyword', targetRow?.energyUnitName ?? selectedUnit?.energyUnitName ?? '');
+    }
     if (path === '/energy-analysis/intensity') params.set('objectId', targetUnitId);
     setSelectedUnit(null);
     navigate(`${path}?${params}`);
@@ -600,6 +618,9 @@ export function BalanceOptimizationPage() {
           external={totals.directExternal}
           unmatched={unmatchedEnergy}
         />
+        <p className={styles.balanceOverviewLegend}>
+          与能流分析对应：生产系统、能源转换系统、辅助系统均为一级用能单元归属；“直接外供”是企业边界输出中的直接外供，转换外供仍在能流分析中单独展示；未匹配能源对应未分配量。
+        </p>
         <BalanceIssueHint unmatched={unmatchedEnergy} overAllocated={overAllocatedEnergy} external={totals.external} directExternal={totals.directExternal} />
       </section>
       <section className={`${styles.card} ${styles.panel}`}>
@@ -612,8 +633,11 @@ export function BalanceOptimizationPage() {
     <section className={`${styles.card} ${styles.tableCard}`}>
       <div className={styles.panelHead}>
         <h2>异常问题清单</h2>
+        <span>数据完整性问题请在此处查看并去核查</span>
       </div>
       <UnitBalanceTable
+        issueListRef={issueListRef}
+        highlightedIssueId={highlightedIssueId}
         rows={diagnosticRows}
         taskStatuses={taskStatuses}
         enterpriseFlow={enterpriseIssueEvidence ? { evidence: enterpriseIssueEvidence, status: enterpriseFlowStatus } : undefined}
@@ -855,7 +879,7 @@ function EnergyDiagnosisPanel({
       rows: dataRows.slice(0, 3),
       summary: false,
       empty: '当前未发现数据完整性异常',
-      detail: (row: UnitBalanceRow, _summary: boolean) => row.dataCompletenessReason,
+      detail: (row: UnitBalanceRow, _summary: boolean) => row.dataCompletenessIssues[0] ?? row.dataCompletenessReason,
     },
   ].filter((group) => group.rows.length > 0);
 
@@ -864,7 +888,7 @@ function EnergyDiagnosisPanel({
       return <section key={group.key} className={styles.energyDiagnosisGroup}>
       <div className={styles.energyDiagnosisGroupHead}><b className={`${styles.energyDiagnosisBadge} ${styles[`energyDiagnosis${group.tone}`]}`}>{String.fromCharCode(65 + index)}</b><strong>{group.label}</strong></div>
       {group.rows.length ? group.rows.slice(0, 1).map((row) => <div className={styles.energyDiagnosisRow} key={row.energyUnitId}>
-        <span>{row.energyUnitName}</span><em>{group.detail(row, false)}</em><Tag tone={diagnosticSignals(row).priority === '高' ? 'red' : diagnosticSignals(row).priority === '中' ? 'orange' : 'gray'}>{diagnosticSignals(row).priority}</Tag><button type="button" className={styles.energyDiagnosisAction} onClick={() => onOpen(row, group.key as DiagnosisMode)}>{group.key === 'data' ? dataDiagnosisActionLabel(row) : '查看详情'}</button>
+        <span>{row.energyUnitName}</span><em title={group.detail(row, false)}>{group.key === 'data' ? dataDiagnosisSummary(row) : group.detail(row, false)}</em><Tag tone={diagnosticSignals(row).priority === '高' ? 'red' : diagnosticSignals(row).priority === '中' ? 'orange' : 'gray'}>{diagnosticSignals(row).priority}</Tag><button type="button" className={styles.energyDiagnosisAction} onClick={() => onOpen(row, group.key as DiagnosisMode)}>{group.key === 'data' ? dataDiagnosisActionLabel(row) : '查看详情'}</button>
       </div>) : <p className={styles.energyDiagnosisEmpty}>{group.empty}</p>}
     </section>;
     })}
@@ -974,7 +998,7 @@ function buildDiagnosticIssues(row: UnitBalanceRow): DiagnosticIssue[] {
   }
 
   if (row.dataCompletenessStatus === 'incomplete') {
-    const reason = row.dataCompletenessReason;
+    const reason = row.dataCompletenessIssues[0] ?? row.dataCompletenessReason;
     if (reason.includes('未找到能源消费记录')) {
       issues.push({
         code: 'ENERGY_RECORD_MISSING',
@@ -982,11 +1006,13 @@ function buildDiagnosticIssues(row: UnitBalanceRow): DiagnosticIssue[] {
         action: '确认该对象是否应采集能源数据；如应采集，请补录当前期间能源消费记录',
         actionCode: 'GO_ENERGY_DATA',
       });
-    } else if (reason.includes('运营分母') || reason.includes('蒸汽产量')) {
+    } else if (reason.includes('运营分母') || reason.includes('蒸汽产量') || reason.includes('月度运营数据') || reason.includes('仅维护年度值')) {
       issues.push({
         code: 'OPERATION_DENOMINATOR_MISSING',
         evidence: reason,
-        action: '补充产量、产值等适用运营分母；如不适用，请维护指标适用性',
+        action: reason.includes('仅维护年度值')
+          ? '确认年度运营口径；该指标仅支持年度静态值，月度无需补录'
+          : '补充产量、产值等适用运营分母；如不适用，请维护指标适用性',
         actionCode: 'GO_OPERATION_DATA',
       });
     } else if (reason.includes('缺少能源数据')) {
@@ -1033,11 +1059,17 @@ function buildDiagnosticIssues(row: UnitBalanceRow): DiagnosticIssue[] {
 }
 
 function dataDiagnosisActionLabel(row: UnitBalanceRow) {
-  const reason = row.dataCompletenessReason;
-  if (reason.includes('未找到能源消费记录') || reason.includes('缺少能源数据')) return '补充能源数据';
-  if (reason.includes('运营分母') || reason.includes('蒸汽产量') || reason.includes('产量') || reason.includes('面积') || reason.includes('吞吐量')) return '补充运营数据';
-  if (reason.includes('指标配置') || reason.includes('适用性') || reason.includes('计算口径') || reason.includes('适用典型指标') || reason.includes('必要关联关系')) return '检查指标配置';
-  return '查看缺失项';
+  return '查看问题清单';
+}
+
+function dataDiagnosisSummary(row: UnitBalanceRow) {
+  const reason = row.dataCompletenessIssues[0] ?? row.dataCompletenessReason;
+  if (reason.includes('仅维护年度值')) return '月度指标不适用 · 年度静态值';
+  if (reason.includes('未找到能源消费记录')) return '缺少能源消费记录';
+  if (reason.includes('缺少能源数据')) return '缺少能源数据';
+  if (reason.includes('运营分母') || reason.includes('产量') || reason.includes('面积') || reason.includes('吞吐量') || reason.includes('蒸汽')) return '缺少运营分母';
+  if (reason.includes('指标配置') || reason.includes('适用性') || reason.includes('关联') || reason.includes('口径')) return '指标配置待完善';
+  return '当前期间数据待完善';
 }
 
 function diagnosisBasis(row: UnitBalanceRow) {
@@ -1064,12 +1096,16 @@ function diagnosticSource(row: UnitBalanceRow) {
 }
 
 function UnitBalanceTable({
+  issueListRef,
+  highlightedIssueId,
   rows,
   taskStatuses,
   enterpriseFlow,
   onOpenTracking,
   onEnterpriseTracking,
 }: {
+  issueListRef: React.RefObject<HTMLDivElement | null>;
+  highlightedIssueId: string | null;
   rows: UnitBalanceRow[];
   taskStatuses: Record<string, BalanceTaskStatus>;
   enterpriseFlow?: { evidence: string; status: BalanceTaskStatus };
@@ -1077,7 +1113,7 @@ function UnitBalanceTable({
   onEnterpriseTracking: () => void;
 }) {
   const hasRows = Boolean(enterpriseFlow) || rows.length > 0;
-  return <div className={styles.tableWrap}><table className={styles.diagnosisTable}><thead><tr>
+  return <div ref={issueListRef} className={styles.tableWrap}><table className={styles.diagnosisTable}><thead><tr>
     <th>对象</th><th>对象类型</th><th>问题来源</th><th>问题类型</th><th>诊断依据</th><th>建议动作</th><th>处理进展</th>
   </tr></thead><tbody>{hasRows ? <>
     {enterpriseFlow && <tr key={ENTERPRISE_BALANCE_ID}>
@@ -1093,7 +1129,7 @@ function UnitBalanceTable({
       const signal = diagnosticSignals(row);
       const issueTone = signal.issue.includes('异常') || signal.issue.includes('偏离') ? 'red' : signal.issue.includes('缺少') || signal.issue.includes('待') ? 'orange' : 'green';
       const status = taskStatuses[row.energyUnitId] ?? '待核查';
-      return <tr key={row.energyUnitId}>
+      return <tr key={row.energyUnitId} className={highlightedIssueId === row.energyUnitId ? styles.diagnosisRowHighlight : undefined} aria-current={highlightedIssueId === row.energyUnitId ? 'true' : undefined}>
         <td className={styles.diagnosisObject}>{row.energyUnitName}</td>
         <td>{row.unitType}</td>
         <td>{diagnosticSource(row)}</td>
@@ -1117,8 +1153,6 @@ function taskStatusButtonClass(status: BalanceTaskStatus) {
   if (status === '处理中') return styles.diagnosisStatusProcessing;
   return styles.diagnosisStatusCompleted;
 }
-
-
 
 function BalanceDiagnosisDrawer({
   selection,

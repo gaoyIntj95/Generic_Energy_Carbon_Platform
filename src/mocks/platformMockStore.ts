@@ -207,7 +207,7 @@ const seedStrategies: OptimizationStrategy[] = [
 let strategies = seedStrategies.map((item) => ({ ...item }));
 
 const seedCarbonAssets: CarbonAsset[] = [
-  { carbonAssetId: 'ca-quota-2026', complianceCycle: '2026年度', assetType: '碳配额', assetSource: '政府分配', totalAmount: 15_000, eligibleAmount: 6_500, carryoverEligibleAmount: 200, lockedAmount: 0, usedAmount: 8_500, voucherNumber: 'QUOTA-2026-001', bookedAt: '2026-03-15', assetState: '部分使用', remark: '2026年度政府分配配额' },
+  { carbonAssetId: 'ca-quota-2026', complianceCycle: '2026年度', assetType: '碳配额', assetSource: '政府分配', totalAmount: 15_000, eligibleAmount: 6_500, carryoverEligibleAmount: 0, lockedAmount: 0, usedAmount: 8_500, voucherNumber: 'QUOTA-2026-001', bookedAt: '2026-03-15', assetState: '部分使用', remark: '2026年度政府分配配额，下一周期结转量待本期履约结算确认' },
   { carbonAssetId: 'ca-ccer-2026', complianceCycle: '2026年度', assetType: 'CCER', assetSource: '市场购买', totalAmount: 2_000, eligibleAmount: 1_000, carryoverEligibleAmount: 0, lockedAmount: 0, usedAmount: 0, voucherNumber: 'CCER-2026-018', bookedAt: '2026-06-30', assetState: '可用', remark: '履约储备' },
   { carbonAssetId: 'ca-green-2026', complianceCycle: '2026年度', assetType: '绿证折算减排量', assetSource: '内部转化', totalAmount: 1_200, eligibleAmount: 0, lockedAmount: 0, usedAmount: 0, voucherNumber: 'GEC-2026-003', bookedAt: '2026-07-01', assetState: '待核验', remark: '待确认是否纳入本履约周期可用资产' },
   { carbonAssetId: 'ca-quota-2025', complianceCycle: '2025年度', assetType: '碳配额', assetSource: '政府分配', totalAmount: 14_000, eligibleAmount: 709.9, lockedAmount: 0, usedAmount: 13_290.1, voucherNumber: 'QUOTA-2025-001', bookedAt: '2025-03-10', assetState: '部分使用', remark: '历史履约周期' },
